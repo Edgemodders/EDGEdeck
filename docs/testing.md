@@ -20,7 +20,7 @@ Last updated 2026-10-17. Dates before then come from the session records; anythi
 | [Publish workflow](#publish-workflow) | Automated, on a tag | 2026-10-16 (v0.26.6) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-16 | 23 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | 8 open |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 4 open |
 
 ## Automated
 
@@ -129,16 +129,13 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 10-17 | 0.27.1 test build | PC | Start EDGEdeck with 0.27.0's registration in place | No "updated EDGEdeck's handler" line, and the registry kept the old command. The startup read stored its answer in a state object that `refresh()` had just replaced, so EDGEdeck never knew who handled the links at start (since REDdeck). **0.27.2** keeps the answer, and logs its version and where links go; on the laptop, with the old command written in, a real VS Code run logged "from an older build" and rewrote it |
 | 10-17 | 0.27.2 test build | PC | A "Mod manager download" button on Nexus | The log said `Nexus link received` and showed the rewrite at start, then `Nexus: 422 ... Invalid parameter 'expires' value nil`. VS Code decodes the vscode:// query, so the nxm link's own `&` split it and only `?key=` came through (the UI test showed the old reading giving `...?key=a-b_c`). **0.27.3** takes everything after `url=`; smoke and UI tests check it |
 | 10-17 | 0.27.3 test build | PC | A "Mod manager download" button on Nexus | **Passed.** The log showed the whole link (`key`, `expires`, `user_id`), and the file downloaded into the library as a new mod. The first real nxm test since links came in (0.7) |
+| 10-17 | 0.27.3 | PC | The four waiting tests that need no project: loadouts (0.26.0), `modlist.txt` with a bare `.archive` (0.26.1), deploy with the game running (0.26.3), CET's known name in Import from Vortex (0.26.2) | **Passed.** A copied loadout changed nothing in the sidebar until made active, and its deploy removed the files of the mods turned off; a bare archive landed in `modlist.txt`; with the game open, Deploy showed the modal with **The game is closed now** and deployed after it; "CET" and "107" found Cyber Engine Tweaks |
 
 ## Waiting for a hand test
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 1 | **Loadouts** | 0.26.0 | Copy Default and turn a few mods off in the copy on the page: the sidebar does not change. Make active, Deploy: the report lists those mods' files as removed. Switch back from the title bar and deploy again |
 | 2 | **Add to Project with an archive** | 0.25.0; needs REDcode 0.6.1+ with REDbridge 0.7.1 and an open `.cpmodproj` | Right-click an `.archive` in a mod, Add to Project, "All N resources": a message counts what went under `source\archive`, the files show in the Project view. Again with "Choose resources...", two or three ticked: only those. A third time: already there; Keep mine leaves them, Replace rewrites. On a whole mod with loose files and an archive: loose to `source\resources`, archive resources to `source\archive`, one message. Send EDGEdeck's and REDcode's logs if anything fails |
 | 3 | Add to Project with loose files | 0.18.0 | No report found (unverified) |
-| 4 | **`modlist.txt` and single files** | 0.26.1 | After updating, one change waits; Deploy. `modlist.txt` lists both archives, and View shows it replaced. Add mod, a bare `.archive`, deploy: it is in `modlist.txt` |
-| 5 | **The running game** | 0.26.3 | Deploy with the game open: EDGEdeck waits for "The game is closed now". `edgedeck deploy` refuses |
-| 6 | CET's known name | 0.26.2 | In Import from Vortex, search "Cyber Engine Tweaks", "CET" or "107": found |
 | 8 | REDmod deploy | M1 | Never seen working: no REDmod package in the test sets |
 | 9 | Not hand-tested | | Light-theme accents and the HUD theme suggestion; the MCP server used from an assistant; Undo on the real game (unverified) |
