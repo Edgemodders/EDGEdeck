@@ -276,7 +276,7 @@
       },
       {
         "command": "edgedeck.mcpSetup",
-        "title": "EDGEdeck: Connect an assistant (MCP)...",
+        "title": "Connect an assistant (MCP)...",
         "category": "EDGEdeck"
       },
       {
