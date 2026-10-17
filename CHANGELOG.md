@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.4 (2026-10-17)
+
+- **Add an archive to the REDcode project...** puts the resources of any `.archive` file, one a contributor sent you say, straight into the open REDcode project's `source\archive`, without adding it to the library or the game. Right-click the file in the Explorer, or run the command and pick it. It asks for all resources or a pick, and keeps the ones the project already has unless you say Replace, as for a mod's archive.
+- **Add to Project is now Add to REDcode project**, so it is clear the files go to the REDcode project, not to EDGEdeck's library.
+- The command palette showed "EDGEdeck: EDGEdeck: Connect an assistant (MCP)..."; it says EDGEdeck once.
+
 ## 0.27.3 (2026-10-17)
 
 - **REDdeck is now EDGEdeck**, part of the EDGE platform: a mod manager that will not stay tied to one engine. It is a new extension, `edgemodders.edgedeck`, so it installs next to REDdeck rather than updating it, and nothing carries over: before switching, turn every mod off and deploy in REDdeck, then uninstall it.

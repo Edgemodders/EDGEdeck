@@ -116,6 +116,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.moveUp", (node: ModNode) => move(modOf(node), -1)),
     vscode.commands.registerCommand("edgedeck.moveDown", (node: ModNode) => move(modOf(node), 1)),
     vscode.commands.registerCommand("edgedeck.addToProject", (node: ModNode) => run(() => addToProjectCommand(node))),
+    vscode.commands.registerCommand("edgedeck.addArchiveToProject", (uri?: vscode.Uri) => run(() => addArchiveToProjectCommand(uri))),
     vscode.workspace.onDidChangeWorkspaceFolders(() => updateProjectContext()),
     vscode.commands.registerCommand("edgedeck.revealInGame", (node: ModNode) => run(() => revealInGameCommand(node))),
     vscode.commands.registerCommand("edgedeck.openInExplorer", (node: ModNode) => {
@@ -344,7 +345,7 @@ function reload(): void {
   void run(maybeCheckBridge);
 }
 
-// ---- Add to Project: a mod's loose files into the open REDcode project -------------------------
+// ---- Add to REDcode project: a mod's files, or any .archive, into the open REDcode project ------
 
 /** The open project: the first .cpmodproj directly inside a workspace folder, as REDcode sees it. */
 function currentProject(): string | undefined {
@@ -367,14 +368,13 @@ interface ExtractResult {
 }
 
 /**
- * Puts resources from one of a mod's .archive files into the open project's source\archive, through
- * REDcode's redcode.extractToProject. Asks which resources (all, or a pick), and whether to replace
- * the ones the project already has. Undefined when the user backed out.
+ * Puts resources from an .archive file into the open project's source\archive, through REDcode's
+ * redcode.extractToProject. Asks which resources (all, or a pick), and whether to replace the ones
+ * the project already has with those from `from` (a mod's name, or the archive's). Undefined when
+ * the user backed out.
  */
-async function extractArchiveToProject(mod: ModInfo, rel: string, projectLabel: string): Promise<{ written: string[]; summary: string } | undefined> {
-  if (!library) return undefined;
-  const file = sourcePath(library, mod, rel);
-  const archiveName = rel.split("/").pop() ?? rel;
+async function extractArchiveToProject(file: string, from: string, projectLabel: string): Promise<{ written: string[]; summary: string } | undefined> {
+  const archiveName = path.basename(file);
   let resources: Map<string, string>;
   try {
     resources = await archiveResources(file);
@@ -403,7 +403,7 @@ async function extractArchiveToProject(mod: ModInfo, rel: string, projectLabel: 
   const call = (overwrite: boolean, list: string[]) => vscode.commands.executeCommand<ExtractResult>("redcode.extractToProject", { archive: file, paths: list, overwrite });
   let r = await call(false, paths);
   if (r.kept.length) {
-    const a = await vscode.window.showWarningMessage(`${r.kept.length} of these ${r.kept.length === 1 ? "is" : "are"} already in ${projectLabel}. Replace ${r.kept.length === 1 ? "it" : "them"} with ${mod.name}'s?`, { modal: true, detail: r.kept.slice(0, 8).join("\n") + (r.kept.length > 8 ? `\n...and ${r.kept.length - 8} more` : "") }, "Replace", "Keep mine");
+    const a = await vscode.window.showWarningMessage(`${r.kept.length} of these ${r.kept.length === 1 ? "is" : "are"} already in ${projectLabel}. Replace ${r.kept.length === 1 ? "it" : "them"} with the one${r.kept.length === 1 ? "" : "s"} from ${from}?`, { modal: true, detail: r.kept.slice(0, 8).join("\n") + (r.kept.length > 8 ? `\n...and ${r.kept.length - 8} more` : "") }, "Replace", "Keep mine");
     if (a === "Replace") {
       // REDcode reports kept files as project paths: source\archive\<game path>.
       const again = await call(true, r.kept.map((k) => k.replace(/^source[\\/]archive[\\/]/i, "")));
@@ -416,17 +416,48 @@ async function extractArchiveToProject(mod: ModInfo, rel: string, projectLabel: 
   return { written: r.written, summary: bits.join(", ") };
 }
 
+/** The open project, or undefined after saying there is none (and offering REDcode's New Project). */
+async function projectOrSay(): Promise<string | undefined> {
+  const project = currentProject();
+  if (project) return project;
+  const commands = await vscode.commands.getCommands(true);
+  const canCreate = commands.includes("redcode.newProject");
+  const a = await vscode.window.showWarningMessage("No REDcode project is open. Open the folder that holds a .cpmodproj file, or create a project with REDcode.", ...(canCreate ? ["New Project"] : []));
+  if (a === "New Project") await vscode.commands.executeCommand("redcode.newProject");
+  return undefined;
+}
+
+/**
+ * Add an archive to the REDcode project: an .archive from anywhere (one a contributor sent, say)
+ * straight into the project's source\archive, without adding it to the library or the game.
+ */
+async function addArchiveToProjectCommand(uri: vscode.Uri | undefined): Promise<void> {
+  const project = await projectOrSay();
+  if (!project) return;
+  const commands = await vscode.commands.getCommands(true);
+  if (!commands.includes("redcode.extractToProject")) {
+    void vscode.window.showWarningMessage("Putting an archive's resources in a project needs REDcode 0.6.1 or newer.");
+    return;
+  }
+  let file = uri?.fsPath;
+  if (!file) {
+    const picked = await vscode.window.showOpenDialog({ title: "Add an archive to the REDcode project", canSelectMany: false, filters: { "Cyberpunk 2077 archive": ["archive"] }, openLabel: "Add to project" });
+    file = picked?.[0]?.fsPath;
+  }
+  if (!file) return;
+  const name = projectName(project);
+  const r = await extractArchiveToProject(file, path.basename(file), name);
+  if (!r) return;
+  log.appendLine(`Add to project (${name}): ${r.summary} (${file})${r.written.length ? `\n  ${r.written.join("\n  ")}` : ""}`);
+  if (commands.includes("redcode.refreshProject")) void vscode.commands.executeCommand("redcode.refreshProject");
+  void vscode.window.showInformationMessage(`${r.summary}.`);
+}
+
 async function addToProjectCommand(node: ModNode | undefined): Promise<void> {
   const mod = modOf(node);
   if (!library || !mod || !node) return;
-  const project = currentProject();
-  if (!project) {
-    const commands = await vscode.commands.getCommands(true);
-    const canCreate = commands.includes("redcode.newProject");
-    const a = await vscode.window.showWarningMessage("No REDcode project is open. Open the folder that holds a .cpmodproj file, or create a project with REDcode.", ...(canCreate ? ["New Project"] : []));
-    if (a === "New Project") await vscode.commands.executeCommand("redcode.newProject");
-    return;
-  }
+  const project = await projectOrSay();
+  if (!project) return;
   const files = node.type === "file" ? [node.file] : node.type === "folder" ? node.files : mod.files;
   const name = projectName(project);
   let result = addToProject(library, mod, files, project);
@@ -452,7 +483,7 @@ async function addToProjectCommand(node: ModNode | undefined): Promise<void> {
   if (result.archives.length) {
     if (commands.includes("redcode.extractToProject")) {
       for (const rel of result.archives) {
-        const r = await extractArchiveToProject(mod, rel, name);
+        const r = await extractArchiveToProject(sourcePath(library, mod, rel), mod.name, name);
         if (r) {
           extracted.push(...r.written);
           parts.push(r.summary);

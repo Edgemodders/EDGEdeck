@@ -44,11 +44,15 @@ The sidebar view is one list in three groups: **Set up** while anything is missi
 - **The line after the name** shows the version, how many other versions are in the library, the size, and the status: `deployed`, `not deployed yet`, `off`, `off, still deployed`, `changed in game folder`, `update 1.2 available`, `loses 3 archive files`.
 - **Click a mod** for its detail panel: the files it deploys, its conflicts by file path and inside archives, and buttons for turn on, move, open folder, Open on Nexus, Update and Remove.
 - **Expand a mod** for the folders it deploys into and the files in them. Click a file to open the library copy. Hover anything for a card with size, dates, where it deploys and where it came from.
-- **Hover a row** for the move buttons. The mod higher in the list wins a conflict. Right-click for the rest: Details, Open on Nexus Mods, Switch version, Reveal in File Explorer, Remove, and, when a REDcode project is open, Add to Project.
+- **Hover a row** for the move buttons. The mod higher in the list wins a conflict. Right-click for the rest: Details, Open on Nexus Mods, Switch version, Reveal in File Explorer, Remove, and, when a REDcode project is open, Add to REDcode project.
 
-### Add to Project
+### Add to REDcode project
 
-With a REDcode project open in the workspace (a folder with a `.cpmodproj` file), right-click a mod, a folder or a file and pick **Add to Project**. Loose files, such as scripts, CET Lua, TweakXL YAML, ArchiveXL files and configs, are copied into the project's `source/resources` under their deploy paths, so the packed mod carries them at the same place in the game. A file the project already has with other content is left alone unless you say Replace. For an `.archive` file, EDGEdeck lists what is inside and asks for all of it or a pick; REDcode then extracts those meshes, textures and entities into `source/archive` at their game paths (this needs REDcode 0.6.1 and REDbridge 0.7.1 or newer). Resources the project already has are kept unless you say Replace. Another author's assets are theirs; check the mod's permissions on Nexus before you ship them.
+With a REDcode project open in the workspace (a folder with a `.cpmodproj` file), right-click a mod, a folder or a file and pick **Add to REDcode project**. Loose files, such as scripts, CET Lua, TweakXL YAML, ArchiveXL files and configs, are copied into the project's `source/resources` under their deploy paths, so the packed mod carries them at the same place in the game. A file the project already has with other content is left alone unless you say Replace. For an `.archive` file, EDGEdeck lists what is inside and asks for all of it or a pick; REDcode then extracts those meshes, textures and entities into `source/archive` at their game paths (this needs REDcode 0.6.1 and REDbridge 0.7.1 or newer). Resources the project already has are kept unless you say Replace.
+
+An `.archive` that is not in your library, such as one a contributor sent you, goes in the same way without installing it anywhere: right-click it in VS Code's Explorer and pick **Add an archive to the REDcode project...**, or run that command and pick the file.
+
+Another author's assets are theirs; check the mod's permissions on Nexus before you ship them.
 
 The view's title bar has **Open EDGEdeck**, **Add mod**, **Deploy**, **Nexus: check for updates** and **Refresh**. Its `...` menu holds the rest: Show conflicts, Show pending changes, Import from Vortex, Undo deploy, Nexus sign in, add from a link, Add from REDcode project, Get REDbridge, Pick the game folder, Open library folder, Show log, Save and Load loadout.
 

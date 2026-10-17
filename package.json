@@ -2,7 +2,7 @@
   "name": "edgedeck",
   "displayName": "EDGEdeck",
   "description": "A simple mod manager for Cyberpunk 2077: one list, add, on/off, deploy, remove.",
-  "version": "0.27.3",
+  "version": "0.27.4",
   "publisher": "edgemodders",
   "preview": true,
   "pricing": "Free",
@@ -286,7 +286,12 @@
       },
       {
         "command": "edgedeck.addToProject",
-        "title": "Add to Project",
+        "title": "Add to REDcode project",
+        "category": "EDGEdeck"
+      },
+      {
+        "command": "edgedeck.addArchiveToProject",
+        "title": "Add an archive to the REDcode project...",
         "category": "EDGEdeck"
       }
     ],
@@ -496,6 +501,10 @@
         {
           "command": "edgedeck.addToProject",
           "when": "false"
+        },
+        {
+          "command": "edgedeck.addArchiveToProject",
+          "when": "edgedeck.projectOpen"
         }
       ],
       "explorer/context": [
@@ -503,6 +512,11 @@
           "command": "edgedeck.addProject",
           "when": "resourceExtname == .cpmodproj",
           "group": "edgedeck@1"
+        },
+        {
+          "command": "edgedeck.addArchiveToProject",
+          "when": "resourceExtname == .archive && edgedeck.projectOpen",
+          "group": "edgedeck@2"
         }
       ]
     },

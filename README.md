@@ -46,7 +46,7 @@ EDGEdeck keeps your mods in a library outside the game folder, deploys the ones 
 | **Patch day** | The Frameworks header says "game updated to 2.31" when the game changed since the last deploy, and EDGEdeck checks the frameworks on Nexus once for that version. |
 | **Deploy** | Hardlinks the enabled mods into the game, writes the load order, prepares REDmod packages, records a manifest. |
 | **Remove** | Deletes the mod from the library. Deployed files come out on the next deploy. |
-| **Add to Project** | With a REDcode project open, copies a mod's loose files into its `source/resources` under their deploy paths. Archives are for REDcode's Game Assets view. |
+| **Add to REDcode project** | With a REDcode project open, copies a mod's loose files into its `source/resources` under their deploy paths, and an archive's resources, all or a pick, into `source/archive` through REDcode. **Add an archive to the REDcode project...** does the same for any `.archive` file, without adding it to the library. |
 | Undo deploy | Removes every file in the manifest and nothing else. |
 
 ## Repository layout

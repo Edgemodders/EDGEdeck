@@ -20,7 +20,7 @@ Last updated 2026-10-17. Dates before then come from the session records; anythi
 | [Publish workflow](#publish-workflow) | Automated, on a tag | 2026-10-16 (v0.26.6) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-16 | 23 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | none open |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 1 open |
 
 ## Automated
 
@@ -136,7 +136,8 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 
 ## Waiting for a hand test
 
-None: every hand test so far has passed (2026-10-17). New ones go in this table:
+Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table:
 
 | # | Test | Since | Steps |
 |---|---|---|---|
+| 1 | **Add an archive to the REDcode project** | 0.27.4; REDcode 0.6.1+ and an open project | Right-click an `.archive` outside the library in the Explorer (or run the command and pick one): all or chosen resources land under `source\archive`, nothing changes in the library or the game. Again: Keep mine and Replace. The right-click menu on a mod says **Add to REDcode project** |
