@@ -12,7 +12,7 @@ The source of EDGEdeck's Nexus Mods page lives here, so updates are edits in the
 | Field | Value |
 |---|---|
 | Mod name | EDGEdeck |
-| Version | EDGEdeck's version, from `package.json` (for example 0.26.5) |
+| Version | EDGEdeck's version, from `package.json` (for example 0.27.3) |
 | Category | Utilities (check the list for Cyberpunk 2077 when creating the page) |
 | Brief overview | A simple mod manager for Cyberpunk 2077 inside VS Code: add, on or off, deploy, remove. Hardlink deploys you can undo, conflicts inside archives, Nexus sign-in and updates, loadouts, Vortex import. A VS Code extension, not a game mod. (255 characters at most; this is 234) |
 | Author | Edgemodders |
