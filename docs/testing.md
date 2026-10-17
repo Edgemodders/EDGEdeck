@@ -20,7 +20,7 @@ Last updated 2026-10-17. Dates before then come from the session records; anythi
 | [Publish workflow](#publish-workflow) | Automated, on a tag | 2026-10-16 (v0.26.6) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-16 | 23 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | 1 open |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | none open |
 
 ## Automated
 
@@ -132,9 +132,11 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 10-17 | 0.27.3 | PC | The four waiting tests that need no project: loadouts (0.26.0), `modlist.txt` with a bare `.archive` (0.26.1), deploy with the game running (0.26.3), CET's known name in Import from Vortex (0.26.2) | **Passed.** A copied loadout changed nothing in the sidebar until made active, and its deploy removed the files of the mods turned off; a bare archive landed in `modlist.txt`; with the game open, Deploy showed the modal with **The game is closed now**; clicked with the game still running (twice) it came back and nothing deployed, and after quitting the game, clicking it deployed (EDGEdeck checks again only on the click); "CET" and "107" found Cyber Engine Tweaks |
 | 10-17 | 0.27.3 | PC | The leftovers: light theme, Suggest the HUD theme, Undo deploy on the real game, the MCP server from an assistant | **Passed.** Readable in Light+; the theme suggestion offered the HUD theme; Undo deploy removed every deployed file; after Connect an assistant, the assistant answered "9 mods, 8 on, none deployed yet", true after the Undo, so it read the library and the game folder's manifest. Found: the command palette showed "EDGEdeck: EDGEdeck: Connect an assistant (MCP)..." (title and category both said EDGEdeck); fixed for the next build |
 | 10-17 | 0.27.3 | PC | Add to Project into a REDcode project: loose files (0.18.0) and an archive (0.25.0), all resources, chosen ones, and a second time | **Passed.** Loose files went under `source\resources`, archive resources under `source\archive`, a repeat counted them as already there. The owner: this replaces installing a contributor's .archive into the game for WolvenKit to expand, copying out and removing it again. Seen: "project" alone read as EDGEdeck's library at first |
+| 10-17 | 0.27.3 | PC | REDmod deploy (M1): the REDmod DLC installed, a REDmod package added and deployed | **Passed.** The first time a REDmod package went through EDGEdeck's deploy and `redMod.exe deploy` |
 
 ## Waiting for a hand test
 
+None: every hand test so far has passed (2026-10-17). New ones go in this table:
+
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 8 | REDmod deploy | M1 | Never seen working: no REDmod package in the test sets |
