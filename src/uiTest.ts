@@ -6,8 +6,13 @@ import * as assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { nxmFromQuery } from "./nxm";
 
 export async function run(): Promise<void> {
+  // An nxm link through VS Code's own Uri, as the forwarder sends it: every parameter comes back.
+  const link = "nxm://cyberpunk2077/mods/35393/files/166705?key=a-b_c&expires=1760000000&user_id=42";
+  const uri = vscode.Uri.parse(`vscode://edgemodders.edgedeck/nxm?url=${encodeURIComponent(link)}`);
+  assert.equal(nxmFromQuery(uri.query), link, `query as VS Code gives it: ${uri.query}`);
   const lib = process.env.EDGEDECK_TEST_LIB!;
   const game = process.env.EDGEDECK_TEST_GAME!;
   assert.ok(lib && game, "EDGEDECK_TEST_LIB and EDGEDECK_TEST_GAME must be set");

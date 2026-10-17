@@ -27,7 +27,7 @@ import { ModsView, type ModNode, type SetupStep } from "./modsView";
 import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
-import { currentNxmHandler, describeHandler, forwarderCommand, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority } from "./nxm";
+import { currentNxmHandler, describeHandler, forwarderCommand, nxmFromQuery, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority } from "./nxm";
 import { deployRedmod, enabledRedmodPackages } from "./redmod";
 import { addToProject, classifyProject, findProjectFile, installProject, projectName, syncProjects } from "./project";
 import { importFromVortex, listVortexMods, vortexDisplayName, vortexStagingCandidates } from "./vortex";
@@ -2181,7 +2181,7 @@ async function nexusAddLinkCommand(): Promise<void> {
 
 async function handleUri(uri: vscode.Uri): Promise<void> {
   if (uri.path !== "/nxm") return;
-  const url = new URLSearchParams(uri.query).get("url");
+  const url = nxmFromQuery(uri.query);
   if (!url) throw new Error("The link EDGEdeck received had no nxm URL in it.");
   log.appendLine(`Nexus link received: ${url.replace(/key=[^&]*/, "key=...")}`);
   await addFromLink(url);

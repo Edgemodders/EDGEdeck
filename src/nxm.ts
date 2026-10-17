@@ -20,6 +20,18 @@ export interface NxmLink {
   userId?: number;
 }
 
+/**
+ * The nxm link inside the query of the vscode:// link the forwarder opens. VS Code hands the query
+ * over decoded, so the link's own & look like more parameters of ours: everything after `url=` is
+ * the link. A query that is still encoded is decoded once.
+ */
+export function nxmFromQuery(query: string): string | undefined {
+  const i = query.indexOf("url=");
+  if (i < 0) return undefined;
+  const value = query.slice(i + "url=".length);
+  return /^nxm%3A/i.test(value) ? decodeURIComponent(value) : value || undefined;
+}
+
 /** Parses nxm://cyberpunk2077/mods/123/files/456?key=...&expires=...&user_id=... */
 export function parseNxm(link: string): NxmLink {
   let url: URL;

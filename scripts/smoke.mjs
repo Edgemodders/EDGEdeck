@@ -801,6 +801,13 @@ console.log("undo: ok");
 {
   const nxm = core.parseNxm("nxm://cyberpunk2077/mods/7780/files/144164?key=abc123&expires=1760000000&user_id=42");
   assert.deepEqual(nxm, { game: "cyberpunk2077", modId: 7780, fileId: 144164, key: "abc123", expires: 1760000000, userId: 42 });
+  // The link back out of the vscode:// query, decoded (as VS Code hands it over) or not: all its parameters.
+  {
+    const link = "nxm://cyberpunk2077/mods/35393/files/166705?key=a-b_c&expires=1760000000&user_id=42";
+    assert.equal(core.nxmFromQuery(`url=${link}`), link);
+    assert.equal(core.nxmFromQuery(`url=${encodeURIComponent(link)}`), link);
+    assert.equal(core.nxmFromQuery("other=1"), undefined);
+  }
   assert.throws(() => core.parseNxm("https://www.nexusmods.com/cyberpunk2077/mods/7780"), /Not an nxm link/);
   assert.throws(() => core.parseNxm("nxm://cyberpunk2077/collections/abc/revisions/1"), /collections/);
   assert.equal(core.versionNewer("1.20.4", "1.20.3"), true);
