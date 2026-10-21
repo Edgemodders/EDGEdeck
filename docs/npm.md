@@ -26,6 +26,7 @@ Tools:
 | `edgedeck_install_project` | Add or refresh a REDcode or WolvenKit project's packed output; `sameName` (`follow` or `version`) settles a mod of the same name from another folder |
 | `edgedeck_turn` | Turn a mod on or off |
 | `edgedeck_move` | Move a mod up or down; higher wins a conflict |
+| `edgedeck_rename` | A new name for a mod in EDGEdeck, for all its versions; empty puts the first name back |
 | `edgedeck_remove` | Remove a mod from the library |
 | `edgedeck_pending` | What the next deploy would add, replace, put back or remove, and why |
 | `edgedeck_deploy` | Put the active loadout in the game (refuses while the game runs); `mod` deploys that mod's changes only |
@@ -43,7 +44,7 @@ Nothing touches the game folder until `edgedeck_deploy` or `edgedeck_undo`; the 
 npx -p @edgemodders/edgedeck-mcp edgedeck list
 ```
 
-or, installed with `npm i -g @edgemodders/edgedeck-mcp`, just `edgedeck list`. Commands: `list`, `mod`, `add`, `install-project`, `on`, `off`, `up`, `down`, `remove`, `pending`, `deploy`, `undo`, `changes`, `conflicts`, `loadout save|load|list`, `vortex list|import`, `mcp`. Options `--library`, `--game`, and `--json` for machine output.
+or, installed with `npm i -g @edgemodders/edgedeck-mcp`, just `edgedeck list`. Commands: `list`, `mod`, `add`, `install-project`, `on`, `off`, `up`, `down`, `rename`, `remove`, `pending`, `deploy`, `undo`, `changes`, `conflicts`, `loadout save|load|list`, `vortex list|import`, `mcp`. Options `--library`, `--game`, and `--json` for machine output.
 
 ## More
 

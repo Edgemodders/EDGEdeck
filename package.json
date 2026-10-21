@@ -145,6 +145,11 @@
         "category": "EDGEdeck"
       },
       {
+        "command": "edgedeck.rename",
+        "title": "Rename...",
+        "category": "EDGEdeck"
+      },
+      {
         "command": "edgedeck.remove",
         "title": "Remove",
         "category": "EDGEdeck"
@@ -451,6 +456,11 @@
           "group": "1_open@1"
         },
         {
+          "command": "edgedeck.rename",
+          "when": "view == edgedeck.mods && viewItem == mod",
+          "group": "9_remove@0"
+        },
+        {
           "command": "edgedeck.remove",
           "when": "view == edgedeck.mods && viewItem == mod",
           "group": "9_remove@1"
@@ -516,6 +526,10 @@
         {
           "command": "edgedeck.addArchiveToProject",
           "when": "edgedeck.projectOpen"
+        },
+        {
+          "command": "edgedeck.rename",
+          "when": "false"
         }
       ],
       "explorer/context": [
@@ -607,6 +621,13 @@
       {
         "id": "edgedeck.mcp",
         "label": "EDGEdeck"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "edgedeck.rename",
+        "key": "f2",
+        "when": "focusedView == edgedeck.mods"
       }
     ]
   },

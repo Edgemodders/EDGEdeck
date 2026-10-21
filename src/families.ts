@@ -112,6 +112,7 @@ export function settleNewVersion(lib: Library, mod: ModInfo): { replaced?: ModIn
   const fam = familyOf(lib, mod);
   const others = fam.mods.filter((m) => m.id !== mod.id);
   if (!others.length) return {};
+  takeFamilyName(lib, mod, others);
   const previous = others.find((m) => m.enabled) ?? [...others].sort(newestFirst)[0];
   if (mod.version && previous.version && versionNewer(previous.version, mod.version)) {
     if (mod.enabled) {
@@ -133,6 +134,41 @@ export function settleNewVersion(lib: Library, mod: ModInfo): { replaced?: ModIn
     saveMod(lib, mod);
   }
   return { replaced: previous };
+}
+
+/**
+ * Gives a mod a new name in EDGEdeck: every version of its family gets it, files and the game stay
+ * as they are. The family keeps its key (pinned in `family` when it came from the name), so its
+ * versions, section and loadouts stay together, and each version remembers its first name in
+ * `renamedFrom`. An empty name puts the first names back.
+ */
+export function renameFamily(lib: Library, mod: ModInfo, name: string): Family {
+  const fam = familyOf(lib, mod);
+  const to = name.trim();
+  for (const m of fam.mods) {
+    m.family = fam.key;
+    if (!to) {
+      if (m.renamedFrom !== undefined) m.name = m.renamedFrom;
+      delete m.renamedFrom;
+    } else if (m.name !== to) {
+      m.renamedFrom ??= m.name;
+      m.name = to;
+      if (m.renamedFrom === to) delete m.renamedFrom;
+    }
+    saveMod(lib, m);
+  }
+  return familyOf(lib, mod);
+}
+
+/** A new version of a renamed mod takes the family's name, and remembers its own as the first one. */
+export function takeFamilyName(lib: Library, mod: ModInfo, others: ModInfo[]): void {
+  const renamed = others.find((m) => m.renamedFrom !== undefined);
+  if (!renamed || mod.name === renamed.name) return;
+  // Pinned first: a family keyed by name would lose the mod once its name changes.
+  mod.family = familyKey(renamed);
+  mod.renamedFrom = mod.name;
+  mod.name = renamed.name;
+  saveMod(lib, mod);
 }
 
 /** Families with more than one version on, from before versions were settled on adding. */

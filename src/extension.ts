@@ -15,7 +15,7 @@ import { ChangesPanel, type ChangesMessage } from "./changesPanel";
 import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, latestBridgeRelease, removeOlderBridges } from "./bridgeInstall";
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
-import { activateVersion, families, familyOf, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
+import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveInSection, moveSection, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
@@ -98,6 +98,8 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.undo", () => run(undoCommand)),
     vscode.commands.registerCommand("edgedeck.runGame", () => run(runGameCommand)),
     vscode.commands.registerCommand("edgedeck.remove", (node: ModNode) => run(() => removeCommand(modOf(node)))),
+    // From the context menu with the row; from F2 with nothing, so the selected row.
+    vscode.commands.registerCommand("edgedeck.rename", (node?: ModNode) => run(() => renameCommand(modOf(node ?? tree.selection[0])))),
     vscode.commands.registerCommand("edgedeck.details", (node: ModNode) => run(() => showDetails(modOf(node)))),
     vscode.commands.registerCommand("edgedeck.checkConflicts", () => run(showConflicts)),
     vscode.commands.registerCommand("edgedeck.openPage", () => run(showPage)),
@@ -1527,6 +1529,9 @@ async function detailAction(action: string, id: string): Promise<void> {
     case "remove":
       await removeCommand(mod);
       break;
+    case "rename":
+      await renameCommand(mod);
+      break;
     case "nexus":
       await nexusOpenCommand(mod);
       break;
@@ -2073,6 +2078,26 @@ async function undoCommand(): Promise<void> {
   log.appendLine(`Undo: ${result.removed} removed${result.skipped.length ? `, left alone because they changed: ${result.skipped.join(", ")}` : ""}`);
   refresh();
   void vscode.window.showInformationMessage(`Undo: ${result.removed} files removed.${result.skipped.length ? ` ${result.skipped.length} changed files were left in place; see the log.` : ""}`);
+}
+
+/** Rename...: a new name in EDGEdeck for a mod and all its versions. Files and the game stay as they are. */
+async function renameCommand(mod: ModInfo | undefined): Promise<void> {
+  if (!mod || !library) return;
+  const lib = library;
+  const fam = familyOf(lib, mod);
+  const first = fam.active.renamedFrom;
+  const versions = fam.mods.length > 1 ? `, for all ${fam.mods.length} of its versions` : "";
+  const name = await vscode.window.showInputBox({
+    title: `Rename ${fam.name}`,
+    value: fam.name,
+    valueSelection: [0, fam.name.length],
+    prompt: `A new name for this mod in EDGEdeck${versions}. Its files and the game do not change.${first !== undefined ? ` Leave it empty to go back to "${first}".` : ""}`,
+    validateInput: (v) => (v.trim() || first !== undefined ? undefined : "Type a name"),
+  });
+  if (name === undefined || name.trim() === fam.name) return;
+  const renamed = renameFamily(lib, mod, name);
+  log.appendLine(`Renamed ${fam.name} to ${renamed.name}${fam.mods.length > 1 ? ` (${fam.mods.length} versions)` : ""}`);
+  refresh();
 }
 
 async function removeCommand(mod: ModInfo | undefined): Promise<void> {

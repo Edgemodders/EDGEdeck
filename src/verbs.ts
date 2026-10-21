@@ -6,7 +6,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { classify, rednodeManifest } from "./classifier";
-import { settleNewVersion } from "./families";
+import { familyOf, renameFamily, settleNewVersion } from "./families";
 import { deploy, detectChanges, modStatus, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, type Decision, type Lost } from "./deploy";
 import { findSevenZip, unpackOrCopy } from "./extract";
 import { checkFrameworks, frameworkSummary } from "./frameworks";
@@ -168,6 +168,17 @@ export const verbs = {
     const mod = find(s, id);
     moveMod(s.lib, mod, direction === "up" ? -1 : 1);
     return { data: { order: s.lib.info.order }, text: s.lib.info.order.join("\n") };
+  },
+
+  /** A new name in EDGEdeck for a mod and all its versions; an empty name puts the first name back. */
+  rename(s: Session, id: string, name: string): Verb {
+    const mod = find(s, id);
+    const before = familyOf(s.lib, mod).name;
+    const fam = renameFamily(s.lib, mod, name);
+    return {
+      data: { id: mod.id, name: fam.name, versions: fam.mods.map((m) => m.id) },
+      text: `${before} is now ${fam.name}${fam.mods.length > 1 ? ` (${fam.mods.length} versions)` : ""}; its files and the game do not change`,
+    };
   },
 
   remove(s: Session, id: string): Verb {

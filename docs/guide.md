@@ -42,9 +42,10 @@ The sidebar view is one list in three groups: **Set up** while anything is missi
 
 - **The checkbox** turns a mod on or off. Nothing touches the game until you deploy.
 - **The line after the name** shows the version, how many other versions are in the library, the size, and the status: `deployed`, `not deployed yet`, `off`, `off, still deployed`, `changed in game folder`, `update 1.2 available`, `loses 3 archive files`.
-- **Click a mod** for its detail panel: the files it deploys, its conflicts by file path and inside archives, and buttons for turn on, move, open folder, Open on Nexus, Update and Remove.
+- **Click a mod** for its detail panel: the files it deploys, its conflicts by file path and inside archives, and buttons for turn on, move, open folder, Rename, Open on Nexus, Update and Remove.
 - **Expand a mod** for the folders it deploys into and the files in them. Click a file to open the library copy. Hover anything for a card with size, dates, where it deploys and where it came from.
-- **Hover a row** for the move buttons. The mod higher in the list wins a conflict. Right-click for the rest: Details, Open on Nexus Mods, Switch version, Reveal in File Explorer, Remove, and, when a REDcode project is open, Add to REDcode project.
+- **Hover a row** for the move buttons. The mod higher in the list wins a conflict. Right-click for the rest: Details, Open on Nexus Mods, Switch version, Reveal in File Explorer, Rename, Remove, and, when a REDcode project is open, Add to REDcode project.
+- **Rename** (right-click, or F2 on the selected row) gives a mod a name of your own in EDGEdeck. Every version of it gets the name, and new versions take it when they arrive. Its files and the game do not change. Rename to an empty name to go back to the first one.
 
 ### Add to REDcode project
 

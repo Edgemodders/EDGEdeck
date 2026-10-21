@@ -11,6 +11,7 @@
 //                                       --keep-both adds the project as another version of it, on in its place
 //   edgedeck on <id> | off <id>         turn a mod on or off
 //   edgedeck up <id> | down <id>        change the order (first wins conflicts)
+//   edgedeck rename <id> [name...]    a new name in EDGEdeck, for all its versions (no name: the first one back)
 //   edgedeck remove <id>
 //   edgedeck deploy [--keep PATH...] [--restore PATH...] [--mod ID]   --mod: that mod's changes only
 //   edgedeck undo
@@ -74,6 +75,7 @@ if (cmd === "mcp") {
       case "off": out(v.turn(s, need(rest[0], "a mod id"), cmd === "on")); break;
       case "up":
       case "down": out(v.move(s, need(rest[0], "a mod id"), cmd)); break;
+      case "rename": out(v.rename(s, need(rest[0], "a mod id"), rest.slice(1).join(" "))); break;
       case "remove": out(v.remove(s, need(rest[0], "a mod id"))); break;
       case "deploy": out(await v.deploy(s, flags.keep ?? [], flags.restore ?? [], typeof flags.mod === "string" ? flags.mod : undefined)); break;
       case "undo": out(v.undo(s)); break;

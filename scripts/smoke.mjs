@@ -431,6 +431,40 @@ console.log("changes: ok");
     for (const m of [first, second, older]) core.removeMod(lib, m);
   }
   console.log("families: ok");
+
+  // Rename: every version gets the name, the family stays one (its key pinned, so a name-keyed
+  // family, its section and loadouts hold), a new version takes the name, and empty puts it back.
+  {
+    write(path.join(tmp, "ren", "archive", "pc", "mod", "Ren.archive"), "r");
+    const placements = [{ from: path.join(tmp, "ren", "archive", "pc", "mod", "Ren.archive"), to: "archive/pc/mod/Ren.archive", kind: "archive" }];
+    const v1 = core.addMod(lib, placements, { name: "Neon Signs 1.0", version: "1.0", source: { type: "folder" } });
+    const v2 = core.addMod(lib, placements, { name: "Neon Signs 1.1", version: "1.1", source: { type: "folder" } });
+    core.settleNewVersion(lib, v2);
+    const key = core.familyKey(v1);
+    assert.equal(key, "name:neon signs");
+    lib.info.sectionOf = { ...(lib.info.sectionOf ?? {}), [key]: "Visual" };
+    const fam = core.renameFamily(lib, v2, "Glowing Signs");
+    assert.equal(fam.name, "Glowing Signs");
+    assert.deepEqual([v1.name, v2.name], ["Glowing Signs", "Glowing Signs"], "every version");
+    assert.deepEqual([v1.renamedFrom, v2.renamedFrom], ["Neon Signs 1.0", "Neon Signs 1.1"], "first names kept");
+    assert.equal(core.familyKey(v1), key, "the family keeps its key");
+    assert.equal(core.families(lib).filter((f) => f.key === key).length, 1, "still one family");
+    assert.equal(lib.info.sectionOf[key], "Visual", "its section holds");
+    const again = JSON.parse(fs.readFileSync(path.join(libRoot, "library", v1.id, "mod.json"), "utf8"));
+    assert.equal(again.name, "Glowing Signs", "saved");
+    // A new download under the old name joins the family and takes the new name.
+    const v3 = core.addMod(lib, placements, { name: "Neon Signs 1.2", version: "1.2", source: { type: "folder" } });
+    core.settleNewVersion(lib, v3);
+    assert.equal(v3.name, "Glowing Signs");
+    assert.equal(v3.renamedFrom, "Neon Signs 1.2");
+    assert.equal(core.familyOf(lib, v3).mods.length, 3);
+    assert.match(core.verbs.rename({ lib, libraryRoot: libRoot, game: "" }, v3.id, "").text, /Glowing Signs is now Neon Signs 1\.2/);
+    assert.deepEqual([v1.name, v2.name, v3.name], ["Neon Signs 1.0", "Neon Signs 1.1", "Neon Signs 1.2"], "empty puts the first names back");
+    assert.equal(v1.renamedFrom, undefined);
+    delete lib.info.sectionOf[key];
+    for (const m of [v1, v2, v3]) core.removeMod(lib, m);
+    console.log("rename: ok");
+  }
 }
 
 // placeAbove: the loser moves to directly above the winner; already-above is a no-op.

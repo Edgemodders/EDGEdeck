@@ -30,6 +30,8 @@ export interface ModInfo {
   files: string[];
   /** The family this mod belongs to, when set by hand (Keep both, Rename): overrides the key from its source and name. */
   family?: string;
+  /** The name it had before the user renamed it in EDGEdeck; set only while renamed. */
+  renamedFrom?: string;
   /** What Nexus last said about this mod, when it has a mod id. */
   nexus?: { name: string; version: string; latestVersion: string; latestFileId: number; latestFileName: string; checked: string; author?: string; summary?: string };
 }

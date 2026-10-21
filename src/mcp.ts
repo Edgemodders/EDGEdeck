@@ -113,6 +113,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  "edgedeck_rename",
+  {
+    title: "Rename a mod",
+    description: "Gives a mod a new name in EDGEdeck, for all its versions; its files and the game do not change. New versions of it take the name too. An empty name puts the first name back.",
+    inputSchema: { id: z.string(), name: z.string().describe("The new name, or empty for the first one") },
+  },
+  ({ id, name }) => run(() => verbs.rename(session(), id, name))(),
+);
+
+server.registerTool(
   "edgedeck_remove",
   {
     title: "Remove a mod",

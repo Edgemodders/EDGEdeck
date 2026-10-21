@@ -46,6 +46,7 @@ EDGEdeck keeps your mods in a library outside the game folder, deploys the ones 
 | **Patch day** | The Frameworks header says "game updated to 2.31" when the game changed since the last deploy, and EDGEdeck checks the frameworks on Nexus once for that version. |
 | **Deploy** | Hardlinks the enabled mods into the game, writes the load order, prepares REDmod packages, records a manifest. |
 | **Run game** | Starts Cyberpunk 2077 with `-modded`, through Steam for a Steam install and from the exe otherwise. Deploys the changes waiting first. The play button in the Mods view's title bar, or Run game on the EDGEdeck page. |
+| **Rename** | A name of your own for a mod in EDGEdeck, for all its versions and the ones that come later. Right-click a mod, or F2. Files and the game do not change. |
 | **Remove** | Deletes the mod from the library. Deployed files come out on the next deploy. |
 | **Add to REDcode project** | With a REDcode project open, copies a mod's loose files into its `source/resources` under their deploy paths, and an archive's resources, all or a pick, into `source/archive` through REDcode. **Add an archive to the REDcode project...** does the same for any `.archive` file, without adding it to the library. |
 | Undo deploy | Removes every file in the manifest and nothing else. |
@@ -88,7 +89,7 @@ node bin/edgedeck.mjs conflicts --json          # every command prints JSON with
 
 On npm as [`@edgemodders/edgedeck-mcp`](https://www.npmjs.com/package/@edgemodders/edgedeck-mcp): `npx -y @edgemodders/edgedeck-mcp` (server) and `edgedeck` (CLI), published with every release at the extension's version; `scripts/npm-package.mjs` assembles it from the build, the README is `docs/npm.md`.
 
-The same verbs are MCP tools: `node dist/mcp.js --library <folder> --game <folder>` serves `edgedeck_list`, `edgedeck_mod`, `edgedeck_add`, `edgedeck_install_project`, `edgedeck_turn`, `edgedeck_move`, `edgedeck_remove`, `edgedeck_pending`, `edgedeck_deploy`, `edgedeck_undo`, `edgedeck_changes`, `edgedeck_conflicts`, `edgedeck_loadout` and `edgedeck_vortex` over stdio. VS Code 1.101 and later picks the server up from the extension for the agents it hosts; **EDGEdeck: Connect an assistant (MCP)...** copies the `claude mcp add` line for Claude Code. The Mods view follows what an assistant changes.
+The same verbs are MCP tools: `node dist/mcp.js --library <folder> --game <folder>` serves `edgedeck_list`, `edgedeck_mod`, `edgedeck_add`, `edgedeck_install_project`, `edgedeck_turn`, `edgedeck_move`, `edgedeck_rename`, `edgedeck_remove`, `edgedeck_pending`, `edgedeck_deploy`, `edgedeck_undo`, `edgedeck_changes`, `edgedeck_conflicts`, `edgedeck_loadout` and `edgedeck_vortex` over stdio. VS Code 1.101 and later picks the server up from the extension for the agents it hosts; **EDGEdeck: Connect an assistant (MCP)...** copies the `claude mcp add` line for Claude Code. The Mods view follows what an assistant changes.
 
 ## Roadmap
 

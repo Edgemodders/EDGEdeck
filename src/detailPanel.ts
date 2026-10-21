@@ -136,6 +136,7 @@ ${nexusLine}
   <button data-action="moveUp" title="Wins conflicts against the mods below it">Move up</button>
   <button data-action="moveDown">Move down</button>
   <button data-action="open">Open folder</button>
+  <button data-action="rename" title="A new name in EDGEdeck; files and the game do not change">Rename</button>
   ${mod.source.modId ? `<button data-action="nexus">Open on Nexus</button>` : ""}
   ${update ? `<button data-action="update" title="Download it from Nexus and put it in this mod's place">Update to ${esc(update)}</button>` : ""}
   <button data-action="remove" class="danger">Remove</button>

@@ -5,7 +5,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { classify, type Classification } from "./classifier";
-import { activateVersion, baseName, familyKey, familyOf } from "./families";
+import { activateVersion, baseName, familyKey, familyOf, takeFamilyName } from "./families";
 import { addMod, placeAbove, saveMod, sourcePath, type Library, type ModInfo } from "./library";
 
 export interface AddToProjectResult {
@@ -152,7 +152,8 @@ export function projectMod(lib: Library, projectFile: string): ModInfo | undefin
 export function sameNameMod(lib: Library, projectFile: string): ModInfo | undefined {
   if (projectMod(lib, projectFile)) return undefined;
   const name = baseName(projectName(projectFile));
-  const match = name ? lib.mods.find((m) => baseName(m.name) === name) : undefined;
+  // A mod renamed in EDGEdeck still answers to its first name.
+  const match = name ? lib.mods.find((m) => baseName(m.name) === name || (m.renamedFrom !== undefined && baseName(m.renamedFrom) === name)) : undefined;
   return match && familyOf(lib, match).active;
 }
 
@@ -189,8 +190,9 @@ export function installProject(lib: Library, projectFile: string, beside?: { mod
     if (beside?.how === "version") {
       const family = familyKey(beside.mod);
       const previous = familyOf(lib, beside.mod);
-      const mod = addMod(lib, c.placements, { name: beside.mod.name, version: devVersion(lib, family), source: { type: "project", path: projectFile } });
+      const mod = addMod(lib, c.placements, { name: projectName(projectFile), version: devVersion(lib, family), source: { type: "project", path: projectFile } });
       mod.family = family;
+      takeFamilyName(lib, mod, previous.mods);
       placeAbove(lib, mod, previous.active);
       for (const m of previous.mods) {
         if (m.enabled) {
