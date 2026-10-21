@@ -7,16 +7,25 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { classify, rednodeManifest } from "./classifier";
 import { settleNewVersion } from "./families";
-import { deploy, detectChanges, modStatus, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, type Decision } from "./deploy";
+import { deploy, detectChanges, modStatus, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, type Decision, type Lost } from "./deploy";
 import { findSevenZip, unpackOrCopy } from "./extract";
 import { checkFrameworks, frameworkSummary } from "./frameworks";
 import { findGame, gameRunning, gameVersion, isGameFolder } from "./game";
 import { addMod, defaultLibraryPath, keepDownload, loadLibrary, modFolder, moveMod, removeMod, saveLibrary, saveMod, type Library, type ModInfo } from "./library";
 import { activeLoadout, importLoadout, listLoadouts, makeActive, saveLoadout } from "./loadouts";
-import { installProject } from "./project";
+import { installProject, sameNameMod, type BesideHow } from "./project";
 import { deployRedmod, enabledRedmodPackages } from "./redmod";
 import { formatBytes, librarySize, modSize } from "./sizes";
 import { importFromVortex, listVortexMods } from "./vortex";
+
+/** Projects whose files lost to another mod, in words: the game is not running the build just packed. */
+function lostProjectsText(lib: Library, lost: Lost[]): string {
+  const lines = lost.flatMap((l) => {
+    const mod = lib.mods.find((m) => m.id === l.mod);
+    return mod?.source.type === "project" ? [`the game still has ${l.winner} for ${l.files} file(s), not the project ${l.mod} (move ${l.mod} up to let it win)`] : [];
+  });
+  return lines.length ? `; ${lines.join("; ")}` : "";
+}
 
 export interface Session {
   lib: Library;
@@ -131,12 +140,20 @@ export const verbs = {
   },
 
   /** Adds a REDcode or WolvenKit project's packed output, or refreshes the mod that follows it, and turns it on. */
-  installProject(s: Session, projectFile: string): Verb {
+  /**
+   * `sameName` answers for a mod of the same name that does not follow this project: follow (it
+   * follows this project from now on) or version (the project is another version of it, on in its
+   * place). Without it, the project is a mod of its own and the text says what it sits beside.
+   */
+  installProject(s: Session, projectFile: string, sameName?: BesideHow): Verb {
     if (!fs.existsSync(projectFile)) throw new Error(`${projectFile} does not exist`);
-    const { mod, added } = installProject(s.lib, projectFile);
+    const other = sameNameMod(s.lib, projectFile);
+    const before = other && `${other.id}${other.source.type === "project" && other.source.path ? ` (${path.dirname(other.source.path)})` : ""}`;
+    const { mod, added, beside } = installProject(s.lib, projectFile, other && sameName ? { mod: other, how: sameName } : undefined);
+    const note = beside?.how === "follow" ? `; ${before} follows this project now` : beside ? `; another version of ${before}, on in its place` : other ? `; note: the library also has ${before} under the same name, a separate mod; the one higher in the list wins the files they share (call again with sameName follow or version to settle it)` : "";
     return {
-      data: { id: mod.id, name: mod.name, version: mod.version, kinds: mod.kinds, files: mod.files.length, added },
-      text: `${added ? "added" : "refreshed"} ${mod.id} from its project (${mod.files.length} files, ${mod.kinds.join(", ")}); it is on, deploy to put it in the game`,
+      data: { id: mod.id, name: mod.name, version: mod.version, kinds: mod.kinds, files: mod.files.length, added, sameName: other?.id, beside: beside?.how },
+      text: `${added ? "added" : "refreshed"} ${mod.id} from its project (${mod.files.length} files, ${mod.kinds.join(", ")}); it is on, deploy to put it in the game${note}`,
     };
   },
 
@@ -169,7 +186,7 @@ export const verbs = {
     const result = deploy(s.lib, s.game, decisions, undefined, await gameVersion(s.game));
     const redmod = enabledRedmodPackages(s.lib).length ? await deployRedmod(s.lib, s.game) : undefined;
     const report = writeDeployReport(s.lib, s.game, result);
-    const text = `deployed (${result.method}): ${result.linked} added for ${modsTouched(result).length} mod(s), ${result.removed} removed, ${result.kept} unchanged; ${result.modsInGame} mod(s) in the game; report ${report}${result.skipped.length ? `; skipped (changed in game folder, answer with keep or restore): ${result.skipped.join(", ")}` : ""}${redmod ? `; REDmod: ${redmod.ran ? `${redmod.packages.length} prepared` : redmod.output}` : ""}`;
+    const text = `deployed (${result.method}): ${result.linked} added for ${modsTouched(result).length} mod(s), ${result.removed} removed, ${result.kept} unchanged; ${result.modsInGame} mod(s) in the game; report ${report}${result.skipped.length ? `; skipped (changed in game folder, answer with keep or restore): ${result.skipped.join(", ")}` : ""}${redmod ? `; REDmod: ${redmod.ran ? `${redmod.packages.length} prepared` : redmod.output}` : ""}${lostProjectsText(s.lib, result.lost)}`;
     return { data: { ...result, redmod, report }, text };
   },
 

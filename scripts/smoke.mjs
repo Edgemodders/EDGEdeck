@@ -259,8 +259,50 @@ console.log("changes: ok");
   assert.equal(lib.mods.filter((m) => m.source.type === "project").length, 1);
   const verb = core.verbs.installProject({ lib, libraryRoot: libRoot, game: "" }, projectFile);
   assert.equal(verb.data.added, false);
-  core.removeMod(lib, again.mod);
   console.log("install project: ok");
+
+  // A second project folder with the same mod name (EDGEdeck #3): without an answer it is a mod of
+  // its own and loses the shared file; Keep both makes it another version, on in the first one's
+  // place; Use this project moves the first mod over to it.
+  const proj2 = path.join(tmp, "proj2");
+  const projectFile2 = path.join(proj2, "TestMod.cpmodproj");
+  write(projectFile2, "<CP77Mod><Name>TestMod</Name><ModName>Test Mod</ModName></CP77Mod>");
+  write(path.join(proj2, "packed", "archive", "pc", "mod", "TestMod.archive"), "w2");
+  const a = again.mod;
+  assert.equal(core.sameNameMod(lib, projectFile2)?.id, a.id);
+  assert.equal(core.sameNameMod(lib, projectFile), undefined, "the project's own mod is not a same-name mod");
+  const separate = core.installProject(lib, projectFile2).mod;
+  assert.notEqual(separate.id, a.id);
+  const noGame = path.join(tmp, "no-game");
+  const lost = core.lostFiles(core.plan(lib, noGame)).filter((l) => l.mod === separate.id);
+  assert.deepEqual(lost, [{ mod: separate.id, files: 1, winner: a.id }], "the newer folder loses to the one above it");
+  assert.match(core.verbs.installProject({ lib, libraryRoot: libRoot, game: "" }, projectFile).text, /refreshed/);
+  core.removeMod(lib, separate);
+  assert.match(core.verbs.installProject({ lib, libraryRoot: libRoot, game: "" }, projectFile2).text, /also has test-mod/);
+  core.removeMod(lib, lib.mods.find((m) => m.source.path === projectFile2));
+
+  const both = core.installProject(lib, projectFile2, { mod: a, how: "version" });
+  assert.equal(both.mod.version, "dev 2");
+  assert.equal(both.mod.enabled, true);
+  assert.equal(a.enabled, false, "the other version goes off");
+  assert.ok(lib.info.order.indexOf(both.mod.id) < lib.info.order.indexOf(a.id), "in the first one's place");
+  assert.deepEqual(core.familyOf(lib, a).mods.map((m) => m.id).sort(), [a.id, both.mod.id].sort(), "one family");
+  assert.equal(core.lostFiles(core.plan(lib, noGame)).filter((l) => l.mod === both.mod.id || l.mod === a.id).length, 0);
+  // Installing the first folder again turns it on in the family's place, the other version off.
+  core.installProject(lib, projectFile);
+  assert.equal(a.enabled, true);
+  assert.equal(both.mod.enabled, false);
+  core.removeMod(lib, both.mod);
+
+  const follow = core.installProject(lib, projectFile2, { mod: a, how: "follow" });
+  assert.equal(follow.mod.id, a.id, "no second mod");
+  assert.equal(follow.added, false);
+  assert.equal(a.source.path, projectFile2);
+  assert.equal(fs.readFileSync(path.join(libRoot, "library", a.id, "archive", "pc", "mod", "TestMod.archive"), "utf8"), "w2");
+  assert.equal(core.familyKey(a), `project:${projectFile.toLowerCase()}`, "its family and section stay");
+  assert.equal(core.sameNameMod(lib, projectFile2), undefined);
+  core.removeMod(lib, a);
+  console.log("install project beside a mod of the same name: ok");
 }
 
 // Sizes: per file, per mod, and the library's totals.

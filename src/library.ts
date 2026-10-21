@@ -28,6 +28,8 @@ export interface ModInfo {
   source: ModSource;
   /** Paths under the game folder, forward slashes, in no particular order. */
   files: string[];
+  /** The family this mod belongs to, when set by hand (Keep both, Rename): overrides the key from its source and name. */
+  family?: string;
   /** What Nexus last said about this mod, when it has a mod id. */
   nexus?: { name: string; version: string; latestVersion: string; latestFileId: number; latestFileName: string; checked: string; author?: string; summary?: string };
 }

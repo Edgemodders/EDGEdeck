@@ -30,7 +30,7 @@ import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
 import { currentNxmHandler, describeHandler, forwarderCommand, nxmFromQuery, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority } from "./nxm";
 import { deployRedmod, enabledRedmodPackages } from "./redmod";
-import { addToProject, classifyProject, findProjectFile, installProject, projectName, syncProjects } from "./project";
+import { addToProject, classifyProject, findProjectFile, installProject, projectName, sameNameMod, syncProjects, type BesideHow, type InstallProjectResult } from "./project";
 import { importFromVortex, listVortexMods, vortexDisplayName, vortexStagingCandidates } from "./vortex";
 
 let library: Library | undefined;
@@ -162,14 +162,43 @@ export interface EDGEdeckApi {
   gamePath(): string;
   /** The id of the mod that follows this project, if EDGEdeck has one. */
   projectMod(projectFile: string): string | undefined;
-  /** Adds the project's packed output, or refreshes the mod that follows it, and turns it on. Does not deploy. */
-  installProject(projectFile: string): { id: string; name: string; files: number; added: boolean };
+  /**
+   * Adds the project's packed output, or refreshes the mod that follows it, and turns it on. Does not
+   * deploy. When EDGEdeck has a mod of the same name that does not follow this project, asks once:
+   * use this project for it, keep both (the project as another version, on), or cancel (undefined).
+   */
+  installProject(projectFile: string): Promise<{ id: string; name: string; files: number; added: boolean } | undefined>;
   /** Names of the mods, other than `except`, whose changes wait for a deploy. */
   pendingMods(except?: string): string[];
   /** Deploys as EDGEdeck: Deploy does, with its questions and its result message. Undefined when refused or cancelled. */
-  deploy(): Promise<{ linked: number; removed: number; kept: number; skipped: string[]; conflicts: number } | undefined>;
+  deploy(): Promise<ApiDeployResult | undefined>;
   /** Turns a mod off; the next deploy removes its files from the game. */
   turnOff(id: string): void;
+}
+
+/**
+ * A deploy's result for other extensions. `lost`: mods that are on but lost files to a mod above them
+ * (ids, and the winner's name), so REDcode can say when the game still has another build.
+ */
+export interface ApiDeployResult {
+  linked: number;
+  removed: number;
+  kept: number;
+  skipped: string[];
+  conflicts: number;
+  lost: { mod: string; files: number; winner: string; winnerName: string }[];
+}
+
+function apiResult(result: DeployResult): ApiDeployResult {
+  const nameOf = (id: string) => library?.mods.find((m) => m.id === id)?.name ?? id;
+  return {
+    linked: result.linked,
+    removed: result.removed,
+    kept: result.kept,
+    skipped: result.skipped,
+    conflicts: state.plan?.conflicts.length ?? 0,
+    lost: result.lost.map((l) => ({ ...l, winnerName: nameOf(l.winner) })),
+  };
 }
 
 function needLibrary(): Library {
@@ -177,15 +206,59 @@ function needLibrary(): Library {
   return library;
 }
 
+/** A mod in a sentence: name, version, and the project folder when it follows one (two can share a name). */
+function describeMod(mod: ModInfo): string {
+  return `${mod.name}${mod.version ? ` ${mod.version}` : ""}${mod.source.type === "project" && mod.source.path ? ` (${path.dirname(mod.source.path)})` : ""}`;
+}
+
+/**
+ * Before a project goes in: when EDGEdeck has a mod of its name that does not follow it (another
+ * project folder, or a download), asks once what to do with the two. Undefined when there is nothing
+ * to ask, "cancel" when the question was closed.
+ */
+async function askBeside(lib: Library, projectFile: string): Promise<{ mod: ModInfo; how: BesideHow } | undefined | "cancel"> {
+  const other = sameNameMod(lib, projectFile);
+  if (!other) return undefined;
+  const isProject = other.source.type === "project";
+  const a = await vscode.window.showWarningMessage(
+    `EDGEdeck already has ${describeMod(other)}. What should happen to it?`,
+    {
+      modal: true,
+      detail: [
+        isProject ? `Use this project: ${other.name} follows ${path.dirname(projectFile)} from now on and gets its files. No second mod.` : "",
+        `Keep both: this project becomes another version of ${other.name} and is on in its place. Switch version goes back.`,
+      ].filter(Boolean).join("\n\n"),
+    },
+    ...(isProject ? ["Use this project"] : []),
+    "Keep both",
+  );
+  if (!a) return "cancel";
+  return { mod: other, how: a === "Use this project" ? "follow" : "version" };
+}
+
+/** installProject with the same-name question, logged. Undefined when the user cancelled. */
+async function installProjectAsking(projectFile: string, forWhom: string): Promise<InstallProjectResult | undefined> {
+  const lib = needLibrary();
+  const beside = await askBeside(lib, projectFile);
+  if (beside === "cancel") {
+    log.appendLine(`${projectName(projectFile)}: not added (cancelled at the same-name question)`);
+    return undefined;
+  }
+  const before = beside && describeMod(beside.mod);
+  const r = installProject(lib, projectFile, beside);
+  const how = r.beside?.how === "follow" ? `; ${before} follows this project now` : r.beside ? `; another version of ${before}, on in its place` : "";
+  log.appendLine(`${r.added ? "Added" : "Refreshed"} ${r.mod.name} ${r.mod.version} from project ${projectFile}${forWhom} (${r.mod.files.length} files, ${r.mod.kinds.join(", ")})${how}`);
+  refresh();
+  return r;
+}
+
 const api: EDGEdeckApi = {
   apiVersion: 1,
   gamePath: () => settings().gamePath,
   projectMod: (projectFile) => library?.mods.find((m) => m.source.type === "project" && m.source.path?.toLowerCase() === projectFile.toLowerCase())?.id,
-  installProject: (projectFile) => {
-    const { mod, added } = installProject(needLibrary(), projectFile);
-    log.appendLine(`${added ? "Added" : "Refreshed"} ${mod.name} from project ${projectFile} for REDcode (${mod.files.length} files, ${mod.kinds.join(", ")})`);
-    refresh();
-    return { id: mod.id, name: mod.name, files: mod.files.length, added };
+  installProject: async (projectFile) => {
+    const r = await installProjectAsking(projectFile, " for REDcode");
+    return r && { id: r.mod.id, name: r.mod.name, files: r.mod.files.length, added: r.added };
   },
   pendingMods: (except) => {
     const lib = needLibrary();
@@ -198,7 +271,7 @@ const api: EDGEdeckApi = {
   },
   deploy: async () => {
     const result = await deployNow();
-    return result && { linked: result.linked, removed: result.removed, kept: result.kept, skipped: result.skipped, conflicts: state.plan?.conflicts.length ?? 0 };
+    return result && apiResult(result);
   },
   turnOff: (id) => {
     const lib = needLibrary();
@@ -1592,10 +1665,10 @@ async function addProjectCommand(target: string | undefined): Promise<void> {
   }
   const c = classifyProject(projectFile);
   if (!c.placements.length) throw new Error(`${projectName(projectFile)} has no packed output yet. Pack the project in REDcode or WolvenKit first (packed/ next to the project file).`);
-  const mod = addMod(library, c.placements, { name: projectName(projectFile), version: "dev", source: { type: "project", path: projectFile } });
-  log.appendLine(`Added ${mod.name} from project ${projectFile} (${mod.files.length} files, ${mod.kinds.join(", ")})`);
-  refresh();
-  void vscode.window.showInformationMessage(`${mod.name} added from its project. Deploy to test it; after every pack, deploy again.`);
+  const r = await installProjectAsking(projectFile, "");
+  if (!r) return;
+  const what = r.beside?.how === "follow" ? `${r.mod.name} follows this project now` : r.beside ? `${r.mod.name} ${r.mod.version} added from its project, on in place of the other version` : `${r.mod.name} added from its project`;
+  void vscode.window.showInformationMessage(`${what}. Deploy to test it; after every pack, deploy again.`);
 }
 
 /** Save as new loadout: a copy of the mods' on/off state now, under a new name. The active loadout stays active. */
@@ -1932,7 +2005,31 @@ async function deployNow(): Promise<DeployResult | undefined> {
     if (a === "View" && report) void vscode.commands.executeCommand("markdown.showPreview", vscode.Uri.file(report)).then(undefined, () => vscode.window.showTextDocument(vscode.Uri.file(report!)));
     else if (a === "Show conflicts") void showConflicts();
   });
+  warnLostProjects(result);
   return result;
+}
+
+/**
+ * A project whose files lost to another mod: the game is not running the build just packed, which
+ * a conflict count alone does not make plain. Said once per pair, with a button to let it win.
+ */
+function warnLostProjects(result: DeployResult): void {
+  if (!library) return;
+  const lib = library;
+  for (const l of result.lost) {
+    const mod = lib.mods.find((m) => m.id === l.mod);
+    const winner = lib.mods.find((m) => m.id === l.winner);
+    if (!mod || !winner || mod.source.type !== "project") continue;
+    const text = `The game still has ${describeMod(winner)} for ${l.files} file${l.files === 1 ? "" : "s"}, not the project ${describeMod(mod)}.`;
+    log.appendLine(text);
+    void vscode.window.showWarningMessage(text, `Let ${mod.name} win`).then((a) => {
+      if (!a) return;
+      placeAbove(lib, mod, winner);
+      log.appendLine(`${mod.name} placed above ${winner.name}`);
+      refresh();
+      offerDeploy(`${mod.name} now wins over ${winner.name}.`);
+    });
+  }
 }
 
 async function undoCommand(): Promise<void> {

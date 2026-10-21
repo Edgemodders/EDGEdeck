@@ -23,7 +23,7 @@ Tools:
 | `edgedeck_list` | Every mod: on or off, version, kinds, status, size; the frameworks line after a game patch |
 | `edgedeck_mod` | One mod in detail: files, versions, Nexus info |
 | `edgedeck_add` | Add a zip, 7z, rar, single mod file or folder to the library |
-| `edgedeck_install_project` | Add or refresh a REDcode or WolvenKit project's packed output |
+| `edgedeck_install_project` | Add or refresh a REDcode or WolvenKit project's packed output; `sameName` (`follow` or `version`) settles a mod of the same name from another folder |
 | `edgedeck_turn` | Turn a mod on or off |
 | `edgedeck_move` | Move a mod up or down; higher wins a conflict |
 | `edgedeck_remove` | Remove a mod from the library |

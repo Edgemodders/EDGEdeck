@@ -70,6 +70,19 @@ export async function run(): Promise<void> {
   await vscode.commands.executeCommand("edgedeck.details", { type: "mod", mod: JSON.parse(fs.readFileSync(path.join(modDir, "mod.json"), "utf8")) });
   await new Promise((r) => setTimeout(r, 500));
 
+  // The API REDcode uses: installProject is async (it may ask about a mod of the same name) and
+  // deploy() reports the mods that lost files.
+  const api = ext.exports as { installProject(f: string): Promise<{ id: string; added: boolean } | undefined>; deploy(): Promise<{ lost: unknown[] } | undefined> };
+  const proj = path.join(lib, "..", "ui-project");
+  fs.mkdirSync(path.join(proj, "packed", "archive", "pc", "mod"), { recursive: true });
+  fs.writeFileSync(path.join(proj, "UiProject.cpmodproj"), "<CP77Mod><ModName>UI Project</ModName></CP77Mod>");
+  fs.writeFileSync(path.join(proj, "packed", "archive", "pc", "mod", "UiProject.archive"), "p");
+  const installed = await api.installProject(path.join(proj, "UiProject.cpmodproj"));
+  assert.equal(installed?.added, true, "installProject did not add the project");
+  const deployed = await api.deploy();
+  assert.ok(Array.isArray(deployed?.lost), "deploy() has no lost list");
+  assert.ok(fs.existsSync(path.join(game, "archive", "pc", "mod", "UiProject.archive")), "the project did not deploy");
+
   await cfg.update("libraryPath", undefined, vscode.ConfigurationTarget.Global);
   await cfg.update("gamePath", undefined, vscode.ConfigurationTarget.Global);
   console.log("ui test: all passed");

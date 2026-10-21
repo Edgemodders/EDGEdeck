@@ -5,7 +5,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { classify, type Classification } from "./classifier";
-import { addMod, saveMod, sourcePath, type Library, type ModInfo } from "./library";
+import { activateVersion, baseName, familyKey, familyOf } from "./families";
+import { addMod, placeAbove, saveMod, sourcePath, type Library, type ModInfo } from "./library";
 
 export interface AddToProjectResult {
   /** Project-relative paths written. */
@@ -130,6 +131,38 @@ export interface InstallProjectResult {
   mod: ModInfo;
   /** True when the project was new to the library; false when the mod that follows it was refreshed. */
   added: boolean;
+  /** The mod of the same name the project went in beside, and how (see `installProject`). */
+  beside?: { mod: ModInfo; how: BesideHow };
+}
+
+/** follow: the mod of the same name follows this project from now on. version: the project is another version of it. */
+export type BesideHow = "follow" | "version";
+
+/** The mod that follows this project file, if any. */
+export function projectMod(lib: Library, projectFile: string): ModInfo | undefined {
+  return lib.mods.find((m) => m.source.type === "project" && m.source.path?.toLowerCase() === projectFile.toLowerCase());
+}
+
+/**
+ * A mod with the project's name that does not follow this project (another project folder, or a
+ * download of the same mod): the active version of its family. Undefined when the project is known
+ * already or no name matches. Installing beside one without asking would leave two mods fighting
+ * over the same files, and the older one can win.
+ */
+export function sameNameMod(lib: Library, projectFile: string): ModInfo | undefined {
+  if (projectMod(lib, projectFile)) return undefined;
+  const name = baseName(projectName(projectFile));
+  const match = name ? lib.mods.find((m) => baseName(m.name) === name) : undefined;
+  return match && familyOf(lib, match).active;
+}
+
+/** "dev", or "dev 2", "dev 3"... when the family has those already. */
+function devVersion(lib: Library, family: string): string {
+  const taken = new Set(lib.mods.filter((m) => familyKey(m) === family).map((m) => m.version.toLowerCase()));
+  if (!taken.has("dev")) return "dev";
+  let n = 2;
+  while (taken.has(`dev ${n}`)) n++;
+  return `dev ${n}`;
 }
 
 /**
@@ -137,12 +170,37 @@ export interface InstallProjectResult {
  * output now, whatever the file times say, and is turned on; a project EDGEdeck does not know yet is
  * added as version "dev". Deploying is a separate step, so the caller can ask about other pending
  * changes first.
+ *
+ * `beside` answers the question about a mod of the same name (`sameNameMod`): follow makes that mod
+ * follow this project and refreshes it; version adds the project as another version of its family,
+ * on in the active version's place. Without it, a new project is a mod of its own.
  */
-export function installProject(lib: Library, projectFile: string): InstallProjectResult {
+export function installProject(lib: Library, projectFile: string, beside?: { mod: ModInfo; how: BesideHow }): InstallProjectResult {
   const c = classifyProject(projectFile);
   if (!c.placements.length) throw new Error(`${projectName(projectFile)} has no packed output yet. Pack the project first (packed/ next to the project file).`);
-  const existing = lib.mods.find((m) => m.source.type === "project" && m.source.path?.toLowerCase() === projectFile.toLowerCase());
+  let existing = projectMod(lib, projectFile);
+  if (!existing && beside?.how === "follow") {
+    existing = beside.mod;
+    // Its family (other versions, its section) stays where it was, whatever its source says now.
+    existing.family = familyKey(existing);
+    existing.source = { type: "project", path: projectFile };
+  }
   if (!existing) {
+    if (beside?.how === "version") {
+      const family = familyKey(beside.mod);
+      const previous = familyOf(lib, beside.mod);
+      const mod = addMod(lib, c.placements, { name: beside.mod.name, version: devVersion(lib, family), source: { type: "project", path: projectFile } });
+      mod.family = family;
+      placeAbove(lib, mod, previous.active);
+      for (const m of previous.mods) {
+        if (m.enabled) {
+          m.enabled = false;
+          saveMod(lib, m);
+        }
+      }
+      saveMod(lib, mod);
+      return { mod, added: true, beside };
+    }
     const mod = addMod(lib, c.placements, { name: projectName(projectFile), version: "dev", source: { type: "project", path: projectFile } });
     return { mod, added: true };
   }
@@ -156,7 +214,9 @@ export function installProject(lib: Library, projectFile: string): InstallProjec
   for (const f of existing.files) if (!keep.has(f)) fs.rmSync(sourcePath(lib, existing, f), { force: true });
   existing.files = [...keep].sort();
   existing.kinds = c.kinds;
+  // On, in the place of whichever version of its family was on.
+  activateVersion(lib, existing);
   existing.enabled = true;
   saveMod(lib, existing);
-  return { mod: existing, added: false };
+  return { mod: existing, added: false, ...(beside ? { beside } : {}) };
 }

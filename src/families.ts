@@ -1,7 +1,8 @@
 // Families: the versions of one mod, grouped. The library keeps one entry per downloaded version
 // so a user can go back; the UI shows one row per mod with a version to pick. A family's key is
-// the Nexus mod id when there is one, else a REDnode package's id, else the project path, else the
-// name without version tokens. Only one version of a family is on at a time.
+// the one set by hand (`family`), else the Nexus mod id when there is one, else a REDnode package's
+// id, else the project path, else the name without version tokens. Only one version of a family is
+// on at a time.
 
 import { placeAbove, saveMod, type Library, type ModInfo } from "./library";
 import { versionNewer } from "./nexus";
@@ -40,6 +41,7 @@ export function rednodePackageId(mod: Pick<ModInfo, "files">): string | undefine
 }
 
 export function familyKey(mod: ModInfo): string {
+  if (mod.family) return mod.family;
   if (mod.source.modId) return `nexus:${mod.source.modId}`;
   const pkg = rednodePackageId(mod);
   if (pkg) return `rednode:${pkg}`;

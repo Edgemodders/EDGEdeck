@@ -5,7 +5,10 @@
 //   edgedeck list [--size]              what is in the library, its size and status (--size: largest first)
 //   edgedeck mod <id>                   one mod in full: files, sizes, source, Nexus data, conflicts
 //   edgedeck add <file|folder> [--name N] [--option FOLDER]
-//   edgedeck install-project <.cpmodproj>  add a REDcode or WolvenKit project's packed output, or refresh it, and turn it on
+//   edgedeck install-project <.cpmodproj> [--follow | --keep-both]
+//                                       add a REDcode or WolvenKit project's packed output, or refresh it, and turn it on;
+//                                       beside a mod of the same name: --follow makes that mod follow this project,
+//                                       --keep-both adds the project as another version of it, on in its place
 //   edgedeck on <id> | off <id>         turn a mod on or off
 //   edgedeck up <id> | down <id>        change the order (first wins conflicts)
 //   edgedeck remove <id>
@@ -66,7 +69,7 @@ if (cmd === "mcp") {
       case "list": out(await v.list(s, !!flags.size)); break;
       case "mod": out(v.mod(s, need(rest[0], "a mod id"))); break;
       case "add": out(await v.add(s, need(rest[0], "a file or folder"), flags.name, flags.option)); break;
-      case "install-project": out(v.installProject(s, need(rest[0], "a .cpmodproj file"))); break;
+      case "install-project": out(v.installProject(s, need(rest[0], "a .cpmodproj file"), flags.follow ? "follow" : flags["keep-both"] ? "version" : undefined)); break;
       case "on":
       case "off": out(v.turn(s, need(rest[0], "a mod id"), cmd === "on")); break;
       case "up":

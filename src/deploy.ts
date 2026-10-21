@@ -217,6 +217,30 @@ export interface DeployResult {
   changes: DeployChange[];
   /** Mods with files in the game after this deploy. */
   modsInGame: number;
+  /** Mods that are on but lost files to a mod above them: per loser and winner, how many files. */
+  lost: Lost[];
+}
+
+export interface Lost {
+  /** The mod whose files are not in the game. */
+  mod: string;
+  files: number;
+  /** The mod whose files are there instead. */
+  winner: string;
+}
+
+/** Conflicts turned around: which mods lose how many files to which. */
+export function lostFiles(p: Plan): Lost[] {
+  const out = new Map<string, Lost>();
+  for (const c of p.conflicts) {
+    for (const loser of c.losers) {
+      const k = `${loser}\0${c.winner}`;
+      const l = out.get(k) ?? { mod: loser, files: 0, winner: c.winner };
+      l.files++;
+      out.set(k, l);
+    }
+  }
+  return [...out.values()];
 }
 
 export interface DeployChange {
@@ -350,7 +374,7 @@ export function deploy(lib: Library, gamePath: string, decisions: Map<string, De
   const p = plan(lib, gamePath);
   const manifest: Manifest = readManifest(gamePath) ?? { version: 1, library: lib.root, gamePath, method: p.method, time: "", files: [], dirs: [] };
   manifest.library = lib.root;
-  const result: DeployResult = { linked: 0, removed: 0, kept: 0, backedUp: 0, method: manifest.method, skipped: [], changes: [], modsInGame: 0 };
+  const result: DeployResult = { linked: 0, removed: 0, kept: 0, backedUp: 0, method: manifest.method, skipped: [], changes: [], modsInGame: 0, lost: lostFiles(p) };
   const entries = new Map(manifest.files.map((e) => [key(e.path), e]));
 
   // Honour the user's answers: "keep" imports the changed game file into the library first.

@@ -82,10 +82,13 @@ server.registerTool(
   "edgedeck_install_project",
   {
     title: "Install a project",
-    description: "Takes a REDcode or WolvenKit project's packed/ folder into the library: adds it as version dev the first time, and on later calls replaces the files of the mod that follows the project. The mod is turned on; deploy to put it in the game. Pack the project first.",
-    inputSchema: { project: z.string().describe("Full path of the .cpmodproj file") },
+    description: "Takes a REDcode or WolvenKit project's packed/ folder into the library: adds it as version dev the first time, and on later calls replaces the files of the mod that follows the project. The mod is turned on; deploy to put it in the game. Pack the project first. When the library has a mod of the same name that does not follow this project (another project folder, or a download), the result says so; ask the player and call again with sameName.",
+    inputSchema: {
+      project: z.string().describe("Full path of the .cpmodproj file"),
+      sameName: z.enum(["follow", "version"]).optional().describe("For a mod of the same name: follow = it follows this project from now on (no second mod); version = the project becomes another version of it, on in its place"),
+    },
   },
-  ({ project }) => run(() => verbs.installProject(session(), project))(),
+  ({ project, sameName }) => run(() => verbs.installProject(session(), project, sameName))(),
 );
 
 server.registerTool(
