@@ -25,6 +25,8 @@ nav:
     url: /
   - title: Guide
     url: /guide.html
+  - title: Changelog
+    url: /changelog.html
   - title: Design
     url: /design.html
   - title: Tests

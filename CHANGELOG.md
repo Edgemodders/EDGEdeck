@@ -1,12 +1,23 @@
 # Changelog
 
-## 0.28.0 (2026-10-21)
+What changed in each EDGEdeck release, for players and modders. Each release takes its notes from its section here: the GitHub release (written by the publish workflow), the VS Code Marketplace and Open VSX (which show this file), and the version's changelog on the Nexus Mods page (pasted by hand).
+
+How to keep it:
+
+- With each change a player or modder would notice, add a line under **Unreleased**, in its group: **New**, **Changed**, **Fixed** or **Other**. One change per line, in the commit that makes the change. Leave out what only the tests see.
+- Before a release, rename **Unreleased** to `## <version> (<date>)` and start a new empty **Unreleased** above it. The publish workflow stops before publishing anything if the version has no section.
+- Links are full URLs, since the same text goes to GitHub, the stores and Nexus.
+- `npm run release:notes` prints the GitHub notes; `npm run release:notes -- --nexus` prints plain lines for Nexus's changelog field, one per change.
+- Sections before 0.28.0 predate the groups and are left as they were; entries before 0.27.0 keep the old name, REDdeck.
+
+## Unreleased
+
+**New**
 
 - **Run game.** A play button in the Mods view's title bar, and **Run game** on the EDGEdeck page, start Cyberpunk 2077 with `-modded`, so REDmod mods load. A game in a Steam library starts through Steam, any other from `bin\x64\Cyberpunk2077.exe`; the setting `edgedeck.launch` can force one way. Changes waiting are deployed first, so the game gets what the list shows, and a game already running is left alone. The same as REDcode's Run Game.
 - **A project beside a mod of the same name.** Installing a project (REDcode's Install, or Add from REDcode project) when EDGEdeck already has a mod of that name from another project folder or a download asks once: **Use this project** (the existing mod follows the new folder from now on, no second mod) or **Keep both** (the project becomes another version of that mod, `dev 2`, and is on in its place; Switch version goes back). Before, the second folder became a second mod, and the older build could keep winning the files they share. The command line takes `--follow` or `--keep-both`, the MCP tool `sameName`.
 - **The deploy message says when a project lost.** When another mod wins files over a project's mod, EDGEdeck says "The game still has X for N files, not the project Y", with **Let Y win**. For REDcode, `deploy()` in the API returns these as `lost`.
 - **Deploy one mod.** For REDcode's Install: `deployMod(id)` in the API, `edgedeck deploy --mod <id>` and `mod` on the MCP deploy tool put in, refresh or take out that mod's files only. Other mods' changes keep waiting for the next Deploy, and the message says how many. `modlist.txt` lists only the archives then in the game. A REDmod change runs REDmod over the REDmods in the game, which it always prepares together.
-- `npm run test:ui` works when a VS Code extension starts it (an assistant in VS Code, say). It inherited `ELECTRON_RUN_AS_NODE`, so the test VS Code started as plain Node and failed.
 
 ## 0.27.4 (2026-10-17)
 

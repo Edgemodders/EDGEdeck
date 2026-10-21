@@ -25,6 +25,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # CHANGELOG.md lives at the root for the stores; the site shows it as changelog.html.
+      - name: Changelog page
+        run: |
+          { printf -- '---\ntitle: Changelog\n---\n\n'; cat CHANGELOG.md; } > docs/changelog.md
       - name: Build site with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:

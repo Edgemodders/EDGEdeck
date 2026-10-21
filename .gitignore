@@ -16,5 +16,8 @@ node_modules/
 library/
 test-library/
 
+# written from CHANGELOG.md by the docs site workflow
+docs/changelog.md
+
 # VS Code builds downloaded by the UI test
 .vscode-test/

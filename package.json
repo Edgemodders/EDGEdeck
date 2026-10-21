@@ -616,7 +616,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "smoke": "node scripts/smoke.mjs",
     "package": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && vsce package --no-dependencies --target win32-x64 --readme-path docs/marketplace.md --out dist/",
-    "test:ui": "node scripts/ui-test.mjs"
+    "test:ui": "node scripts/ui-test.mjs",
+    "release:notes": "node scripts/release-notes.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

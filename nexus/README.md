@@ -52,6 +52,7 @@ By hand, after `npm run package`: `node scripts/nexus-zip.mjs` writes `dist/EDGE
 2. Check it: `node scripts/check-bbcode.mjs nexus/description.bbcode`.
 3. Paste the whole file into the description field on Nexus and save.
 4. For a new version: upload the release's Nexus zip as the main file with the version from `package.json`, Mod Manager Download off. Archive the old file.
+5. Also for a new version: paste the output of `npm run release:notes -- --nexus` (one plain line per change, from the version's CHANGELOG.md section) into the page's changelog for that version.
 
 Keep these in step with the extension (docs/marketplace.md, CHANGELOG.md):
 

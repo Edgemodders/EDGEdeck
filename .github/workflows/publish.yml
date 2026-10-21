@@ -3,7 +3,8 @@
 # the VS Code Marketplace (VSCE_PAT) and Open VSX (OVSX_PAT, skipped while that secret is not set),
 # publishes the MCP server and CLI to npm as @edgemodders/edgedeck-mcp at the same version (NPM_TOKEN),
 # and attaches the .vsix and the Nexus Mods zip (scripts/nexus-zip.mjs, uploaded to Nexus by hand) to a
-# GitHub release. The tokens are Edgemodders organisation secrets.
+# GitHub release with the version's CHANGELOG.md section as notes (scripts/release-notes.mjs; no
+# section, no release). The tokens are Edgemodders organisation secrets.
 name: Publish
 
 on:
@@ -37,6 +38,10 @@ jobs:
             exit 1
           fi
           echo "VERSION=${version}" >> "$GITHUB_ENV"
+
+      # Before anything is built or published: no CHANGELOG.md section for the version stops here.
+      - name: Release notes from CHANGELOG.md
+        run: node scripts/release-notes.mjs "${VERSION}" --out "${RUNNER_TEMP}/notes.md"
 
       - run: npm ci
       - run: npm run typecheck
@@ -85,10 +90,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes=$(node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const m=s.split(/^## /m).find(p=>p.startsWith(process.argv[1]+' '));console.log(m?m.split('\n').slice(1).join('\n').trim():'')" "${VERSION}")
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             echo "Release ${GITHUB_REF_NAME} already exists; adding the Nexus zip if it is missing"
             gh release upload "${GITHUB_REF_NAME}" "dist/EDGEdeck-${VERSION}-nexus.zip" --clobber
             exit 0
           fi
-          gh release create "${GITHUB_REF_NAME}" "dist/edgedeck-${VERSION}.vsix" "dist/EDGEdeck-${VERSION}-nexus.zip" --title "EDGEdeck ${VERSION}" --notes "${notes}"
+          gh release create "${GITHUB_REF_NAME}" "dist/edgedeck-${VERSION}.vsix" "dist/EDGEdeck-${VERSION}-nexus.zip" --title "EDGEdeck ${VERSION}" --notes-file "${RUNNER_TEMP}/notes.md"
