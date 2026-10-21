@@ -7,6 +7,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
+// Set when this runs under a VS Code extension (an assistant in VS Code, say); the test VS Code would start as plain Node.
+delete process.env.ELECTRON_RUN_AS_NODE;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "edgedeck-ui-"));
 const game = path.join(tmp, "game");
 const lib = path.join(tmp, "lib");
