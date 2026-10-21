@@ -6,6 +6,7 @@ import { execFile } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { promisify } from "node:util";
+import { readManifest } from "./deploy";
 import type { Library } from "./library";
 
 const run = promisify(execFile);
@@ -27,15 +28,30 @@ export function enabledRedmodPackages(lib: Library): string[] {
   return names;
 }
 
+/** REDmod package folder names in the game by the manifest, in list order: what one mod's deploy compiles. */
+export function deployedRedmodPackages(lib: Library, gamePath: string): string[] {
+  const inGame = new Set((readManifest(gamePath)?.files ?? []).map((e) => /^mods\/([^/]+)\//i.exec(e.path)?.[1]).filter((n): n is string => !!n));
+  const names: string[] = [];
+  for (const mod of lib.mods) {
+    for (const f of mod.files) {
+      const m = /^mods\/([^/]+)\//i.exec(f);
+      if (m && inGame.has(m[1]) && !names.includes(m[1])) names.push(m[1]);
+    }
+  }
+  return names;
+}
+
 export interface RedmodResult {
   ran: boolean;
   packages: string[];
   output: string;
 }
 
-/** Writes the mod list and runs `redMod.exe deploy`. Skips when there is nothing to deploy or no tool. */
-export async function deployRedmod(lib: Library, gamePath: string, log?: (line: string) => void): Promise<RedmodResult> {
-  const packages = enabledRedmodPackages(lib);
+/**
+ * Writes the mod list and runs `redMod.exe deploy`. Skips when there is nothing to deploy or no tool.
+ * `packages` defaults to the enabled mods' packages (a full deploy).
+ */
+export async function deployRedmod(lib: Library, gamePath: string, log?: (line: string) => void, packages = enabledRedmodPackages(lib)): Promise<RedmodResult> {
   const exe = redModExe(gamePath);
   if (!packages.length) return { ran: false, packages, output: "no REDmod packages enabled" };
   if (!fs.existsSync(exe)) return { ran: false, packages, output: `redMod.exe not found at ${exe}; the REDmod tools are a free DLC on the game's store page` };

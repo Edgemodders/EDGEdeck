@@ -138,10 +138,14 @@ server.registerTool(
   {
     title: "Deploy",
     description: "Hardlinks (or copies, on another drive) the files of every mod that is on into the game folder, writes the archive load order, prepares REDmod packages and records a manifest. A file changed in the game folder since the last deploy is skipped and named; call again with keep (import the changed file into the library) or restore (put the mod's file back). Refuses while Vortex manages the game folder.",
-    inputSchema: { keep: z.array(z.string()).optional().describe("Game-folder paths whose changed file to keep"), restore: z.array(z.string()).optional().describe("Game-folder paths to overwrite with the mod's file") },
+    inputSchema: {
+      keep: z.array(z.string()).optional().describe("Game-folder paths whose changed file to keep"),
+      restore: z.array(z.string()).optional().describe("Game-folder paths to overwrite with the mod's file"),
+      mod: z.string().optional().describe("A mod id: deploy only that mod's changes and leave other mods' changes waiting"),
+    },
     annotations: { destructiveHint: true },
   },
-  ({ keep, restore }) => run(() => verbs.deploy(session(), keep, restore))(),
+  ({ keep, restore, mod }) => run(() => verbs.deploy(session(), keep, restore, mod))(),
 );
 
 server.registerTool(

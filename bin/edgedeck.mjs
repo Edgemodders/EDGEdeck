@@ -12,7 +12,7 @@
 //   edgedeck on <id> | off <id>         turn a mod on or off
 //   edgedeck up <id> | down <id>        change the order (first wins conflicts)
 //   edgedeck remove <id>
-//   edgedeck deploy [--keep PATH...] [--restore PATH...]
+//   edgedeck deploy [--keep PATH...] [--restore PATH...] [--mod ID]   --mod: that mod's changes only
 //   edgedeck undo
 //   edgedeck changes                    files changed in the game folder since the deploy
 //   edgedeck pending                    what the next deploy adds, replaces, puts back or removes, and why
@@ -75,7 +75,7 @@ if (cmd === "mcp") {
       case "up":
       case "down": out(v.move(s, need(rest[0], "a mod id"), cmd)); break;
       case "remove": out(v.remove(s, need(rest[0], "a mod id"))); break;
-      case "deploy": out(await v.deploy(s, flags.keep ?? [], flags.restore ?? [])); break;
+      case "deploy": out(await v.deploy(s, flags.keep ?? [], flags.restore ?? [], typeof flags.mod === "string" ? flags.mod : undefined)); break;
       case "undo": out(v.undo(s)); break;
       case "changes": out(v.changes(s)); break;
       case "pending": out(v.pending(s)); break;

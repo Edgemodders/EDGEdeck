@@ -72,7 +72,11 @@ export async function run(): Promise<void> {
 
   // The API REDcode uses: installProject is async (it may ask about a mod of the same name) and
   // deploy() reports the mods that lost files.
-  const api = ext.exports as { installProject(f: string): Promise<{ id: string; added: boolean } | undefined>; deploy(): Promise<{ lost: unknown[] } | undefined> };
+  const api = ext.exports as {
+    installProject(f: string): Promise<{ id: string; added: boolean } | undefined>;
+    deploy(): Promise<{ lost: unknown[] } | undefined>;
+    deployMod(id: string): Promise<{ waiting?: number } | undefined>;
+  };
   const proj = path.join(lib, "..", "ui-project");
   fs.mkdirSync(path.join(proj, "packed", "archive", "pc", "mod"), { recursive: true });
   fs.writeFileSync(path.join(proj, "UiProject.cpmodproj"), "<CP77Mod><ModName>UI Project</ModName></CP77Mod>");
@@ -82,6 +86,12 @@ export async function run(): Promise<void> {
   const deployed = await api.deploy();
   assert.ok(Array.isArray(deployed?.lost), "deploy() has no lost list");
   assert.ok(fs.existsSync(path.join(game, "archive", "pc", "mod", "UiProject.archive")), "the project did not deploy");
+  // deployMod: a rebuilt project goes in alone; nothing else was waiting.
+  fs.writeFileSync(path.join(proj, "packed", "archive", "pc", "mod", "UiProject.archive"), "p2");
+  await api.installProject(path.join(proj, "UiProject.cpmodproj"));
+  const one = await api.deployMod(installed!.id);
+  assert.equal(one?.waiting, 0, "deployMod left other changes waiting");
+  assert.equal(fs.readFileSync(path.join(game, "archive", "pc", "mod", "UiProject.archive"), "utf8"), "p2", "deployMod did not relink the rebuilt file");
 
   await cfg.update("libraryPath", undefined, vscode.ConfigurationTarget.Global);
   await cfg.update("gamePath", undefined, vscode.ConfigurationTarget.Global);

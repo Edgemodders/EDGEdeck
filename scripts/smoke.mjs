@@ -218,6 +218,43 @@ console.log("changes: ok");
   console.log("rebuilt: ok");
 }
 
+// One mod's deploy (REDcode's Install, EDGEdeck #2): its files go in, other mods' changes wait,
+// modlist.txt lists only what is in the game, and the manifest stays true.
+{
+  const listed = () => fs.readFileSync(path.join(game, ...core.ModListPath.split("/")), "utf8").split("\r\n").filter(Boolean);
+  const was = listed();
+  write(path.join(src, "one-a", "archive", "pc", "mod", "OneA.archive"), "a");
+  write(path.join(src, "one-a", "r6", "scripts", "OneA", "OneA.reds"), "a");
+  write(path.join(src, "one-b", "archive", "pc", "mod", "OneB.archive"), "b");
+  write(path.join(src, "one-c", "archive", "pc", "mod", "OneA.archive"), "c");
+  const a = core.addMod(lib, cls("one-a", "OneA").placements, { name: "OneA", source: { type: "folder" } });
+  const b = core.addMod(lib, cls("one-b", "OneB").placements, { name: "OneB", source: { type: "folder" } });
+  const r1 = core.deploy(lib, game, new Map(), undefined, undefined, a.id);
+  assert.ok(fs.existsSync(path.join(game, "archive", "pc", "mod", "OneA.archive")));
+  assert.ok(!fs.existsSync(path.join(game, "archive", "pc", "mod", "OneB.archive")), "the other mod waits");
+  assert.equal(r1.waiting, 1);
+  assert.deepEqual(listed(), [...was, "OneA.archive"], "modlist.txt lists what is in the game");
+  assert.deepEqual(core.pendingChanges(lib, game, core.plan(lib, game)).filter((c) => c.mod !== "edgedeck").map((c) => c.mod), [b.id], "only the other mod is pending");
+  assert.ok(core.readManifest(game).files.some((e) => e.mod === a.id && e.path === "r6/scripts/OneA/OneA.reds"));
+  // Another mod now wins a path this mod has in the game: the path goes to the winner, and lost says so.
+  const cMod = core.addMod(lib, cls("one-c", "OneC").placements, { name: "OneC", source: { type: "folder" } });
+  core.placeAbove(lib, cMod, a);
+  const r2 = core.deploy(lib, game, new Map(), undefined, undefined, a.id);
+  assert.equal(fs.readFileSync(path.join(game, "archive", "pc", "mod", "OneA.archive"), "utf8"), "c");
+  assert.deepEqual(r2.lost.filter((l) => l.mod === a.id), [{ mod: a.id, files: 1, winner: cMod.id }]);
+  // Turned off, one mod's deploy takes its files out and leaves the rest.
+  a.enabled = false;
+  core.saveMod(lib, a);
+  core.deploy(lib, game, new Map(), undefined, undefined, a.id);
+  assert.ok(!fs.existsSync(path.join(game, "r6", "scripts", "OneA", "OneA.reds")));
+  assert.ok(!fs.existsSync(path.join(game, "archive", "pc", "mod", "OneB.archive")), "still waiting");
+  for (const m of [a, b, cMod]) core.removeMod(lib, m);
+  core.deploy(lib, game);
+  assert.deepEqual(listed(), was);
+  assert.equal(core.plan(lib, game).add.length + core.plan(lib, game).stale.length, 0, "a full deploy settles everything");
+  console.log("deploy one mod: ok");
+}
+
 // A project: its packed folder is the mod; packing again refreshes the library copy.
 {
   const proj = path.join(tmp, "proj");

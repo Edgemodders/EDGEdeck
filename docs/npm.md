@@ -28,7 +28,7 @@ Tools:
 | `edgedeck_move` | Move a mod up or down; higher wins a conflict |
 | `edgedeck_remove` | Remove a mod from the library |
 | `edgedeck_pending` | What the next deploy would add, replace, put back or remove, and why |
-| `edgedeck_deploy` | Put the active loadout in the game (refuses while the game runs) |
+| `edgedeck_deploy` | Put the active loadout in the game (refuses while the game runs); `mod` deploys that mod's changes only |
 | `edgedeck_undo` | Take everything EDGEdeck deployed out again, putting backups back |
 | `edgedeck_changes` | Deployed files changed or missing in the game folder since |
 | `edgedeck_conflicts` | Files two enabled mods both have, and who wins |

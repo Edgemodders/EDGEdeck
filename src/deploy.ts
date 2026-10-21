@@ -219,6 +219,8 @@ export interface DeployResult {
   modsInGame: number;
   /** Mods that are on but lost files to a mod above them: per loser and winner, how many files. */
   lost: Lost[];
+  /** A deploy of one mod: other mods' changes left for the next deploy, as paths. */
+  waiting?: number;
 }
 
 export interface Lost {
@@ -365,10 +367,36 @@ function cleanDirs(gamePath: string, manifest: Manifest): void {
 }
 
 /**
+ * The paths a deploy of one mod covers: the ones it has in the game now and the ones it wins in the
+ * plan. A path where another mod wins over it is not among them; that mod's change waits.
+ */
+export function modDeployPaths(gamePath: string, p: Plan, id: string): Set<string> {
+  const paths = new Set((readManifest(gamePath)?.files ?? []).filter((e) => e.mod === id).map((e) => key(e.path)));
+  for (const d of p.desired) if (d.mod?.id === id) paths.add(key(d.rel));
+  return paths;
+}
+
+/**
+ * modlist.txt for the archives in the game: winners first in library order, as `plan` writes it
+ * when everything is deployed. Empty when there are none.
+ */
+function modlistFor(lib: Library, files: ManifestEntry[]): string {
+  const rank = new Map(lib.mods.map((m, i) => [m.id, i]));
+  const archives = files
+    .filter((e) => e.mod !== Generated && e.path.toLowerCase().startsWith("archive/pc/mod/") && e.path.toLowerCase().endsWith(".archive"))
+    .sort((a, b) => (rank.get(a.mod) ?? 1e9) - (rank.get(b.mod) ?? 1e9) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return archives.length ? archives.map((e) => path.posix.basename(e.path)).join("\r\n") + "\r\n" : "";
+}
+
+/**
  * Deploys the enabled mods. `decisions` answers the "changed in the game folder" question per path:
  * keep (the changed file is copied into the library and becomes the mod's file) or restore.
+ *
+ * With `only`, deploys that one mod's changes (REDcode's Install): the paths `modDeployPaths` gives,
+ * and modlist.txt rewritten for the archives then in the game. Other mods' changes stay waiting,
+ * counted in `waiting`, and the manifest stays a true record of the game folder.
  */
-export function deploy(lib: Library, gamePath: string, decisions: Map<string, Decision> = new Map(), progress?: (done: number, total: number) => void, gameVersion?: string): DeployResult {
+export function deploy(lib: Library, gamePath: string, decisions: Map<string, Decision> = new Map(), progress?: (done: number, total: number) => void, gameVersion?: string, only?: string): DeployResult {
   if (vortexManages(gamePath)) throw new Error("Vortex manages this game folder. Purge in Vortex first (Mods > Purge), then deploy with EDGEdeck.");
   if (!isGameFolder(gamePath)) throw new Error(`${gamePath} does not look like the Cyberpunk 2077 folder (no bin\\x64\\Cyberpunk2077.exe).`);
   const p = plan(lib, gamePath);
@@ -376,6 +404,14 @@ export function deploy(lib: Library, gamePath: string, decisions: Map<string, De
   manifest.library = lib.root;
   const result: DeployResult = { linked: 0, removed: 0, kept: 0, backedUp: 0, method: manifest.method, skipped: [], changes: [], modsInGame: 0, lost: lostFiles(p) };
   const entries = new Map(manifest.files.map((e) => [key(e.path), e]));
+  const scope = only ? modDeployPaths(gamePath, p, only) : undefined;
+  const inScope = (rel: string) => !scope || scope.has(key(rel));
+  const stale = p.stale.filter((e) => inScope(e.path) && !(scope && e.mod === Generated));
+  const add = p.add.filter((d) => inScope(d.rel) && !(scope && d.content !== undefined));
+  if (scope) {
+    const waiting = new Set([...p.stale.map((e) => e.path), ...p.add.map((d) => d.rel)].filter((r) => !scope.has(key(r)) && key(r) !== key(ModListPath)).map(key));
+    result.waiting = waiting.size;
+  }
 
   // Honour the user's answers: "keep" imports the changed game file into the library first.
   for (const [rel, decision] of decisions) {
@@ -385,7 +421,7 @@ export function deploy(lib: Library, gamePath: string, decisions: Map<string, De
     }
   }
 
-  const total = p.stale.length + p.add.length;
+  const total = stale.length + add.length;
   let done = 0;
   const save = () => {
     manifest.time = new Date().toISOString();
@@ -393,7 +429,7 @@ export function deploy(lib: Library, gamePath: string, decisions: Map<string, De
     writeManifest(gamePath, manifest);
   };
 
-  for (const entry of p.stale) {
+  const takeOut = (entry: ManifestEntry) => {
     const decided = decisions.get(entry.path);
     if (removeDeployed(lib, gamePath, manifest, entry, decided !== undefined, result.skipped)) {
       entries.delete(key(entry.path));
@@ -401,11 +437,9 @@ export function deploy(lib: Library, gamePath: string, decisions: Map<string, De
       result.changes.push({ path: entry.path, mod: entry.mod, kind: "removed", ...(entry.backup ? { backup: true } : {}) });
     }
     manifest.files = [...entries.values()];
-    progress?.(++done, total);
-  }
-  if (p.stale.length) cleanDirs(gamePath, manifest);
+  };
 
-  for (const d of p.add) {
+  const putIn = (d: Desired) => {
     const target = gameFile(gamePath, d.rel);
     const existing = entries.get(key(d.rel));
     let backup = existing?.backup ?? false;
@@ -414,7 +448,7 @@ export function deploy(lib: Library, gamePath: string, decisions: Map<string, De
       const state = stillOurs(existing, manifest.method, gamePath);
       if (state === "changed" && !decisions.has(d.rel)) {
         result.skipped.push(d.rel);
-        continue;
+        return;
       }
       // "ok" here means the library file was replaced (a rebuilt mod): relink without asking.
       fs.rmSync(target, { force: true });
@@ -442,10 +476,33 @@ export function deploy(lib: Library, gamePath: string, decisions: Map<string, De
     manifest.files = [...entries.values()];
     result.linked++;
     result.changes.push({ path: d.rel, mod: entry.mod, kind: existing ? "replaced" : "added", ...(backup && !existing ? { backup: true } : {}) });
+  };
+
+  for (const entry of stale) {
+    takeOut(entry);
+    progress?.(++done, total);
+  }
+  if (stale.length) cleanDirs(gamePath, manifest);
+
+  for (const d of add) {
+    putIn(d);
     progress?.(++done, total);
     if (done % 200 === 0) save();
   }
-  result.kept = p.desired.length - result.linked - result.skipped.length;
+
+  // One mod's deploy: modlist.txt lists the archives now in the game, not the ones still waiting.
+  if (scope) {
+    const content = modlistFor(lib, manifest.files);
+    const e = entries.get(key(ModListPath));
+    if (!content && e) {
+      takeOut(e);
+      cleanDirs(gamePath, manifest);
+    } else if (content && (!e || generatedDiffers(gameFile(gamePath, ModListPath), content))) {
+      putIn({ rel: ModListPath, mod: undefined, src: "", content });
+    }
+  }
+  result.kept = (scope ? p.desired.filter((d) => scope.has(key(d.rel))).length : p.desired.length) - result.linked - result.skipped.length;
+  if (scope) result.kept = Math.max(0, result.kept);
   result.modsInGame = new Set(manifest.files.map((e) => e.mod).filter((m) => m !== Generated)).size;
   save();
   return result;

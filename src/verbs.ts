@@ -14,7 +14,7 @@ import { findGame, gameRunning, gameVersion, isGameFolder } from "./game";
 import { addMod, defaultLibraryPath, keepDownload, loadLibrary, modFolder, moveMod, removeMod, saveLibrary, saveMod, type Library, type ModInfo } from "./library";
 import { activeLoadout, importLoadout, listLoadouts, makeActive, saveLoadout } from "./loadouts";
 import { installProject, sameNameMod, type BesideHow } from "./project";
-import { deployRedmod, enabledRedmodPackages } from "./redmod";
+import { deployedRedmodPackages, deployRedmod, enabledRedmodPackages } from "./redmod";
 import { formatBytes, librarySize, modSize } from "./sizes";
 import { importFromVortex, listVortexMods } from "./vortex";
 
@@ -176,17 +176,22 @@ export const verbs = {
     return { data: { removed: mod.id }, text: `removed ${mod.id} from the library; its deployed files leave on the next deploy` };
   },
 
-  /** Deploys. A file changed outside EDGEdeck is skipped unless named in keep (import it) or restore (overwrite it). */
-  async deploy(s: Session, keep: string[] = [], restore: string[] = []): Promise<Verb> {
+  /**
+   * Deploys. A file changed outside EDGEdeck is skipped unless named in keep (import it) or restore
+   * (overwrite it). With `only` (a mod id), deploys that mod's changes and leaves the rest waiting.
+   */
+  async deploy(s: Session, keep: string[] = [], restore: string[] = [], only?: string): Promise<Verb> {
     gameReady(s);
     if (gameRunning()) throw new Error("Cyberpunk 2077 is running; it keeps mod files open. Quit the game, then deploy");
+    if (only) find(s, only);
     const decisions = new Map<string, Decision>();
     for (const p of keep) decisions.set(p, "keep");
     for (const p of restore) decisions.set(p, "restore");
-    const result = deploy(s.lib, s.game, decisions, undefined, await gameVersion(s.game));
-    const redmod = enabledRedmodPackages(s.lib).length ? await deployRedmod(s.lib, s.game) : undefined;
+    const result = deploy(s.lib, s.game, decisions, undefined, await gameVersion(s.game), only);
+    const packages = only ? (result.changes.some((c) => c.path.toLowerCase().startsWith("mods/")) ? deployedRedmodPackages(s.lib, s.game) : []) : enabledRedmodPackages(s.lib);
+    const redmod = packages.length ? await deployRedmod(s.lib, s.game, undefined, packages) : undefined;
     const report = writeDeployReport(s.lib, s.game, result);
-    const text = `deployed (${result.method}): ${result.linked} added for ${modsTouched(result).length} mod(s), ${result.removed} removed, ${result.kept} unchanged; ${result.modsInGame} mod(s) in the game; report ${report}${result.skipped.length ? `; skipped (changed in game folder, answer with keep or restore): ${result.skipped.join(", ")}` : ""}${redmod ? `; REDmod: ${redmod.ran ? `${redmod.packages.length} prepared` : redmod.output}` : ""}${lostProjectsText(s.lib, result.lost)}`;
+    const text = `deployed${only ? ` ${only} only` : ""} (${result.method}): ${result.linked} added for ${modsTouched(result).length} mod(s), ${result.removed} removed, ${result.kept} unchanged; ${result.modsInGame} mod(s) in the game; report ${report}${result.skipped.length ? `; skipped (changed in game folder, answer with keep or restore): ${result.skipped.join(", ")}` : ""}${redmod ? `; REDmod: ${redmod.ran ? `${redmod.packages.length} prepared` : redmod.output}` : ""}${result.waiting ? `; ${result.waiting} file(s) of other mods' changes still waiting` : ""}${lostProjectsText(s.lib, result.lost)}`;
     return { data: { ...result, redmod, report }, text };
   },
 

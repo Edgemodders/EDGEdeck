@@ -10,7 +10,7 @@ import * as vscode from "vscode";
 import { BridgeClient, compareVersions, findBridge, MinBridgeVersion } from "./bridgeClient";
 import { classify, rednodeManifest } from "./classifier";
 import { enabledArchives, findArchiveConflicts, type ArchiveConflictSummary, type ArchiveListing } from "./conflicts";
-import { deploy, detectChanges, modStatus, modsRemoved, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, vortexManages, type Change, type Decision, type DeployResult, type PendingChange, type Plan } from "./deploy";
+import { deploy, detectChanges, modDeployPaths, modStatus, modsRemoved, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, vortexManages, type Change, type Decision, type DeployResult, type PendingChange, type Plan } from "./deploy";
 import { ChangesPanel, type ChangesMessage } from "./changesPanel";
 import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, latestBridgeRelease, removeOlderBridges } from "./bridgeInstall";
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
@@ -29,7 +29,7 @@ import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer } fr
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
 import { currentNxmHandler, describeHandler, forwarderCommand, nxmFromQuery, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority } from "./nxm";
-import { deployRedmod, enabledRedmodPackages } from "./redmod";
+import { deployedRedmodPackages, deployRedmod, enabledRedmodPackages } from "./redmod";
 import { addToProject, classifyProject, findProjectFile, installProject, projectName, sameNameMod, syncProjects, type BesideHow, type InstallProjectResult } from "./project";
 import { importFromVortex, listVortexMods, vortexDisplayName, vortexStagingCandidates } from "./vortex";
 
@@ -172,6 +172,12 @@ export interface EDGEdeckApi {
   pendingMods(except?: string): string[];
   /** Deploys as EDGEdeck: Deploy does, with its questions and its result message. Undefined when refused or cancelled. */
   deploy(): Promise<ApiDeployResult | undefined>;
+  /**
+   * Deploys one mod's changes only: its files go in, are refreshed or come out (when it is off). Other
+   * mods' changes stay waiting (`waiting` counts their files), and a file another mod wins stays
+   * theirs. Same questions and result message as deploy(). Undefined when refused or cancelled.
+   */
+  deployMod(id: string): Promise<ApiDeployResult | undefined>;
   /** Turns a mod off; the next deploy removes its files from the game. */
   turnOff(id: string): void;
 }
@@ -187,6 +193,8 @@ export interface ApiDeployResult {
   skipped: string[];
   conflicts: number;
   lost: { mod: string; files: number; winner: string; winnerName: string }[];
+  /** deployMod: files of other mods' changes left for the next deploy. */
+  waiting?: number;
 }
 
 function apiResult(result: DeployResult): ApiDeployResult {
@@ -198,6 +206,7 @@ function apiResult(result: DeployResult): ApiDeployResult {
     skipped: result.skipped,
     conflicts: state.plan?.conflicts.length ?? 0,
     lost: result.lost.map((l) => ({ ...l, winnerName: nameOf(l.winner) })),
+    ...(result.waiting !== undefined ? { waiting: result.waiting } : {}),
   };
 }
 
@@ -271,6 +280,12 @@ const api: EDGEdeckApi = {
   },
   deploy: async () => {
     const result = await deployNow();
+    return result && apiResult(result);
+  },
+  deployMod: async (id) => {
+    const mod = needLibrary().mods.find((m) => m.id === id);
+    if (!mod) throw new Error(`EDGEdeck has no mod with id ${id}`);
+    const result = await deployNow(mod);
     return result && apiResult(result);
   },
   turnOff: (id) => {
@@ -1916,7 +1931,12 @@ function lockedFileError(err: unknown): Error {
   return new Error(`${file ? path.basename(file) : "A file"} in the game folder is in use, so Windows would not change it. Close the game (or the program that has it open) and deploy again. What this deploy finished is kept; the rest is still waiting.${file ? ` (${file})` : ""}`);
 }
 
-async function deployNow(): Promise<DeployResult | undefined> {
+/**
+ * EDGEdeck: Deploy, for the command and the API: asks about changed files, deploys, reports.
+ * With `only`, deploys that one mod's changes (the API's deployMod): its questions are about its own
+ * paths, and other mods' changes keep waiting. Undefined when refused or cancelled.
+ */
+async function deployNow(only?: ModInfo): Promise<DeployResult | undefined> {
   if (!library) return;
   const { gamePath } = settings();
   if (!(await gameClosed("deploying"))) return;
@@ -1929,7 +1949,7 @@ async function deployNow(): Promise<DeployResult | undefined> {
     return;
   }
   // Two versions of one mod on would fight over every file; libraries from before 0.21.1 can have that.
-  for (const fam of familiesWithTwoOn(library)) {
+  for (const fam of familiesWithTwoOn(library).filter((f) => !only || f.key === familyKey(only))) {
     const on = fam.mods.filter((m) => m.enabled);
     const keep = on[0]; // families list newest first
     const others = on.slice(1).map((m) => m.version || m.name).join(", ");
@@ -1947,7 +1967,8 @@ async function deployNow(): Promise<DeployResult | undefined> {
     refresh();
   }
   const decisions = new Map<string, Decision>();
-  for (const c of detectChanges(gamePath).filter((c) => c.kind === "changed")) {
+  const scope = only && modDeployPaths(gamePath, plan(library, gamePath), only.id);
+  for (const c of detectChanges(gamePath).filter((c) => c.kind === "changed" && (!scope || scope.has(c.entry.path.toLowerCase())))) {
     const mod = library.mods.find((m) => m.id === c.entry.mod)?.name ?? c.entry.mod;
     const a = await vscode.window.showWarningMessage(
       `${c.entry.path} changed in the game folder since EDGEdeck deployed it from ${mod}. Keep the changed file, or put the mod's file back?`,
@@ -1972,17 +1993,21 @@ async function deployNow(): Promise<DeployResult | undefined> {
         last = pct;
       },
       state.version,
+      only?.id,
     );
     } catch (err) {
       refresh();
       throw lockedFileError(err);
     }
   });
-  log.appendLine(`Deployed (${result.method}): ${result.linked} added, ${result.removed} removed, ${result.kept} unchanged, ${result.backedUp} backed up${result.skipped.length ? `, skipped ${result.skipped.join(", ")}` : ""}`);
+  log.appendLine(`Deployed${only ? ` ${only.name} only` : ""} (${result.method}): ${result.linked} added, ${result.removed} removed, ${result.kept} unchanged, ${result.backedUp} backed up${result.skipped.length ? `, skipped ${result.skipped.join(", ")}` : ""}${result.waiting ? `, ${result.waiting} waiting for other mods` : ""}`);
   let redmodNote = "";
-  if (enabledRedmodPackages(library).length) {
-    const r = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Preparing REDmod mods" }, () => deployRedmod(library!, gamePath, (l) => log.appendLine(l)));
-    redmodNote = r.ran ? ` ${r.packages.length} REDmod mod${r.packages.length === 1 ? "" : "s"} prepared; Run game starts the game with -modded.` : ` REDmod mods not prepared: ${r.output}.`;
+  // REDmod compiles every package in the game at once. One mod's deploy runs it when it changed a
+  // REDmod file, over the packages then in the game rather than every one that is on.
+  const redmodPackages = only ? (result.changes.some((c) => c.path.toLowerCase().startsWith("mods/")) ? deployedRedmodPackages(library, gamePath) : []) : enabledRedmodPackages(library);
+  if (redmodPackages.length) {
+    const r = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Preparing REDmod mods" }, () => deployRedmod(library!, gamePath, (l) => log.appendLine(l), redmodPackages));
+    redmodNote = r.ran ? ` ${r.packages.length} REDmod mod${r.packages.length === 1 ? "" : "s"} prepared${only && r.packages.length > 1 ? " (REDmod prepares every REDmod in the game at once)" : ""}; Run game starts the game with -modded.` : ` REDmod mods not prepared: ${r.output}.`;
   }
   let report: string | undefined;
   try {
@@ -2001,7 +2026,8 @@ async function deployNow(): Promise<DeployResult | undefined> {
     ? [result.linked ? `${plural(result.linked, "file")} for ${plural(touched, "mod")}` : "", result.removed ? `${plural(result.removed, "file")} removed${gone ? ` for ${plural(gone, "mod")}` : ""}` : ""].filter(Boolean).join(", ")
     : "nothing changed";
   const buttons = [...(report ? ["View"] : []), ...(n ? ["Show conflicts"] : [])];
-  void vscode.window.showInformationMessage(`Deployed: ${what}. ${plural(result.modsInGame, "mod")} in the game now.${conflictNote}${redmodNote}`, ...buttons).then((a) => {
+  const waitingNote = result.waiting ? ` Changes for other mods (${plural(result.waiting, "file")}) wait for the next Deploy.` : "";
+  void vscode.window.showInformationMessage(`Deployed${only ? ` ${only.name}` : ""}: ${what}. ${plural(result.modsInGame, "mod")} in the game now.${conflictNote}${redmodNote}${waitingNote}`, ...buttons).then((a) => {
     if (a === "View" && report) void vscode.commands.executeCommand("markdown.showPreview", vscode.Uri.file(report)).then(undefined, () => vscode.window.showTextDocument(vscode.Uri.file(report!)));
     else if (a === "Show conflicts") void showConflicts();
   });
