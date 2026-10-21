@@ -66,7 +66,7 @@ export interface PageData {
 
 export interface PageMessage {
   action:
-    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "undo" | "updates" | "conflicts" | "signIn" | "library"
+    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport";
   /** loadoutView: the loadout to show. */
@@ -306,6 +306,7 @@ input[type=checkbox] { accent-color: var(--yellow); width: 15px; height: 15px; c
   ${d.lastDeploy ? `<button data-msg='${msg({ action: "undo" })}' title="Remove every deployed file and put backups back">Undo deploy</button>` : ""}
   ${d.pending ? `<a class="changes" data-msg='${msg({ action: "changes" })}' title="Every file the next deploy touches, and why">${d.pending} change${d.pending === 1 ? "" : "s"}</a>` : ""}
   <button class="deploy ${d.pending ? "" : "idle"}" data-msg='${msg({ action: "deploy" })}'>${d.pending ? "Deploy" : "Deployed"}</button>
+  <button data-msg='${msg({ action: "run" })}' title="Start Cyberpunk 2077 with -modded${d.pending ? ", after deploying the changes waiting" : ""}">Run game</button>
 </div>
 ${d.vortex ? `<div class="note">Vortex manages this game folder. Purge in Vortex before deploying with EDGEdeck.</div>` : ""}
 ${d.setup.length ? `<div class="setup"><span>Set up:</span>${d.setup.map((s) => `<button data-msg='${msg({ action: "setup", id: s.id })}' title="${esc(s.detail)}">${esc(s.label)}</button>`).join("")}</div>` : ""}

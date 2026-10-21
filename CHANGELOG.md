@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.28.0 (2026-10-21)
+
+- **Run game.** A play button in the Mods view's title bar, and **Run game** on the EDGEdeck page, start Cyberpunk 2077 with `-modded`, so REDmod mods load. A game in a Steam library starts through Steam, any other from `bin\x64\Cyberpunk2077.exe`; the setting `edgedeck.launch` can force one way. Changes waiting are deployed first, so the game gets what the list shows, and a game already running is left alone. The same as REDcode's Run Game.
+- `npm run test:ui` works when a VS Code extension starts it (an assistant in VS Code, say). It inherited `ELECTRON_RUN_AS_NODE`, so the test VS Code started as plain Node and failed.
+
 ## 0.27.4 (2026-10-17)
 
 - **Add an archive to the REDcode project...** puts the resources of any `.archive` file, one a contributor sent you say, straight into the open REDcode project's `source\archive`, without adding it to the library or the game. Right-click the file in the Explorer, or run the command and pick it. It asks for all resources or a pick, and keeps the ones the project already has unless you say Replace, as for a mod's archive.

@@ -25,6 +25,16 @@ export function gameRunning(): boolean {
   }
 }
 
+/**
+ * How Run game starts the game: through Steam when the game sits in a Steam library (or `how` says
+ * steam), else the exe. Always with -modded, which loads REDmod mods and is harmless without any.
+ */
+export function launchTarget(gamePath: string, how: "auto" | "steam" | "exe"): { kind: "steam"; url: string } | { kind: "exe"; exe: string; args: string[] } {
+  const steam = how === "steam" || (how === "auto" && /[\\/]steamapps[\\/]common[\\/]/i.test(gamePath));
+  if (steam) return { kind: "steam", url: "steam://run/1091500//-modded/" };
+  return { kind: "exe", exe: gameExe(gamePath), args: ["-modded"] };
+}
+
 export function isGameFolder(gamePath: string): boolean {
   return !!gamePath && fs.existsSync(gameExe(gamePath));
 }

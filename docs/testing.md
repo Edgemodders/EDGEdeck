@@ -141,3 +141,4 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 | # | Test | Since | Steps |
 |---|---|---|---|
 | 1 | **Add an archive to the REDcode project** | 0.27.4; REDcode 0.6.1+ and an open project | Right-click an `.archive` outside the library in the Explorer (or run the command and pick one): all or chosen resources land under `source\archive`, nothing changes in the library or the game. Again: Keep mine and Replace. The right-click menu on a mod says **Add to REDcode project** |
+| 2 | **Run game** | 0.28.0 | With nothing to deploy, the play button in the Mods view starts the game through Steam with `-modded` (REDmod mods load). Turn a mod on, click it again: it deploys first, then starts. With the game open: "already running", no second copy. On the page, **Run game** does the same. `edgedeck.launch` set to exe starts `bin\x64\Cyberpunk2077.exe -modded` |

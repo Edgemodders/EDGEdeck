@@ -2,6 +2,7 @@
 // the Mods view, the four verbs (add, on/off, deploy, remove), undo, import from Vortex, the detail
 // panel, and the archive conflict scan through REDbridge when it is available.
 
+import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -20,7 +21,7 @@ import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveInSection, moveSection, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { forgetSizes, librarySize, modSize } from "./sizes";
 import { findSevenZip, unpackOrCopy } from "./extract";
-import { findGame, gameRunning, gameVersion, isGameFolder, steamLibraries } from "./game";
+import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, steamLibraries } from "./game";
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
@@ -95,6 +96,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.importLoadout", () => run(importLoadoutCommand)),
     vscode.commands.registerCommand("edgedeck.deploy", () => run(deployCommand)),
     vscode.commands.registerCommand("edgedeck.undo", () => run(undoCommand)),
+    vscode.commands.registerCommand("edgedeck.runGame", () => run(runGameCommand)),
     vscode.commands.registerCommand("edgedeck.remove", (node: ModNode) => run(() => removeCommand(modOf(node)))),
     vscode.commands.registerCommand("edgedeck.details", (node: ModNode) => run(() => showDetails(modOf(node)))),
     vscode.commands.registerCommand("edgedeck.checkConflicts", () => run(showConflicts)),
@@ -935,6 +937,8 @@ async function pageAction(m: PageMessage): Promise<void> {
       return addModCommand();
     case "deploy":
       return deployCommand();
+    case "run":
+      return runGameCommand();
     case "undo":
       return undoCommand();
     case "updates":
@@ -1785,6 +1789,39 @@ async function deployCommand(): Promise<void> {
   await deployNow();
 }
 
+/**
+ * EDGEdeck: Run game, with -modded: through Steam for a Steam install, else the exe. Changes
+ * waiting are deployed first, so the game gets what the list shows.
+ */
+async function runGameCommand(): Promise<void> {
+  const { gamePath } = settings();
+  if (!isGameFolder(gamePath)) {
+    const a = await vscode.window.showWarningMessage("EDGEdeck does not know where the game is.", "Pick the game folder");
+    if (a) await vscode.commands.executeCommand("edgedeck.pickGame");
+    return;
+  }
+  if (gameRunning()) {
+    void vscode.window.showInformationMessage("Cyberpunk 2077 is already running.");
+    return;
+  }
+  if (library && pendingCount() > 0 && !vortexManages(gamePath)) {
+    if (!(await deployNow())) return;
+  }
+  const target = launchTarget(gamePath, vscode.workspace.getConfiguration("edgedeck").get<"auto" | "steam" | "exe">("launch", "auto"));
+  if (target.kind === "steam") {
+    log.appendLine(`Run game: ${target.url}`);
+    await vscode.env.openExternal(vscode.Uri.parse(target.url));
+    return;
+  }
+  log.appendLine(`Run game: ${target.exe} ${target.args.join(" ")}`);
+  const child = spawn(target.exe, target.args, { cwd: path.dirname(target.exe), detached: true, stdio: "ignore" });
+  child.on("error", (e) => {
+    log.appendLine(`Could not start the game: ${e.message}`);
+    void vscode.window.showErrorMessage(`EDGEdeck: could not start the game. ${e.message}`);
+  });
+  child.unref();
+}
+
 /** EDGEdeck: Deploy, for the command and the API: asks about changed files, deploys, reports. Undefined when refused or cancelled. */
 /**
  * Before anything changes the game folder: the running game keeps mod files open, and Windows then
@@ -1872,7 +1909,7 @@ async function deployNow(): Promise<DeployResult | undefined> {
   let redmodNote = "";
   if (enabledRedmodPackages(library).length) {
     const r = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Preparing REDmod mods" }, () => deployRedmod(library!, gamePath, (l) => log.appendLine(l)));
-    redmodNote = r.ran ? ` ${r.packages.length} REDmod mod${r.packages.length === 1 ? "" : "s"} prepared; launch the game with -modded.` : ` REDmod mods not prepared: ${r.output}.`;
+    redmodNote = r.ran ? ` ${r.packages.length} REDmod mod${r.packages.length === 1 ? "" : "s"} prepared; Run game starts the game with -modded.` : ` REDmod mods not prepared: ${r.output}.`;
   }
   let report: string | undefined;
   try {

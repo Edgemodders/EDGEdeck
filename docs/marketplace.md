@@ -10,7 +10,7 @@ EDGEdeck was called REDdeck up to 0.26.6. It is a new extension (`edgemodders.ed
 - **Sign in** to Nexus Mods once; updates and download links follow.
 - **Add** a zip, 7z or rar from Nexus Mods, or a folder. EDGEdeck works out what kind of mod it is and where its files go.
 - Turn a mod **on** or **off**. Nothing touches the game until you deploy.
-- **Deploy** links the enabled mods into the game with hardlinks, writes the archive load order, and records a manifest. Undo deploy removes exactly that and nothing else.
+- **Deploy** links the enabled mods into the game with hardlinks, writes the archive load order, and records a manifest. Undo deploy removes exactly that and nothing else. **Run game** starts the game with `-modded`, deploying the changes waiting first.
 - **Remove** a mod from the library.
 
 It keeps your mods in a library outside the game folder, resolves conflicts by list order, notices when a deployed file was changed by something else and asks one question, and imports the mods Vortex has for the game. With REDbridge present it shows conflicts between files inside mod archives.

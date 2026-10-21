@@ -54,7 +54,7 @@ An `.archive` that is not in your library, such as one a contributor sent you, g
 
 Another author's assets are theirs; check the mod's permissions on Nexus before you ship them.
 
-The view's title bar has **Open EDGEdeck**, **Add mod**, **Deploy**, **Nexus: check for updates** and **Refresh**. Its `...` menu holds the rest: Show conflicts, Show pending changes, Import from Vortex, Undo deploy, Nexus sign in, add from a link, Add from REDcode project, Get REDbridge, Pick the game folder, Open library folder, Show log, Save and Load loadout.
+The view's title bar has **Open EDGEdeck**, **Add mod**, **Deploy**, **Run game**, **Nexus: check for updates** and **Refresh**. Its `...` menu holds the rest: Show conflicts, Show pending changes, Import from Vortex, Undo deploy, Nexus sign in, add from a link, Add from REDcode project, Get REDbridge, Pick the game folder, Open library folder, Show log, Save and Load loadout.
 
 ### The Frameworks group
 
@@ -72,7 +72,7 @@ A game patch is the usual reason a modded game stops starting. EDGEdeck records 
 - **Search** matches name, version, kind and status. **Facet chips** narrow to On, Off, Deployed, Not deployed, Needs deploy, Changed in game folder, Conflicts and Update available, each with its count. A search or a filter opens folded sections while it lasts. **Largest first** sorts by size across every section. The page remembers your filters.
 - **The version cell** is a dropdown when the library holds more than one version of a mod, or when Nexus has a newer one: pick a version to make it the active one, or **Get x.y from Nexus**.
 - **Status** is a link when a deploy is waiting for that mod: it opens the list of files the next deploy adds, replaces, puts back or removes for it, and why.
-- **The toolbar** has Add mod, Check updates or Nexus sign in, Conflicts with a count, Undo deploy, the number of changes waiting, and Deploy.
+- **The toolbar** has Add mod, Check updates or Nexus sign in, Conflicts with a count, Undo deploy, the number of changes waiting, Deploy, and Run game.
 - **The footer** shows the library folder and whether deploy uses hardlinks or copies, the last deploy, disk use, and which REDbridge is running.
 
 ## 5. Adding mods

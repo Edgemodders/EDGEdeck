@@ -45,6 +45,7 @@ EDGEdeck keeps your mods in a library outside the game folder, deploys the ones 
 | Pick a **version** | One row per mod; the version cell is a dropdown of what is in the library, plus Get x.y from Nexus when there is a newer file. |
 | **Patch day** | The Frameworks header says "game updated to 2.31" when the game changed since the last deploy, and EDGEdeck checks the frameworks on Nexus once for that version. |
 | **Deploy** | Hardlinks the enabled mods into the game, writes the load order, prepares REDmod packages, records a manifest. |
+| **Run game** | Starts Cyberpunk 2077 with `-modded`, through Steam for a Steam install and from the exe otherwise. Deploys the changes waiting first. The play button in the Mods view's title bar, or Run game on the EDGEdeck page. |
 | **Remove** | Deletes the mod from the library. Deployed files come out on the next deploy. |
 | **Add to REDcode project** | With a REDcode project open, copies a mod's loose files into its `source/resources` under their deploy paths, and an archive's resources, all or a pick, into `source/archive` through REDcode. **Add an archive to the REDcode project...** does the same for any `.archive` file, without adding it to the library. |
 | Undo deploy | Removes every file in the manifest and nothing else. |

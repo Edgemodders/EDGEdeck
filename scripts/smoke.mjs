@@ -587,6 +587,13 @@ console.log("undo: ok");
   assert.ok(Array.isArray(libs));
   if (found) assert.ok(core.isGameFolder(found));
   console.log(`find game: ok (${libs.length} Steam librar${libs.length === 1 ? "y" : "ies"}, game ${found ?? "not found"})`);
+  const steamGame = "D:\\SteamLibrary\\steamapps\\common\\Cyberpunk 2077";
+  const gogGame = "D:\\GOG Games\\Cyberpunk 2077";
+  assert.deepEqual(core.launchTarget(steamGame, "auto"), { kind: "steam", url: "steam://run/1091500//-modded/" });
+  assert.deepEqual(core.launchTarget(gogGame, "auto"), { kind: "exe", exe: path.join(gogGame, "bin", "x64", "Cyberpunk2077.exe"), args: ["-modded"] });
+  assert.equal(core.launchTarget(steamGame, "exe").kind, "exe");
+  assert.equal(core.launchTarget(gogGame, "steam").kind, "steam");
+  console.log("run game target: ok");
 }
 
 // Game version from the real install, if it is here.

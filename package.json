@@ -2,7 +2,7 @@
   "name": "edgedeck",
   "displayName": "EDGEdeck",
   "description": "A simple mod manager for Cyberpunk 2077: one list, add, on/off, deploy, remove.",
-  "version": "0.27.4",
+  "version": "0.28.0",
   "publisher": "edgemodders",
   "preview": true,
   "pricing": "Free",
@@ -132,6 +132,12 @@
         "title": "Deploy",
         "category": "EDGEdeck",
         "icon": "$(rocket)"
+      },
+      {
+        "command": "edgedeck.runGame",
+        "title": "Run game",
+        "category": "EDGEdeck",
+        "icon": "$(play)"
       },
       {
         "command": "edgedeck.undo",
@@ -313,14 +319,19 @@
           "group": "navigation@2"
         },
         {
+          "command": "edgedeck.runGame",
+          "when": "view == edgedeck.mods",
+          "group": "navigation@3"
+        },
+        {
           "command": "edgedeck.refresh",
           "when": "view == edgedeck.mods",
-          "group": "navigation@4"
+          "group": "navigation@5"
         },
         {
           "command": "edgedeck.checkUpdates",
           "when": "view == edgedeck.mods",
-          "group": "navigation@3"
+          "group": "navigation@4"
         },
         {
           "command": "edgedeck.checkConflicts",
@@ -400,7 +411,7 @@
         {
           "command": "edgedeck.loadLoadout",
           "when": "view == edgedeck.mods",
-          "group": "navigation@3"
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -527,6 +538,21 @@
           "type": "string",
           "default": "",
           "description": "The Cyberpunk 2077 install folder (the one containing bin, archive and r6). Leave it empty to find the game through Steam, GOG or Epic on every start; the status bar and the EDGEdeck page footer show the folder in use. Set it only for a game those cannot see. The command EDGEdeck: Pick the game folder sets it for you."
+        },
+        "edgedeck.launch": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "steam",
+            "exe"
+          ],
+          "enumDescriptions": [
+            "Through Steam when the game is in a Steam library, else the exe",
+            "Always through Steam (steam://run/1091500)",
+            "Always bin\\x64\\Cyberpunk2077.exe directly"
+          ],
+          "default": "auto",
+          "description": "How EDGEdeck: Run game starts the game. Every way adds -modded, which REDmod mods need."
         },
         "edgedeck.libraryPath": {
           "type": "string",
