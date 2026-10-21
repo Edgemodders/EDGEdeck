@@ -20,6 +20,10 @@ How to keep it:
 - **Rename a mod.** Right-click a mod and pick **Rename...** (or press F2 on it, or use the button in its detail panel) to give it a name of your own in EDGEdeck. Every version gets the name, new versions take it when they arrive, and its section and loadouts stay. Its files and the game do not change. An empty name puts the first one back. Also `edgedeck rename` and the MCP tool `edgedeck_rename`.
 - **Deploy one mod.** For REDcode's Install: `deployMod(id)` in the API, `edgedeck deploy --mod <id>` and `mod` on the MCP deploy tool put in, refresh or take out that mod's files only. Other mods' changes keep waiting for the next Deploy, and the message says how many. `modlist.txt` lists only the archives then in the game. A REDmod change runs REDmod over the REDmods in the game, which it always prepares together.
 
+**Changed**
+
+- **Claude Code asks before deploy, undo and remove.** The MCP tools `edgedeck_deploy`, `edgedeck_undo` and `edgedeck_remove` are marked as needing the player's say, so Claude Code asks before every call in every permission mode. Before, in auto mode, "deploy my mods" ran a deploy without asking.
+
 ## 0.27.4 (2026-10-17)
 
 - **Add an archive to the REDcode project...** puts the resources of any `.archive` file, one a contributor sent you say, straight into the open REDcode project's `source\archive`, without adding it to the library or the game. Right-click the file in the Explorer, or run the command and pick it. It asks for all resources or a pick, and keeps the ones the project already has unless you say Replace, as for a mod's archive.

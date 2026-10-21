@@ -44,6 +44,10 @@ function run(fn: () => Verb | Promise<Verb>) {
 
 const session = () => openSession(options);
 
+// Tools that write to the game folder or delete from the library. Claude Code asks the player
+// before every call of a tool with this flag, in every permission mode, auto included.
+const AskFirst = { "anthropic/requiresUserInteraction": true };
+
 const server = new McpServer({ name: "edgedeck", version }, { instructions: Instructions });
 
 server.registerTool(
@@ -129,6 +133,7 @@ server.registerTool(
     description: "Deletes a mod from the library. Its deployed files leave the game on the next deploy. The kept download, if any, stays.",
     inputSchema: { id: z.string() },
     annotations: { destructiveHint: true },
+    _meta: AskFirst,
   },
   ({ id }) => run(() => verbs.remove(session(), id))(),
 );
@@ -154,6 +159,7 @@ server.registerTool(
       mod: z.string().optional().describe("A mod id: deploy only that mod's changes and leave other mods' changes waiting"),
     },
     annotations: { destructiveHint: true },
+    _meta: AskFirst,
   },
   ({ keep, restore, mod }) => run(() => verbs.deploy(session(), keep, restore, mod))(),
 );
@@ -164,6 +170,7 @@ server.registerTool(
     title: "Undo deploy",
     description: "Removes every file EDGEdeck deployed, and nothing else, and puts backed-up files back.",
     annotations: { destructiveHint: true },
+    _meta: AskFirst,
   },
   run(() => verbs.undo(session())),
 );

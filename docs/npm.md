@@ -36,7 +36,7 @@ Tools:
 | `edgedeck_loadout` | Save, switch to (load) or list loadouts |
 | `edgedeck_vortex` | List and import the mods Vortex has for the game (Vortex is not changed) |
 
-Nothing touches the game folder until `edgedeck_deploy` or `edgedeck_undo`; the server tells the assistant to ask the player first.
+Nothing touches the game folder until `edgedeck_deploy` or `edgedeck_undo`; the server tells the assistant to ask the player first. These two and `edgedeck_remove` also carry `_meta: { "anthropic/requiresUserInteraction": true }`, so Claude Code asks you before every call, in every permission mode, auto mode included.
 
 ## The command line
 

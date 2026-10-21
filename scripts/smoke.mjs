@@ -627,8 +627,12 @@ console.log("changes: ok");
   const { StdioClientTransport } = require("@modelcontextprotocol/sdk/client/stdio.js");
   const client = new Client({ name: "smoke", version: "0" });
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(root, "dist", "mcp.js"), "--library", libRoot, "--game", game], stderr: "pipe" }));
-  const names = (await client.listTools()).tools.map((t) => t.name).sort();
+  const tools = (await client.listTools()).tools;
+  const names = tools.map((t) => t.name).sort();
   for (const n of ["edgedeck_add", "edgedeck_changes", "edgedeck_conflicts", "edgedeck_deploy", "edgedeck_list", "edgedeck_loadout", "edgedeck_mod", "edgedeck_move", "edgedeck_pending", "edgedeck_remove", "edgedeck_turn", "edgedeck_undo", "edgedeck_vortex"]) assert.ok(names.includes(n), `tool ${n} missing from ${names.join(", ")}`);
+  // Claude Code asks the player before these, in every permission mode; no other tool asks.
+  const asking = tools.filter((t) => t._meta?.["anthropic/requiresUserInteraction"] === true).map((t) => t.name).sort();
+  assert.deepEqual(asking, ["edgedeck_deploy", "edgedeck_remove", "edgedeck_undo"]);
   const text = (r) => r.content.map((c) => c.text).join("");
   const listed = await client.callTool({ name: "edgedeck_list", arguments: {} });
   assert.ok(!listed.isError && text(listed).includes("bare"), text(listed));
