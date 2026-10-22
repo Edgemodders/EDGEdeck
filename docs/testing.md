@@ -81,7 +81,7 @@ Downloads a VS Code build into `.vscode-test/` once (about 350 MB), then runs `s
 
 ### Publish workflow
 
-Push a tag `vX.Y.Z` matching `package.json`. `.github/workflows/publish.yml` checks the match, runs typecheck, build and smoke, packages for win32-x64, builds the Nexus zip, publishes to the VS Code Marketplace and Open VSX, publishes `@edgemodders/edgedeck-mcp` to npm (skipped if that version exists), and makes the GitHub release. `verify-tokens.yml`, run by hand, checks the store tokens.
+Run **Publish** from the Actions tab with **Make a release** ticked (or `npm run release`), or push a tag `vX.Y.Z` matching `package.json`. Unticked, it stops after packaging and keeps the `.vsix` and the Nexus zip as the run's artifact. `.github/workflows/publish.yml` checks the version is not released yet (or the tag matches), stops when CHANGELOG.md has no section for it, runs typecheck, build and smoke, packages for win32-x64, builds the Nexus zip, publishes to the VS Code Marketplace and Open VSX, publishes `@edgemodders/edgedeck-mcp` to npm (skipped if that version exists), and makes the GitHub release, which makes the tag when there is none. `verify-tokens.yml`, run by hand, checks the store tokens.
 
 | Run | Result |
 |---|---|

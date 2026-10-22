@@ -1,19 +1,42 @@
-# Publishes a release when a version tag is pushed: git tag v0.25.0 && git push origin v0.25.0
-# Checks the tag against package.json, builds, tests, packages for Windows x64, then publishes to
-# the VS Code Marketplace (VSCE_PAT) and Open VSX (OVSX_PAT, skipped while that secret is not set),
-# publishes the MCP server and CLI to npm as @edgemodders/edgedeck-mcp at the same version (NPM_TOKEN),
-# and attaches the .vsix and the Nexus Mods zip (scripts/nexus-zip.mjs, uploaded to Nexus by hand) to a
-# GitHub release with the version's CHANGELOG.md section as notes (scripts/release-notes.mjs; no
-# section, no release). The tokens are Edgemodders organisation secrets.
+# Builds EDGEdeck and, when asked, publishes a release.
+#
+#   Run workflow (Actions tab)                  checks, builds and tests, then keeps the .vsix and the
+#                                               Nexus zip as the run's artifact; nothing is published
+#   Run workflow, "Make a release" ticked       also publishes v<package.json version> and tags this
+#                                               commit with it; stops first if that tag exists (raise
+#                                               the version) or CHANGELOG.md has no section for it
+#   npm run release                             the same as ticking the box, from a terminal
+#   git push origin vX.Y.Z                      a release too, as before; the tag must match package.json
+#
+# A release publishes to the VS Code Marketplace (VSCE_PAT) and Open VSX (OVSX_PAT, skipped while that
+# secret is not set), publishes the MCP server and CLI to npm as @edgemodders/edgedeck-mcp at the same
+# version (NPM_TOKEN), and makes the GitHub release with the .vsix, the Nexus Mods zip
+# (scripts/nexus-zip.mjs, uploaded to Nexus by hand) and the version's CHANGELOG.md section as notes
+# (scripts/release-notes.mjs). The tokens are Edgemodders organisation secrets. The tag is made by the
+# GitHub release step, last, so a run that fails partway can be run again.
+#
+# Release gate: make a release only after every hand test of the changes since the last release has
+# passed (docs/testing.md, "Waiting for a hand test"). Untested or failed means no release.
 name: Publish
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Make a release (publishes and tags this commit v<version>). Only after every hand test has passed
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   id-token: write
+
+# One release at a time.
+concurrency:
+  group: publish
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -21,6 +44,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      RELEASE: ${{ github.event_name == 'push' || inputs.release == true }}
     steps:
       - uses: actions/checkout@v5
 
@@ -30,17 +55,26 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
-      - name: The tag matches package.json
+      - name: The version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=$(node -p "require('./package.json').version")
-          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+              echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+              exit 1
+            fi
+          elif [ "${RELEASE}" = "true" ] && gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${version}" --silent >/dev/null 2>&1; then
+            echo "::error::v${version} is already released. Raise the version in package.json first."
             exit 1
           fi
           echo "VERSION=${version}" >> "$GITHUB_ENV"
+          echo "TAG=v${version}" >> "$GITHUB_ENV"
 
-      # Before anything is built or published: no CHANGELOG.md section for the version stops here.
+      # Before anything is built or published: no CHANGELOG.md section for the version stops a release here.
       - name: Release notes from CHANGELOG.md
+        if: env.RELEASE == 'true'
         run: node scripts/release-notes.mjs "${VERSION}" --out "${RUNNER_TEMP}/notes.md"
 
       - run: npm ci
@@ -54,13 +88,23 @@ jobs:
       - name: Nexus zip
         run: node scripts/nexus-zip.mjs
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EDGEdeck
+          path: |
+            dist/edgedeck-*.vsix
+            dist/EDGEdeck-*-nexus.zip
+          if-no-files-found: error
+
       - name: VS Code Marketplace
+        if: env.RELEASE == 'true'
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         # --skip-duplicate: a re-run of a release that got partway does not fail on what is already out.
         run: npx vsce publish --packagePath "dist/edgedeck-${VERSION}.vsix" --skip-duplicate
 
       - name: Open VSX
+        if: env.RELEASE == 'true'
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
@@ -71,6 +115,7 @@ jobs:
           npx ovsx publish "dist/edgedeck-${VERSION}.vsix" --pat "${OVSX_PAT}" --skip-duplicate
 
       - name: npm (@edgemodders/edgedeck-mcp)
+        if: env.RELEASE == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -86,13 +131,15 @@ jobs:
           # ./ matters: "dist/npm" alone reads as a GitHub repository.
           npm publish ./dist/npm --provenance --access public
 
+      # Makes the tag too when the run was started from the Actions tab (--target: this commit).
       - name: GitHub release
+        if: env.RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            echo "Release ${GITHUB_REF_NAME} already exists; adding the Nexus zip if it is missing"
-            gh release upload "${GITHUB_REF_NAME}" "dist/EDGEdeck-${VERSION}-nexus.zip" --clobber
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists; adding the Nexus zip if it is missing"
+            gh release upload "${TAG}" "dist/EDGEdeck-${VERSION}-nexus.zip" --clobber
             exit 0
           fi
-          gh release create "${GITHUB_REF_NAME}" "dist/edgedeck-${VERSION}.vsix" "dist/EDGEdeck-${VERSION}-nexus.zip" --title "EDGEdeck ${VERSION}" --notes-file "${RUNNER_TEMP}/notes.md"
+          gh release create "${TAG}" "dist/edgedeck-${VERSION}.vsix" "dist/EDGEdeck-${VERSION}-nexus.zip" --target "${GITHUB_SHA}" --title "EDGEdeck ${VERSION}" --notes-file "${RUNNER_TEMP}/notes.md"
