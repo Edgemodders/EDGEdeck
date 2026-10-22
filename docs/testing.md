@@ -88,6 +88,8 @@ Run **Publish** from the Actions tab with **Make a release** ticked (or `npm run
 | v0.26.0 (10-14), v0.26.1 (10-15), v0.26.2, v0.26.3 (10-16) | Pass |
 | v0.26.4 (10-16) | **Failed at npm**: `npm publish dist/npm` was read as a GitHub repo; it needs `./dist/npm`. The extension reached both stores; the GitHub release was made by hand |
 | v0.26.5 (10-16) | Pass, npm included |
+| Run workflow, unticked (10-22) | Pass: built and tested, `.vsix` and Nexus zip kept as the run's artifact, nothing published, no tag |
+| v0.28.0 (10-22), Run workflow with Make a release | Pass, the first from the Actions tab: Marketplace, Open VSX, npm and the GitHub release, tag made on the commit. A first try stopped at the changelog check (still Unreleased), as meant. npm showed it within a minute, Open VSX after about 4, the Marketplace after about 7 |
 | v0.26.6 (10-16) | Pass, the first with the Nexus zip (`EDGEdeck-0.26.6-nexus.zip` on the release) |
 | verify-tokens (10-14) | Pass on the last of four runs (one failure, cause not recorded) |
 
