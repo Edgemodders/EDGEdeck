@@ -1,11 +1,11 @@
 # Changelog
 
-What changed in each EDGEdeck release, for players and modders. Each release takes its notes from its section here: the GitHub release (written by the publish workflow), the VS Code Marketplace and Open VSX (which show this file), and the version's changelog on the Nexus Mods page (pasted by hand).
+What changed in each EDGEdeck release, for players and modders. Each release takes its notes from its section here: the GitHub release (written by the release workflow), the VS Code Marketplace and Open VSX (which show this file), and the version's changelog on the Nexus Mods page (pasted by hand).
 
 How to keep it:
 
 - With each change a player or modder would notice, add a line under **Unreleased**, in its group: **New**, **Changed**, **Fixed** or **Other**. One change per line, in the commit that makes the change. Leave out what only the tests see.
-- Before a release, rename **Unreleased** to `## <version> (<date>)` and start a new empty **Unreleased** above it. The publish workflow stops before publishing anything if the version has no section.
+- Before a release, rename **Unreleased** to `## <version> (<date>)` and start a new empty **Unreleased** above it. The release workflow stops before releasing anything if the version has no section.
 - Links are full URLs, since the same text goes to GitHub, the stores and Nexus.
 - `npm run release:notes` prints the GitHub notes; `npm run release:notes -- --nexus` prints plain lines for Nexus's changelog field, one per change.
 - Sections before 0.28.0 predate the groups and are left as they were; entries before 0.27.0 keep the old name, REDdeck.

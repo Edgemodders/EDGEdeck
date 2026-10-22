@@ -4,9 +4,9 @@
 #                                               Nexus zip as the run's artifact; nothing is published
 #   Run workflow, "Make a release" ticked       also publishes v<package.json version> and tags this
 #                                               commit with it; stops first if that tag exists (raise
-#                                               the version) or CHANGELOG.md has no section for it
+#                                               the version), if it is not run on main, or if
+#                                               CHANGELOG.md has no section for it
 #   npm run release                             the same as ticking the box, from a terminal
-#   git push origin vX.Y.Z                      a release too, as before; the tag must match package.json
 #
 # A release publishes to the VS Code Marketplace (VSCE_PAT) and Open VSX (OVSX_PAT, skipped while that
 # secret is not set), publishes the MCP server and CLI to npm as @edgemodders/edgedeck-mcp at the same
@@ -17,11 +17,9 @@
 #
 # Release gate: make a release only after every hand test of the changes since the last release has
 # passed (docs/testing.md, "Waiting for a hand test"). Untested or failed means no release.
-name: Publish
+name: Release
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       release:
@@ -35,17 +33,17 @@ permissions:
 
 # One release at a time.
 concurrency:
-  group: publish
+  group: release
   cancel-in-progress: false
 
 jobs:
-  publish:
+  release:
     runs-on: windows-latest
     defaults:
       run:
         shell: bash
     env:
-      RELEASE: ${{ github.event_name == 'push' || inputs.release == true }}
+      RELEASE: ${{ inputs.release == true }}
     steps:
       - uses: actions/checkout@v5
 
@@ -60,14 +58,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(node -p "require('./package.json').version")
-          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-              echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+          if [ "${RELEASE}" = "true" ]; then
+            if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+              echo "::error::Releases are made from main, not ${GITHUB_REF_NAME}"
               exit 1
             fi
-          elif [ "${RELEASE}" = "true" ] && gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${version}" --silent >/dev/null 2>&1; then
-            echo "::error::v${version} is already released. Raise the version in package.json first."
-            exit 1
+            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${version}" --silent >/dev/null 2>&1; then
+              echo "::error::v${version} is already released. Raise the version in package.json first."
+              exit 1
+            fi
           fi
           echo "VERSION=${version}" >> "$GITHUB_ENV"
           echo "TAG=v${version}" >> "$GITHUB_ENV"
@@ -131,7 +130,7 @@ jobs:
           # ./ matters: "dist/npm" alone reads as a GitHub repository.
           npm publish ./dist/npm --provenance --access public
 
-      # Makes the tag too when the run was started from the Actions tab (--target: this commit).
+      # Makes the tag too (--target: this commit).
       - name: GitHub release
         if: env.RELEASE == 'true'
         env:

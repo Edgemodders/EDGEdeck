@@ -42,7 +42,7 @@ File description on Nexus:
 
 ### Building it
 
-The publish workflow (`.github/workflows/publish.yml`) builds it with every release and attaches it to the GitHub release, beside the `.vsix`. A release: bump the version, give it its CHANGELOG.md section, push, then run **Publish** from the Actions tab with **Make a release** ticked (or `npm run release`). Download the zip from the release and upload it to Nexus.
+The release workflow (`.github/workflows/release.yml`) builds it with every release and attaches it to the GitHub release, beside the `.vsix`. A release: bump the version, give it its CHANGELOG.md section, push, then run **Release** from the Actions tab with **Make a release** ticked (or `npm run release`). Download the zip from the release and upload it to Nexus.
 
 By hand, after `npm run package`: `node scripts/nexus-zip.mjs` writes `dist/EDGEdeck-<version>-nexus.zip`.
 

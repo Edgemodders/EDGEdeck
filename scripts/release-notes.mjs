@@ -1,4 +1,4 @@
-// Prints the release notes for one version from its section of CHANGELOG.md. The publish workflow
+// Prints the release notes for one version from its section of CHANGELOG.md. The release workflow
 // uses it for the GitHub release, and stops before publishing anything when the version has no
 // section. The same convention as every Edgemodders repo (REDnode's tools/release/notes.mjs).
 //

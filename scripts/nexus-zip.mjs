@@ -1,7 +1,7 @@
 // Builds the Nexus Mods file from the packaged extension: dist/EDGEdeck-<version>-nexus.zip with the
 // .vsix, how to install it, and the licenses. Run after the vsix is packaged (npm run package).
 //   node scripts/nexus-zip.mjs
-// The publish workflow runs it and attaches the zip to the GitHub release; it is uploaded to Nexus
+// The release workflow runs it and attaches the zip to the GitHub release; it is uploaded to Nexus
 // by hand (nexus/README.md).
 import * as fs from "node:fs";
 import * as path from "node:path";

@@ -639,7 +639,7 @@
     "package": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && vsce package --no-dependencies --target win32-x64 --readme-path docs/marketplace.md --out dist/",
     "test:ui": "node scripts/ui-test.mjs",
     "release:notes": "node scripts/release-notes.mjs",
-    "release": "gh workflow run publish.yml --ref main -f release=true"
+    "release": "gh workflow run release.yml --ref main -f release=true"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

@@ -69,7 +69,7 @@ npm run build
 npm run test:ui
 ```
 
-Downloads a VS Code build into `.vscode-test/` once (about 350 MB), then runs `src/uiTest.ts` inside it with a scratch library and a fake game. Expected: `ui test: passed`. Not part of the publish workflow.
+Downloads a VS Code build into `.vscode-test/` once (about 350 MB), then runs `src/uiTest.ts` inside it with a scratch library and a fake game. Expected: `ui test: passed`. Not part of the release workflow.
 
 | Check | Expected |
 |---|---|
@@ -81,7 +81,7 @@ Downloads a VS Code build into `.vscode-test/` once (about 350 MB), then runs `s
 
 ### Publish workflow
 
-Run **Publish** from the Actions tab with **Make a release** ticked (or `npm run release`), or push a tag `vX.Y.Z` matching `package.json`. Unticked, it stops after packaging and keeps the `.vsix` and the Nexus zip as the run's artifact. `.github/workflows/publish.yml` checks the version is not released yet (or the tag matches), stops when CHANGELOG.md has no section for it, runs typecheck, build and smoke, packages for win32-x64, builds the Nexus zip, publishes to the VS Code Marketplace and Open VSX, publishes `@edgemodders/edgedeck-mcp` to npm (skipped if that version exists), and makes the GitHub release, which makes the tag when there is none. `verify-tokens.yml`, run by hand, checks the store tokens.
+Run **Release** from the Actions tab with **Make a release** ticked (or `npm run release`). Unticked, it stops after packaging and keeps the `.vsix` and the Nexus zip as the run's artifact. `.github/workflows/release.yml` (`publish.yml` before 2026-10-22, when a pushed tag also released) checks the version is not released yet and the run is on main, stops when CHANGELOG.md has no section for it, runs typecheck, build and smoke, packages for win32-x64, builds the Nexus zip, publishes to the VS Code Marketplace and Open VSX, publishes `@edgemodders/edgedeck-mcp` to npm (skipped if that version exists), and makes the GitHub release, which makes the tag when there is none. `verify-tokens.yml`, run by hand, checks the store tokens.
 
 | Run | Result |
 |---|---|
