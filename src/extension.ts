@@ -10,7 +10,7 @@ import * as vscode from "vscode";
 import { BridgeClient, compareVersions, findBridge, MinBridgeVersion } from "./bridgeClient";
 import { classify, rednodeManifest } from "./classifier";
 import { enabledArchives, findArchiveConflicts, type ArchiveConflictSummary, type ArchiveListing } from "./conflicts";
-import { deploy, detectChanges, modDeployPaths, modStatus, modsRemoved, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, vortexManages, type Change, type Decision, type DeployResult, type PendingChange, type Plan } from "./deploy";
+import { deploy, deployMethod, detectChanges, modDeployPaths, modStatus, modsRemoved, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, vortexManages, type Change, type Decision, type DeployResult, type PendingChange, type Plan } from "./deploy";
 import { ChangesPanel, type ChangesMessage } from "./changesPanel";
 import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, latestBridgeRelease, removeOlderBridges } from "./bridgeInstall";
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
@@ -19,9 +19,10 @@ import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSa
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveInSection, moveSection, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
-import { forgetSizes, librarySize, modSize } from "./sizes";
+import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
 import { findSevenZip, unpackOrCopy } from "./extract";
 import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, steamLibraries } from "./game";
+import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove";
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
@@ -97,6 +98,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.deploy", () => run(deployCommand)),
     vscode.commands.registerCommand("edgedeck.undo", () => run(undoCommand)),
     vscode.commands.registerCommand("edgedeck.runGame", () => run(runGameCommand)),
+    vscode.commands.registerCommand("edgedeck.moveLibrary", () => run(moveLibraryCommand)),
     vscode.commands.registerCommand("edgedeck.remove", (node: ModNode) => run(() => removeCommand(modOf(node)))),
     // From the context menu with the row; from F2 with nothing, so the selected row.
     vscode.commands.registerCommand("edgedeck.rename", (node?: ModNode) => run(() => renameCommand(modOf(node ?? tree.selection[0])))),
@@ -318,6 +320,7 @@ async function allSetupSteps(): Promise<(SetupStep & { done: boolean })[]> {
   const handler = describeHandler(state.nxmHandler);
   return [
     { id: "game", label: "Find the game folder", detail: "Not found through Steam, GOG or Epic", command: "edgedeck.pickGame", done: isGameFolder(settings().gamePath) },
+    libraryDriveStep(),
     { id: "bridge", label: "Get REDbridge", detail: "Sees conflicts inside archives; a 70 MB download", command: "edgedeck.getBridge", done: !!bridgeExe },
     { id: "nexus", label: "Sign in to Nexus Mods", detail: "For updates and downloads from the site", command: "edgedeck.nexusSignIn", done: signedIn },
     { id: "links", label: "Handle Nexus download links", detail: `Mod manager download buttons go to ${handler} now`, command: "edgedeck.nexusHandleLinks", done: !signedIn || handler === "EDGEdeck" },
@@ -1041,6 +1044,8 @@ async function pageAction(m: PageMessage): Promise<void> {
     case "library":
       if (library) void vscode.env.openExternal(vscode.Uri.file(library.root));
       return;
+    case "moveLibrary":
+      return moveLibraryCommand();
     case "changes":
       return showChanges(m.id);
     case "getBridge":
@@ -1886,6 +1891,99 @@ async function deployCommand(): Promise<void> {
  * EDGEdeck: Run game, with -modded: through Steam for a Steam install, else the exe. Changes
  * waiting are deployed first, so the game gets what the list shows.
  */
+// ---- Move library: anywhere the player likes; the game's drive gives hardlinks ---------------------
+
+function driveOf(p: string): string {
+  return path.parse(path.resolve(p)).root.replace(/\\$/, "");
+}
+
+/** The Set up step for a library on another drive than the game, where deploy has to copy. */
+function libraryDriveStep(): SetupStep & { done: boolean } {
+  const { gamePath } = settings();
+  const root = library?.root ?? settings().libraryPath;
+  const apart = !!library && isGameFolder(gamePath) && !sameDrive(root, gamePath);
+  return {
+    id: "drive",
+    label: "Move the library to the game's drive",
+    detail: apart ? `Library on ${driveOf(root)}, game on ${driveOf(gamePath)}: deploy copies every file` : "",
+    command: "edgedeck.moveLibrary",
+    done: !apart,
+  };
+}
+
+/** "Move library...": pick a folder, move the library there, point the setting at it. */
+async function moveLibraryCommand(): Promise<void> {
+  if (!library) throw new Error("The library is not open.");
+  if (gameRunning()) {
+    void vscode.window.showWarningMessage("Close Cyberpunk 2077 first: it keeps the deployed files open, and they are the library's files too.");
+    return;
+  }
+  const from = library.root;
+  const { gamePath } = settings();
+  const start = isGameFolder(gamePath) && !sameDrive(from, gamePath) ? path.parse(gamePath).root : path.dirname(from);
+  const picked = await vscode.window.showOpenDialog({
+    canSelectFolders: true,
+    canSelectFiles: false,
+    canSelectMany: false,
+    defaultUri: vscode.Uri.file(start),
+    title: isGameFolder(gamePath) ? `Move the library: pick a folder (the game is on ${driveOf(gamePath)})` : "Move the library: pick a folder",
+    openLabel: "Move the library here",
+  });
+  if (!picked?.length) return;
+  const folder = picked[0].fsPath;
+  const cfg = vscode.workspace.getConfiguration("edgedeck");
+  const target = cfg.inspect<string>("libraryPath")?.workspaceValue !== undefined ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+
+  // A folder that already holds a library: switch to it, nothing moves.
+  if (holdsLibrary(folder) && path.resolve(folder).toLowerCase() !== path.resolve(from).toLowerCase()) {
+    const other = loadLibrary(folder, gamePath);
+    const use = await vscode.window.showInformationMessage(
+      `${folder} already holds a library with ${other.mods.length} mod${other.mods.length === 1 ? "" : "s"}. Use that library instead? Nothing is moved, and this library stays in ${from}.`,
+      { modal: true },
+      "Use that library",
+    );
+    if (!use) return;
+    await cfg.update("libraryPath", folder, target);
+    log.appendLine(`Library: switched to ${folder}; ${from} is left as it was.`);
+    return;
+  }
+
+  const to = moveTarget(folder);
+  const across = !sameDrive(from, to);
+  stopWatching();
+  bridge?.stop();
+  bridge = undefined;
+  let result: Awaited<ReturnType<typeof moveLibrary>>;
+  try {
+    result = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `Moving the library to ${to}`, cancellable: across },
+      async (progress, token) => {
+        let shown = 0;
+        return moveLibrary(from, to, (p) => {
+          const pct = p.totalBytes ? (p.bytes / p.totalBytes) * 100 : (p.files / Math.max(1, p.totalFiles)) * 100;
+          progress.report({ increment: pct - shown, message: `${formatBytes(p.bytes)} of ${formatBytes(p.totalBytes)}, ${p.files} of ${p.totalFiles} files` });
+          shown = pct;
+        }, () => token.isCancellationRequested);
+      },
+    );
+  } catch (err) {
+    reload();
+    throw err;
+  }
+  log.appendLine(`Library: moved ${from} to ${to} (${result.how}, ${result.files} files, ${formatBytes(result.bytes)})${result.leftBehind.length ? `; ${result.leftBehind.length} files could not be removed from the old folder` : ""}`);
+  await cfg.update("libraryPath", to, target);
+  reload();
+  const manifest = readManifest(gamePath);
+  const switches = !!manifest && isGameFolder(gamePath) && deployMethod(to, gamePath, manifest.method) !== manifest.method;
+  const left = result.leftBehind.length ? ` ${result.leftBehind.length} file${result.leftBehind.length === 1 ? "" : "s"} could not be removed from ${from}; delete ${result.leftBehind.length === 1 ? "it" : "them"} by hand.` : "";
+  if (switches) {
+    const how = deployMethod(to, gamePath, manifest!.method) === "link" ? "hardlinks instead of copies" : "copies, since hardlinks need the game's drive";
+    offerDeploy(`The library is in ${to} now. The game's files become ${how} on the next deploy.${left}`);
+  } else {
+    void vscode.window.showInformationMessage(`The library is in ${to} now.${left}`);
+  }
+}
+
 async function runGameCommand(): Promise<void> {
   const { gamePath } = settings();
   if (!isGameFolder(gamePath)) {

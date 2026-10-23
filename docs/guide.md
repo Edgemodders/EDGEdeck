@@ -98,7 +98,7 @@ After each deploy, the message says how many files went in for how many mods and
 
 Turning mods on and off changes nothing on disk. The **Deploy** button counts the files waiting, and **Show pending changes** lists every one with the reason: added, replaced by a mod higher in the list, put back from a backup, relinked after a rebuild, removed.
 
-Deploy hardlinks the files of every mod that is on into the game folder, so they take no extra space, and writes `modlist.txt` for the archive load order. If the library sits on another drive, deploy copies instead. It prepares REDmod packages with `redMod.exe` when any are on. Everything it did goes into a manifest in the game folder.
+Deploy hardlinks the files of every mod that is on into the game folder, so they take no extra space, and writes `modlist.txt` for the archive load order. If the library sits on another drive, deploy copies instead, and Set up offers **Move library...** (also in the Mods view's ... menu). It moves the library to a folder you pick, and the next deploy turns the copies into hardlinks. It prepares REDmod packages with `redMod.exe` when any are on. Everything it did goes into a manifest in the game folder.
 
 **Files that changed outside EDGEdeck.** When Steam verify, the game or another tool changed a file EDGEdeck deployed, the mod shows `changed in game folder` and the next deploy asks one question per file: keep the changed file, which imports it into the library, or put the mod's file back. A foreign file in the way of a deploy is moved to the library's backup folder first and comes back on undo.
 
@@ -147,7 +147,7 @@ Open Settings (`Ctrl+,`) and search for `edgedeck`.
 | Setting | Default | What it does |
 |---|---|---|
 | `edgedeck.gamePath` | empty | The Cyberpunk 2077 folder. Empty means find it through Steam, GOG or Epic on every start. Set it only for a game those cannot see. |
-| `edgedeck.libraryPath` | empty | Where mods are kept. Empty means `%USERPROFILE%\EDGEdeck`. Put it on the game's drive so deploy can use hardlinks. |
+| `edgedeck.libraryPath` | empty | Where mods are kept, anywhere you like. Empty means `%USERPROFILE%\EDGEdeck`. Put it on the game's drive so deploy can use hardlinks; **Move library...** moves it and sets this. |
 | `edgedeck.bridgePath` | empty | A REDbridge you built yourself. Empty means the copy Get REDbridge fetched, which the page footer names. |
 | `edgedeck.dotnetRoot` | empty | A .NET root for the REDbridge process only. Empty means the per-user .NET 10 runtime. Never set `DOTNET_ROOT` for your whole account; it breaks Vortex. |
 | `edgedeck.nexusCheckUpdatesOnStart` | on | The daily Nexus update check. |

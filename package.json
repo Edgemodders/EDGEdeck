@@ -182,6 +182,11 @@
         "category": "EDGEdeck"
       },
       {
+        "command": "edgedeck.moveLibrary",
+        "title": "Move library...",
+        "category": "EDGEdeck"
+      },
+      {
         "command": "edgedeck.refresh",
         "title": "Refresh",
         "category": "EDGEdeck",
@@ -364,9 +369,14 @@
           "group": "2_folders@1"
         },
         {
-          "command": "edgedeck.showLog",
+          "command": "edgedeck.moveLibrary",
           "when": "view == edgedeck.mods",
           "group": "2_folders@2"
+        },
+        {
+          "command": "edgedeck.showLog",
+          "when": "view == edgedeck.mods",
+          "group": "2_folders@3"
         },
         {
           "command": "edgedeck.nexusSignIn",

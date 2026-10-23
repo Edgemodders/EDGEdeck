@@ -66,7 +66,7 @@ export interface PageData {
 
 export interface PageMessage {
   action:
-    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library"
+    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport";
   /** loadoutView: the loadout to show. */
@@ -339,7 +339,7 @@ ${d.viewing !== d.activeLoadout ? `<div class="editing">Editing the loadout <b>$
 </div>
 ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</th><th>Ver</th><th>Kind</th><th class="size">Size</th><th title="${d.viewing !== d.activeLoadout ? `What the game has, from the active loadout ${esc(d.activeLoadout)}` : ""}">Status${d.viewing !== d.activeLoadout ? ` <span class="stfor">in ${esc(d.activeLoadout)}</span>` : ""}</th><th class="acts">Actions</th></tr></thead><tbody id="rows">${body}</tbody></table><div class="empty" id="none" hidden>No mod matches.</div>` : `<div class="empty">No mods yet. Press + Add mod, or import from Vortex from the Mods view menu.</div>`}
 <div class="foot">
-  <span>Library: <a data-msg='${msg({ action: "library" })}'>${esc(d.library)}</a> (${d.method === "link" ? "same drive as the game: hardlinks" : "other drive: copies"})</span>
+  <span>Library: <a data-msg='${msg({ action: "library" })}'>${esc(d.library)}</a> (${d.method === "link" ? "same drive as the game: hardlinks" : `other drive: copies. <a data-msg='${msg({ action: "moveLibrary" })}'>Move library...</a>`})</span>
   <span>Last deploy: ${d.lastDeploy ? esc(d.lastDeploy) : "never"}</span>
   <span title="Deployed files are hardlinks and take no extra space on the same drive">Disk: ${fmt(d.sizes.mods)} in mods, <a data-msg='${msg({ action: "downloads" })}' title="The original zips, kept so a mod can be added again. Safe to delete.">${fmt(d.sizes.downloads)} in kept downloads</a>${d.sizes.backups ? `, ${fmt(d.sizes.backups)} in deploy backups` : ""}</span>
   <span>${d.bridge ? `<span class="okdot"></span>${esc(d.bridge)}${d.bridgeUpdate ? ` · <a data-msg='${msg({ action: "getBridge" })}' title="Download it into EDGEdeck's folder; the old one is removed">${esc(d.bridgeUpdate)} available</a>` : ""}` : `No REDbridge: <a data-msg='${msg({ action: "getBridge" })}'>Get REDbridge</a> for conflicts inside archives`}</span>

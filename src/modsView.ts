@@ -11,13 +11,13 @@ import { formatBytes, modSize } from "./sizes";
 
 /** One thing EDGEdeck needs or can use that is not in place yet; the row is a button for it. */
 export interface SetupStep {
-  id: "game" | "bridge" | "nexus" | "links" | "vortex";
+  id: "game" | "drive" | "bridge" | "nexus" | "links" | "vortex";
   label: string;
   detail: string;
   command: string;
 }
 
-const SetupIcons: Record<SetupStep["id"], string> = { game: "folder-opened", bridge: "cloud-download", nexus: "account", links: "link", vortex: "archive" };
+const SetupIcons: Record<SetupStep["id"], string> = { game: "folder-opened", drive: "server", bridge: "cloud-download", nexus: "account", links: "link", vortex: "archive" };
 
 export type ModNode =
   | { type: "group"; label: string; mods: ModInfo[]; steps?: SetupStep[]; user?: boolean }

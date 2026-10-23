@@ -12,6 +12,14 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- **Move library.** The library can live anywhere you like; on the game's drive, deploy uses hardlinks, which take no extra space. **Move library...** (in the Mods view's ... menu, or from the page's footer when deploy is copying) moves it to a folder you pick: a rename on the same drive, or a copy that is checked file by file before the old folder is removed. A folder that already holds a library is used as it is. When the library and the game are on different drives, Set up offers the move.
+
+**Changed**
+
+- **Deploy follows the library's drive.** After the library moves onto the game's drive, the next deploy turns the game's copies into hardlinks; after it moves away, hardlinks into copies. Pending changes say why each file is redone.
+
 ## 0.28.0 (2026-10-22)
 
 **New**

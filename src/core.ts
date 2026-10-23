@@ -9,6 +9,7 @@ export * from "./families";
 export * from "./frameworks";
 export * from "./game";
 export * from "./library";
+export * from "./libraryMove";
 export * from "./loadouts";
 export * from "./nexus";
 export * from "./nexusSso";

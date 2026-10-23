@@ -21,3 +21,6 @@ docs/changelog.md
 
 # VS Code builds downloaded by the UI test
 .vscode-test/
+
+# folders the smoke test makes on the repo's drive to test moving the library across drives
+.smoke-move-*/

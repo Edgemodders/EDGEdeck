@@ -123,6 +123,32 @@ export function canHardlink(libraryRoot: string, gamePath: string): boolean {
   }
 }
 
+/** Hardlink tests by library and game folder: the canary costs a write, and plan() runs on every refresh. */
+const hardlinkable = new Map<string, boolean>();
+
+/**
+ * How to deploy: hardlinks when the library and the game share a drive that allows them, else copies.
+ * Decided again on every plan, so a library moved onto (or off) the game's drive switches method; the
+ * files deployed the other way are then redone (see plan). A manifest that says "link" on the same
+ * drive needs no new test.
+ */
+export function deployMethod(libraryRoot: string, gamePath: string, current?: Manifest["method"]): Manifest["method"] {
+  try {
+    if (fs.statSync(libraryRoot).dev !== fs.statSync(gamePath).dev) return "copy";
+  } catch {
+    return current ?? "copy";
+  }
+  if (current === "link") return "link";
+  const k = `${path.resolve(libraryRoot).toLowerCase()}|${path.resolve(gamePath).toLowerCase()}`;
+  if (!hardlinkable.has(k)) hardlinkable.set(k, canHardlink(libraryRoot, gamePath));
+  return hardlinkable.get(k) ? "link" : "copy";
+}
+
+/** Whether a deployed file was put in the other way than the method now (a moved library). */
+function otherMethod(entry: ManifestEntry, method: Manifest["method"]): boolean {
+  return (method === "link") !== !!entry.ino;
+}
+
 /** Whether the library file behind a deployed entry was replaced since the deploy (a rebuilt mod). */
 function sourceReplaced(entry: ManifestEntry, method: Manifest["method"], d: Desired): boolean {
   if (d.content !== undefined) return false;
@@ -132,11 +158,14 @@ function sourceReplaced(entry: ManifestEntry, method: Manifest["method"], d: Des
   return src.size !== entry.size || Math.abs(src.mtimeMs - entry.mtimeMs) >= 2000;
 }
 
-/** Whether a deployed file is still the one EDGEdeck put there. */
-function stillOurs(entry: ManifestEntry, method: Manifest["method"], gamePath: string): ChangeKind | "ok" {
+/**
+ * Whether a deployed file is still the one EDGEdeck put there. Each entry is judged by how it was put
+ * in (an inode means a hardlink), since a moved library leaves both kinds in one manifest for a while.
+ */
+function stillOurs(entry: ManifestEntry, _method: Manifest["method"], gamePath: string): ChangeKind | "ok" {
   const id = identity(gameFile(gamePath, entry.path));
   if (!id) return "missing";
-  if (method === "link" && entry.ino) {
+  if (entry.ino) {
     if (id.ino !== entry.ino) return "changed";
     if (id.nlink < 2 && entry.mod !== Generated) return "sourceMissing";
     return "ok";
@@ -156,7 +185,7 @@ function generatedDiffers(file: string, content: string): boolean {
 /** What the enabled mods want in the game folder, with conflicts resolved by order. */
 export function plan(lib: Library, gamePath: string): Plan {
   const manifest = readManifest(gamePath);
-  const method = manifest?.method ?? (canHardlink(lib.root, gamePath) ? "link" : "copy");
+  const method = deployMethod(lib.root, gamePath, manifest?.method);
   const desired = new Map<string, Desired>();
   const conflicts = new Map<string, Conflict>();
   for (const mod of lib.mods) {
@@ -189,6 +218,8 @@ export function plan(lib: Library, gamePath: string): Plan {
     // A file EDGEdeck writes itself (modlist.txt) is due when what it should say has changed.
     if (d.content !== undefined && generatedDiffers(gameFile(gamePath, d.rel), d.content)) return true;
     if (stillOurs(e, method, gamePath) !== "ok") return true;
+    // Deployed the other way: the library moved onto or off the game's drive.
+    if (d.content === undefined && otherMethod(e, method)) return true;
     return sourceReplaced(e, method, d);
   });
   return { method, desired: [...desired.values()], conflicts: [...conflicts.values()], stale, add, vortex: vortexManages(gamePath) };
@@ -402,6 +433,8 @@ export function deploy(lib: Library, gamePath: string, decisions: Map<string, De
   const p = plan(lib, gamePath);
   const manifest: Manifest = readManifest(gamePath) ?? { version: 1, library: lib.root, gamePath, method: p.method, time: "", files: [], dirs: [] };
   manifest.library = lib.root;
+  // The method can change when the library moved; entries keep how they were put in until redone.
+  manifest.method = p.method;
   const result: DeployResult = { linked: 0, removed: 0, kept: 0, backedUp: 0, method: manifest.method, skipped: [], changes: [], modsInGame: 0, lost: lostFiles(p) };
   const entries = new Map(manifest.files.map((e) => [key(e.path), e]));
   const scope = only ? modDeployPaths(gamePath, p, only) : undefined;
@@ -556,6 +589,7 @@ export function pendingChanges(lib: Library, gamePath: string, p: Plan): Pending
       const st = stillOurs(e, p.method, gamePath);
       if (st === "missing") out.push({ path: d.rel, mod: id, kind: "restore", detail: "missing from the game folder" });
       else if (st === "changed") out.push({ path: d.rel, mod: id, kind: "restore", detail: "changed in the game folder; deploy asks whether to keep it" });
+      else if (d.content === undefined && otherMethod(e, p.method)) out.push({ path: d.rel, mod: id, kind: "relink", detail: p.method === "link" ? "the library is on the game's drive now: a hardlink instead of a copy" : "the library is on another drive now: a copy instead of a hardlink" });
       else out.push({ path: d.rel, mod: id, kind: "relink", detail: d.content !== undefined ? "the generated content changed (load order)" : "the library file was replaced (new version or rebuild)" });
     }
   }

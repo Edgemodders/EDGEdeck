@@ -1035,6 +1035,90 @@ console.log("undo: ok");
   console.log("vortex staging: ok");
 }
 
+// Move library: a rename on the same drive, a checked copy across drives, and the next deploy switches
+// the game's files between hardlinks and copies to match.
+{
+  const moveGame = path.join(tmp, "move-game");
+  fs.mkdirSync(path.join(moveGame, "bin", "x64"), { recursive: true });
+  fs.writeFileSync(path.join(moveGame, "bin", "x64", "Cyberpunk2077.exe"), "not really");
+  const libA = path.join(tmp, "move-lib-a");
+  let ml = core.loadLibrary(libA, moveGame);
+  const mm = core.addMod(ml, cls("bare", "Bare").placements, { name: "Bare", source: { type: "folder" } });
+  core.deploy(ml, moveGame, new Map());
+  const deployed = () => core.readManifest(moveGame).files.filter((e) => e.mod === mm.id);
+  assert.ok(deployed().length && deployed().every((e) => e.ino), "deployed as hardlinks on the same drive");
+  const gameFile = path.join(moveGame, "archive", "pc", "mod", "CoolMod.archive");
+  const inode = (f) => fs.statSync(f, { bigint: true }).ino;
+
+  // Errors first: into itself, into a non-empty folder.
+  await assert.rejects(core.moveLibrary(libA, path.join(libA, "sub")), /inside the library/);
+  const busy = path.join(tmp, "busy");
+  write(path.join(busy, "x.txt"), "x");
+  await assert.rejects(core.moveLibrary(libA, busy), /not empty/);
+  assert.equal(core.moveTarget(busy), path.join(busy, "EDGEdeck"), "a non-empty folder gets an EDGEdeck folder in it");
+  assert.ok(core.holdsLibrary(libA));
+
+  // The same drive: a rename, the hardlinks stay, nothing to deploy.
+  const libB = path.join(tmp, "move-lib-b");
+  let moved = await core.moveLibrary(libA, libB);
+  assert.equal(moved.how, "rename");
+  assert.ok(!fs.existsSync(libA) && core.holdsLibrary(libB));
+  ml = core.loadLibrary(libB, moveGame);
+  let mp = core.plan(ml, moveGame);
+  assert.equal(mp.method, "link");
+  assert.equal(mp.add.length, 0, "a renamed library keeps the game's hardlinks");
+
+  // Another drive, when this machine has one (the repo's drive differs from the temp folder's on the
+  // dev PC and on the CI runner): a checked copy, then copies in the game, then back to hardlinks.
+  const otherDrive = path.parse(root).root.toLowerCase() !== path.parse(tmp).root.toLowerCase();
+  if (otherDrive) {
+    const far = fs.mkdtempSync(path.join(root, ".smoke-move-"));
+    try {
+      const libC = path.join(far, "lib");
+      const before = fs.statSync(path.join(libB, "library", mm.id, "archive", "pc", "mod", "CoolMod.archive")).mtimeMs;
+      let seen = 0;
+      moved = await core.moveLibrary(libB, libC, (p) => (seen = p.files));
+      assert.equal(moved.how, "copy");
+      assert.equal(seen, moved.files);
+      assert.deepEqual(moved.leftBehind, []);
+      assert.ok(!fs.existsSync(libB), "the old folder is gone after the copy");
+      assert.ok(Math.abs(fs.statSync(path.join(libC, "library", mm.id, "archive", "pc", "mod", "CoolMod.archive")).mtimeMs - before) < 2000, "the copy keeps modified times");
+      ml = core.loadLibrary(libC, moveGame);
+      mp = core.plan(ml, moveGame);
+      assert.equal(mp.method, "copy", "another drive: copies");
+      assert.ok(mp.add.some((d) => d.mod?.id === mm.id), "the hardlinked files are redone as copies");
+      assert.ok(core.pendingChanges(ml, moveGame, mp).some((c) => c.kind === "relink" && /a copy instead of a hardlink/.test(c.detail)));
+      const r1 = core.deploy(ml, moveGame, new Map());
+      assert.equal(r1.method, "copy");
+      assert.equal(r1.skipped.length, 0);
+      assert.ok(deployed().every((e) => !e.ino), "copies now");
+      assert.equal(fs.readFileSync(gameFile, "utf8"), fs.readFileSync(path.join(libC, "library", mm.id, "archive", "pc", "mod", "CoolMod.archive"), "utf8"));
+      assert.equal(core.plan(ml, moveGame).add.length, 0, "a second deploy has nothing to do");
+
+      // A cancelled copy leaves the library where it was and removes what it wrote.
+      const libD = path.join(tmp, "move-lib-d");
+      await assert.rejects(core.moveLibrary(libC, libD, undefined, () => true), /Cancelled/);
+      assert.ok(!fs.existsSync(libD) && core.holdsLibrary(libC));
+
+      // Back to the game's drive: copies become hardlinks again.
+      moved = await core.moveLibrary(libC, libD);
+      assert.equal(moved.how, "copy");
+      ml = core.loadLibrary(libD, moveGame);
+      mp = core.plan(ml, moveGame);
+      assert.equal(mp.method, "link");
+      assert.ok(core.pendingChanges(ml, moveGame, mp).some((c) => c.kind === "relink" && /a hardlink instead of a copy/.test(c.detail)));
+      core.deploy(ml, moveGame, new Map());
+      assert.ok(deployed().every((e) => e.ino), "hardlinks again");
+      assert.equal(inode(gameFile), inode(path.join(libD, "library", mm.id, "archive", "pc", "mod", "CoolMod.archive")), "the game's file is the library's file");
+    } finally {
+      fs.rmSync(far, { recursive: true, force: true });
+    }
+    console.log("move library: ok (same drive and across drives)");
+  } else {
+    console.log("move library: ok (same drive only; no second drive here)");
+  }
+}
+
 // Vortex, if present on this machine: list and classify, import into the temp library, never write.
 const vortex = core.listVortexMods(game);
 if (vortex.length) {
