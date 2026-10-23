@@ -117,17 +117,17 @@ footer li { margin-bottom: 3px; letter-spacing: 0; text-transform: none; }
 <body>
 
 <div class="bar"><div class="wrap">
-  <a class="home" href="./"><span class="dot"></span><b>EDGEDECK</b> / DESIGN DOC / DRAFT 0.3</a>
+  <a class="home" href="./"><span class="dot"></span><b>EDGEDECK</b> / DESIGN DOC / DRAFT 0.4</a>
   <span>VS CODE EXTENSION &middot; CYBERPUNK 2077 ONLY</span>
   <nav>
-    <a href="#goal">Goal</a><a href="#game">The game</a><a href="#vortex">Vortex</a><a href="#ui">UI</a><a href="#arch">Architecture</a><a href="#kinds">Mod kinds</a><a href="#conflicts">Conflicts</a><a href="#nexus">Nexus</a><a href="#loop">REDcode loop</a><a href="#risks">Risks</a><a href="#roadmap">Roadmap</a>
+    <a href="#goal">Goal</a><a href="#game">The game</a><a href="#vortex">Vortex</a><a href="#ui">UI</a><a href="#arch">Architecture</a><a href="#kinds">Mod kinds</a><a href="#conflicts">Conflicts</a><a href="#nexus">Nexus</a><a href="#loop">REDcode loop</a><a href="#risks">Risks</a><a href="#next">Next</a><a href="#roadmap">Roadmap</a>
   </nav>
 </div></div>
 
 <div class="wrap">
 
 <header class="hero">
-  <div class="eyebrow">// Design draft 2, status 2026-10-13</div>
+  <div class="eyebrow">// Design draft 0.4, status 2026-10-22</div>
   <h1>EDGE<span>deck</span></h1>
   <p class="lede">A mod manager for Cyberpunk 2077 that lives inside REDcode and VS Code. One list of mods, four verbs, no jargon. It keeps a library of mods outside the game folder, deploys the ones you turn on, and shows you the conflicts Vortex cannot see because it can read inside the archives.</p>
   <div class="meta">
@@ -392,10 +392,79 @@ deployed.json                     <span class="c">// mirror of &lt;game&gt;\edge
   </table></div>
 </section>
 
+<section id="next">
+  <h2><span class="id">12</span>Next: frameworks, requirements, the library</h2><div class="rule"></div>
+  <p><span class="tag y">Proposed 2026-10-22, for the owner's approval</span> Three things a new player trips over before their first mod works: getting the frameworks, chasing a mod's requirements down more than one level, and a library on the wrong drive. Each becomes one button. This is M6 in the roadmap.</p>
+
+  <h3>Get the frameworks</h3>
+  <div class="grid g2">
+    <div class="panel"><div class="label">What the player sees</div>
+      <ul>
+        <li>A <strong>Get the frameworks</strong> step in Set up while any of the six is missing, the same button in the Frameworks group's header and on the page, and the command <code>edgedeck.getFrameworks</code>.</li>
+        <li>One quick pick with the six, the missing ones ticked. OK downloads them, adds each as a mod (kind framework, on) and offers Deploy. No account, no Premium, no dialogs per file.</li>
+        <li>After a game patch, the Frameworks group's "game updated" line gets an <strong>Update the frameworks</strong> button that fetches the newer ones the same way.</li>
+      </ul></div>
+    <div class="panel"><div class="label">Where the files come from</div>
+      <p>Each framework's author publishes every release on GitHub as well as on Nexus, at the same version (checked 2026-10-22). EDGEdeck takes the GitHub release, which anyone can download without signing in. It records the Nexus mod id too, so the version joins the same family as a Nexus download of that mod and the Nexus update check keeps working. EDGEdeck downloads from the authors' own releases and never redistributes their files.</p></div>
+  </div>
+  <div class="tw"><table>
+    <thead><tr><th>Framework</th><th>Nexus</th><th>GitHub release</th><th>Asset</th><th>Version 2026-10-22</th></tr></thead>
+    <tbody>
+      <tr><td>RED4ext</td><td>2380</td><td>WopsS/RED4ext</td><td><code>red4ext-&lt;v&gt;.zip</code> (not the symbols zip)</td><td>1.30.0</td></tr>
+      <tr><td>Cyber Engine Tweaks</td><td>107</td><td>maximegmd/CyberEngineTweaks</td><td><code>cet_&lt;v&gt;.zip</code></td><td>1.38.0</td></tr>
+      <tr><td>redscript</td><td>1511</td><td>jac3km4/redscript</td><td><code>redscript-v&lt;v&gt;-windows.zip</code></td><td>0.5.32</td></tr>
+      <tr><td>ArchiveXL</td><td>4198</td><td>psiberx/cp2077-archive-xl</td><td><code>ArchiveXL-&lt;v&gt;.zip</code> (not the pdb zip)</td><td>1.27.5</td></tr>
+      <tr><td>TweakXL</td><td>4197</td><td>psiberx/cp2077-tweak-xl</td><td><code>TweakXL-&lt;v&gt;.zip</code></td><td>1.11.5</td></tr>
+      <tr><td>Codeware</td><td>7780</td><td>psiberx/cp2077-codeware</td><td><code>Codeware-&lt;v&gt;.zip</code></td><td>1.20.6</td></tr>
+    </tbody>
+  </table></div>
+  <p>A framework counts as present when the library has its family (Nexus id) or a mod with its files. If a release's asset name changes and no asset matches, EDGEdeck says so and opens the Nexus page instead. Anonymous GitHub calls allow 60 an hour, which six frameworks never reach.</p>
+
+  <h3>Requirements, walked for you</h3>
+  <div class="grid g2">
+    <div class="panel"><div class="label">The data</div>
+      <p>Nexus's API v2 (GraphQL at <code>api.nexusmods.com/v2/graphql</code>) gives each mod's requirements: <code>mod.modRequirements.nexusRequirements</code> with the mod id, name, notes and whether it lives outside Nexus (<code>externalRequirement</code>, <code>url</code>), plus <code>dlcRequirements</code> for Phantom Liberty. It needs no key (checked 2026-10-22). Requirements are per mod, not per file, and each requirement has its own, so EDGEdeck walks the tree: Appearance Menu Mod needs ArchiveXL, Codeware, CET and Appearance Runtime Plugin, and three of those need RED4ext, which is six mods over two levels.</p></div>
+    <div class="panel"><div class="label">What the player sees</div>
+      <ul>
+        <li>After a Nexus mod is added (nxm link or update), EDGEdeck walks its requirements and stops at what the library already has. If anything is missing, one message: "AMM needs 5 mods you don't have: ArchiveXL, RED4ext, Codeware, CET, Appearance Runtime Plugin." Buttons: <strong>Get them</strong>, <strong>Choose...</strong> (a quick pick, all ticked), <strong>Not now</strong>.</li>
+        <li><strong>Check requirements</strong> on any mod with a Nexus id, from its row's menu or the detail panel, for mods added before this existed.</li>
+        <li>The detail panel lists "Needs" with a tick for each one present. A row whose requirements are missing says "needs 2 mods" as its status.</li>
+        <li>Requirements outside Nexus are listed with their link, to get by hand. A Phantom Liberty requirement is checked against the game folder.</li>
+      </ul></div>
+  </div>
+  <div class="grid g2">
+    <div class="panel"><div class="label">Getting the files</div>
+      <ul>
+        <li>The six frameworks come from GitHub, as above, for everyone.</li>
+        <li>For any other requirement, EDGEdeck takes the mod's newest main file (<code>files.json</code>, category MAIN) and asks only when there is more than one.</li>
+        <li><strong>Premium</strong> members: Nexus gives download links through the API, so every file downloads without a click.</li>
+        <li><strong>Free</strong> members: Nexus gives a download only through the site's "Mod manager download" button. EDGEdeck queues the files, opens each one's page, and waits for its nxm link. The status bar and a notification say "Requirements: 2 of 5. Press Mod Manager Download on the page that opened." Each link that arrives is matched to the queue, which moves on. Cancel at any point; what already arrived stays.</li>
+      </ul></div>
+    <div class="panel"><div class="label">Rules</div>
+      <ul>
+        <li>Each mod once: the walk keeps a set of ids, so a shared requirement (RED4ext above) is fetched once, and a loop cannot run forever.</li>
+        <li>Requirements arrive on and are placed where their kinds put them (frameworks in Frameworks). Nothing is deployed until the player deploys.</li>
+        <li>Requirements are kept in <code>mod.json</code> (<code>requires</code>, Nexus ids), cached for a day, so the panel and the status need no new request.</li>
+        <li>One request per mod, no scraping, within Nexus's acceptable use. Nexus's open requests before the OAuth client id (2026-10-22) may add conditions; this design follows them.</li>
+        <li>The CLI and MCP get <code>edgedeck requirements &lt;id&gt;</code> and <code>edgedeck_requirements</code>, which show the tree. Downloads for free members stay in VS Code, where the browser hand-off works.</li>
+      </ul></div>
+  </div>
+
+  <h3>The library, anywhere the player wants</h3>
+  <div class="panel">
+    <p>Decided by the owner on 2026-10-22: the library goes wherever the player chooses, and most will put it outside their user profile. The only rule is that hardlinks need the library on the same drive as the game. Without that, deploy copies, which works but uses the space twice. <code>edgedeck.libraryPath</code> already takes any folder; what is new:</p>
+    <ul>
+      <li>A <strong>Set up</strong> step when the library and the game are on different drives: "Your library is on C: and the game on E:, so deploy copies every file. Move the library to E:?" Its button opens Move library with <code>E:\EDGEdeck</code> suggested.</li>
+      <li><strong>Move library...</strong> (<code>edgedeck.moveLibrary</code>): pick a folder. On the same drive it is a rename. Across drives it copies with progress, checks every file, then removes the old folder. It updates the setting, and the next deploy relinks. To check while building: the manifest keeps the method of the first deploy, so a library that moves onto the game's drive must switch from copies to hardlinks on that deploy.</li>
+      <li>Choosing a folder that already holds a library switches to it without moving anything.</li>
+    </ul></div>
+  <p><strong>Order:</strong> the library first (small, and it makes hardlinks the normal case), then Get the frameworks, then requirements, which reuses the framework downloads and the nxm queue.</p>
+</section>
+
 <section id="roadmap">
-  <h2><span class="id">12</span>Roadmap</h2><div class="rule"></div>
-  <div class="panel ok" style="margin-bottom:14px"><div class="label">Status 2026-10-13, version 0.16.0</div>
-    <p>M0 to M3 are built and in daily use on two PCs, M4's EDGEdeck side and M5's loadouts and command line too. Beyond this draft: one row per mod with a version dropdown, a pending-changes list, a wide table page with search and facets, Get REDbridge with a daily update check, game detection through Steam's library list, sizes everywhere, and a Set up group for a new install. Left: MCP tools, REDnode packages as a kind, the REDcode-side hand-off. Not on the Marketplace. The <a href="guide.html">guide</a> covers use and the <a href="./">docs index</a> keeps the phase status.</p></div>
+  <h2><span class="id">13</span>Roadmap</h2><div class="rule"></div>
+  <div class="panel ok" style="margin-bottom:14px"><div class="label">Status 2026-10-22, version 0.28.0</div>
+    <p>M0 to M5 are built, released and in daily use on two PCs. EDGEdeck is on the VS Code Marketplace and Open VSX (preview), its CLI and MCP server on npm as <code>@edgemodders/edgedeck-mcp</code>. Beyond the first plan: one row per mod with a version dropdown, a pending-changes list, a wide table page with search and facets, sections, loadouts, Get REDbridge with a daily update check, game detection through Steam's library list, sizes everywhere, a Set up group, Run game, Rename, and REDcode's install loop with <code>deployMod</code>. Waiting on others: Nexus's OAuth client id (Nexus answered on 2026-10-22 with requests) and EDGEmods' install request. Next is M6. The <a href="guide.html">guide</a> covers use and the <a href="./">docs index</a> keeps the phase status.</p></div>
   <div class="panel">
     <div class="phase"><div class="n">M0<small>DECIDE</small></div><div>
       <h3>Name, library location, word list</h3>
@@ -415,15 +484,18 @@ deployed.json                     <span class="c">// mirror of &lt;game&gt;\edge
     <div class="phase"><div class="n">M5<small>SHARE</small></div><div>
       <h3>Loadouts, CLI, MCP</h3>
       <p>Save and load a list as a loadout file. <code>edgedeck</code> CLI on npm over the same core. MCP tools beside REDbridge's. Publish to Open VSX and the Marketplace.</p></div></div>
+    <div class="phase"><div class="n">M6<small>SETUP</small></div><div>
+      <h3>Frameworks, requirements, the library</h3>
+      <p>Proposed. Get the frameworks from their GitHub releases in one click. Walk a Nexus mod's requirements and get the missing ones, automatically for Premium, one click per file for free members. Move library, and a Set up step when the library and the game are on different drives. See <a href="#next">Next</a>.</p></div></div>
   </div>
 </section>
 
 <section id="questions">
-  <h2><span class="id">13</span>Open questions</h2><div class="rule"></div>
+  <h2><span class="id">14</span>Open questions</h2><div class="rule"></div>
   <ul>
-    <li><strong>Library location.</strong> User profile by default, or next to the game by default so hardlinks always work?</li>
-    <li><strong>Should EDGEdeck manage the frameworks</strong> (install RED4ext, CET and redscript itself) or only recognise them? Managing them is friendlier and is what Vortex does.</li>
-    <li><strong>Launching the game.</strong> A "Play" button that launches with <code>-modded</code> when REDmod packages are on is obvious and friendly. Steam launches it through REDlauncher, which complicates this. Worth a small investigation.</li>
+    <li><strong>Library location.</strong> Decided 2026-10-22: the player's choice, anywhere; it only needs the game's drive for hardlinks. Move library and a Set up step in <a href="#next">Next</a>.</li>
+    <li><strong>Should EDGEdeck manage the frameworks?</strong> Decided 2026-10-22: yes, with one Get the frameworks button. See <a href="#next">Next</a>.</li>
+    <li><strong>Launching the game.</strong> Done in 0.28.0: Run game starts it through Steam (<code>steam://run/1091500//-modded/</code>) or the exe, always with <code>-modded</code>.</li>
     <li><strong>Which mods do you run on the big PC?</strong> A real list drives the classifier's test cases.</li>
     <li><strong>Collections</strong> stay out, or is importing a collection's mod list (without Vortex) worth it later?</li>
   </ul>
