@@ -17,6 +17,7 @@ import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
+import { frameworkStates, missingFrameworks, type FrameworkState } from "./frameworkGet";
 import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveInSection, moveSection, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
@@ -99,6 +100,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.undo", () => run(undoCommand)),
     vscode.commands.registerCommand("edgedeck.runGame", () => run(runGameCommand)),
     vscode.commands.registerCommand("edgedeck.moveLibrary", () => run(moveLibraryCommand)),
+    vscode.commands.registerCommand("edgedeck.getFrameworks", () => run(getFrameworksCommand)),
     vscode.commands.registerCommand("edgedeck.remove", (node: ModNode) => run(() => removeCommand(modOf(node)))),
     // From the context menu with the row; from F2 with nothing, so the selected row.
     vscode.commands.registerCommand("edgedeck.rename", (node?: ModNode) => run(() => renameCommand(modOf(node ?? tree.selection[0])))),
@@ -321,6 +323,7 @@ async function allSetupSteps(): Promise<(SetupStep & { done: boolean })[]> {
   return [
     { id: "game", label: "Find the game folder", detail: "Not found through Steam, GOG or Epic", command: "edgedeck.pickGame", done: isGameFolder(settings().gamePath) },
     libraryDriveStep(),
+    frameworksStep(),
     { id: "bridge", label: "Get REDbridge", detail: "Sees conflicts inside archives; a 70 MB download", command: "edgedeck.getBridge", done: !!bridgeExe },
     { id: "nexus", label: "Sign in to Nexus Mods", detail: "For updates and downloads from the site", command: "edgedeck.nexusSignIn", done: signedIn },
     { id: "links", label: "Handle Nexus download links", detail: `Mod manager download buttons go to ${handler} now`, command: "edgedeck.nexusHandleLinks", done: !signedIn || handler === "EDGEdeck" },
@@ -973,11 +976,13 @@ async function pageData() {
 }
 
 /** The Frameworks group's note on the page. */
-function frameworkNote(): { summary: string; detail: string; warn: boolean } | undefined {
+function frameworkNote(): { summary: string; detail: string; warn: boolean; get?: string } | undefined {
   const c = frameworkCheck();
   if (!c || !c.frameworks.length) return undefined;
   const summary = frameworkSummary(c);
-  return summary ? { summary, detail: frameworkDetail(c).join("\n"), warn: c.changed || c.updates.length > 0 } : undefined;
+  const missing = library ? missingFrameworks(library).length : 0;
+  const get = missing ? "Get the frameworks" : c.changed || c.updates.length ? "Update the frameworks" : undefined;
+  return summary || get ? { summary, detail: frameworkDetail(c).join("\n"), warn: c.changed || c.updates.length > 0, get } : undefined;
 }
 
 async function showPage(): Promise<void> {
@@ -1046,6 +1051,8 @@ async function pageAction(m: PageMessage): Promise<void> {
       return;
     case "moveLibrary":
       return moveLibraryCommand();
+    case "getFrameworks":
+      return getFrameworksCommand();
     case "changes":
       return showChanges(m.id);
     case "getBridge":
@@ -1572,7 +1579,7 @@ async function addModCommand(): Promise<void> {
 }
 
 /** Adds one file or folder: extract if needed, classify, ask about options, copy into the library. */
-async function addFrom(source: string, preset?: { name: string; version: string; source: ModSource }): Promise<void> {
+async function addFrom(source: string, preset?: { name: string; version: string; source: ModSource; quiet?: boolean; family?: string }): Promise<ModInfo | undefined> {
   if (!library) return;
   const isFile = fs.statSync(source).isFile();
   let name = preset?.name ?? cleanName(path.basename(source, isFile ? path.extname(source) : ""));
@@ -1607,11 +1614,15 @@ async function addFrom(source: string, preset?: { name: string; version: string;
     const sourceInfo: ModSource = preset?.source ?? (isFile ? { type: "file", path: keepDownload(library, source) } : { type: "folder", path: source });
     const mod = addMod(library, c.placements, { name: name.trim(), version: preset?.version ?? manifest?.version ?? versionFrom(path.basename(source)), source: sourceInfo });
     log.appendLine(`Added ${mod.name} (${mod.files.length} files, ${mod.kinds.join(", ")}) from ${source}`);
+    if (preset?.family && familyKey(mod) !== preset.family) {
+      mod.family = preset.family;
+      saveMod(library, mod);
+    }
     const settled = settleNewVersion(library, mod);
     if (settled.replaced) {
       log.appendLine(`  a new version of ${settled.replaced.name}: takes the place of ${settled.replaced.version || "the earlier one"}, which is off now`);
-      void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is a new version of ${settled.replaced.name} ${settled.replaced.version}. It takes its place${mod.enabled ? " and is on" : ""}; ${settled.replaced.version || "the earlier one"} stays in the library, off. Pick it from the version list to go back.`);
-    } else if (settled.older) {
+      if (!preset?.quiet) void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is a new version of ${settled.replaced.name} ${settled.replaced.version}. It takes its place${mod.enabled ? " and is on" : ""}; ${settled.replaced.version || "the earlier one"} stays in the library, off. Pick it from the version list to go back.`);
+    } else if (settled.older && !preset?.quiet) {
       void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is older than ${settled.older.version}, so it was added switched off. Pick it from the version list to use it.`);
     }
     if (c.unplaced.length) {
@@ -1619,6 +1630,7 @@ async function addFrom(source: string, preset?: { name: string; version: string;
       void vscode.window.showWarningMessage(`${mod.name} added. ${c.unplaced.length} file${c.unplaced.length === 1 ? "" : "s"} EDGEdeck did not know where to put ${c.unplaced.length === 1 ? "was" : "were"} left out. See the log.`);
     }
     refresh();
+    return mod;
   } finally {
     if (temp) fs.rmSync(temp, { recursive: true, force: true });
   }
@@ -1891,6 +1903,90 @@ async function deployCommand(): Promise<void> {
  * EDGEdeck: Run game, with -modded: through Steam for a Steam install, else the exe. Changes
  * waiting are deployed first, so the game gets what the list shows.
  */
+// ---- Get the frameworks: the six, from their authors' GitHub releases --------------------------------
+
+/** The Set up step while the library lacks any of the six frameworks. */
+function frameworksStep(): SetupStep & { done: boolean } {
+  const missing = library ? missingFrameworks(library) : [];
+  return {
+    id: "frameworks",
+    label: "Get the frameworks",
+    detail: missing.length === 6 ? "RED4ext, CET, redscript, ArchiveXL, TweakXL and Codeware: most mods need them" : `${missing.map((f) => f.name).join(", ")} missing`,
+    command: "edgedeck.getFrameworks",
+    done: !library || !missing.length,
+  };
+}
+
+/** "Get the frameworks": one pick, missing and outdated ones ticked, then download and add each. */
+async function getFrameworksCommand(): Promise<void> {
+  if (!library) throw new Error("The library is not open.");
+  const states = await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: "Asking GitHub for the frameworks' newest releases" },
+    () => frameworkStates(library!),
+  );
+  const describe = (s: FrameworkState): string => {
+    const have = s.family ? `${s.family.mods[0]?.version || "a version"} in the library` : "not in the library";
+    if (!s.release) return have;
+    return s.family ? (s.wanted ? `${have}, ${s.release.version} is out` : `${have}, current`) : `${s.release.version}, ${have}`;
+  };
+  const items = states.map((s) => ({
+    label: s.source.name,
+    description: describe(s),
+    detail: s.error ? `Cannot get it now: ${s.error}` : undefined,
+    picked: s.wanted && !!s.release,
+    state: s,
+  }));
+  const anyWanted = items.some((i) => i.picked);
+  const picked = await vscode.window.showQuickPick(items, {
+    canPickMany: true,
+    title: "Get the frameworks",
+    placeHolder: anyWanted ? "From each author's GitHub release, the same files as on Nexus. Ticked: missing, or newer than the library's." : "All six are in the library and current. Tick one to get it again.",
+  });
+  if (!picked?.length) return;
+  const added: string[] = [];
+  const failed: FrameworkState[] = [];
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "edgedeck-frameworks-"));
+  try {
+    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Getting the frameworks" }, async (progress) => {
+      for (const [i, item] of picked.entries()) {
+        const s = item.state;
+        if (!s.release) {
+          failed.push(s);
+          continue;
+        }
+        progress.report({ message: `${s.source.name} ${s.release.version} (${i + 1} of ${picked.length})`, increment: 100 / picked.length });
+        try {
+          const zip = path.join(temp, s.release.assetName);
+          await download(s.release.url, zip);
+          const mod = await addFrom(zip, {
+            name: s.family?.name ?? s.source.name,
+            version: s.release.version,
+            source: { type: "github", path: s.release.page, modId: s.source.nexusId },
+            quiet: true,
+            // A framework the library knows by its files only (no Nexus id) keeps its family.
+            family: s.family && s.family.key !== `nexus:${s.source.nexusId}` ? s.family.key : undefined,
+          });
+          if (mod) added.push(`${mod.name} ${mod.version}`);
+        } catch (err) {
+          log.appendLine(`Get the frameworks: ${s.source.name}: ${err instanceof Error ? err.message : String(err)}`);
+          failed.push({ ...s, error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+    });
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+  refresh();
+  void refreshSetup();
+  if (failed.length) {
+    const names = failed.map((s) => s.source.name).join(", ");
+    void vscode.window.showWarningMessage(`EDGEdeck could not get ${names} from GitHub${failed[0].error ? ` (${failed[0].error})` : ""}. Get ${failed.length === 1 ? "it" : "them"} from Nexus instead?`, "Open on Nexus").then((a) => {
+      if (a) for (const s of failed) void vscode.env.openExternal(vscode.Uri.parse(modPageUrl(s.source.nexusId)));
+    });
+  }
+  if (added.length) offerDeploy(`Added ${added.join(", ")}.`);
+}
+
 // ---- Move library: anywhere the player likes; the game's drive gives hardlinks ---------------------
 
 function driveOf(p: string): string {

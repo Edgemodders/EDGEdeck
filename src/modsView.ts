@@ -11,13 +11,13 @@ import { formatBytes, modSize } from "./sizes";
 
 /** One thing EDGEdeck needs or can use that is not in place yet; the row is a button for it. */
 export interface SetupStep {
-  id: "game" | "drive" | "bridge" | "nexus" | "links" | "vortex";
+  id: "game" | "drive" | "frameworks" | "bridge" | "nexus" | "links" | "vortex";
   label: string;
   detail: string;
   command: string;
 }
 
-const SetupIcons: Record<SetupStep["id"], string> = { game: "folder-opened", drive: "server", bridge: "cloud-download", nexus: "account", links: "link", vortex: "archive" };
+const SetupIcons: Record<SetupStep["id"], string> = { game: "folder-opened", drive: "server", frameworks: "layers", bridge: "cloud-download", nexus: "account", links: "link", vortex: "archive" };
 
 export type ModNode =
   | { type: "group"; label: string; mods: ModInfo[]; steps?: SetupStep[]; user?: boolean }
@@ -95,6 +95,7 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
       item.description = `${node.mods.length}, ${on} on`;
       item.contextValue = "group";
       const check = node.label === "Frameworks" && !node.user ? this.frameworks() : undefined;
+      if (node.label === "Frameworks" && !node.user) item.contextValue = "frameworksGroup";
       if (check) {
         const summary = frameworkSummary(check);
         if (summary) item.description += ` · ${summary}`;
@@ -150,7 +151,7 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
         `**${mod.name}** ${mod.version}${others > 1 ? ` (${others} versions in the library)` : ""}`,
         `${mod.kinds.join(", ")} · ${mod.files.length} files · ${size} in the library`,
         `Added ${new Date(mod.added).toLocaleString()}`,
-        mod.source.type === "nexus" || mod.source.modId ? `Nexus mod ${mod.source.modId}${mod.nexus?.author ? ` by ${mod.nexus.author}` : ""}${mod.nexus?.checked ? ` · checked ${mod.nexus.checked.slice(0, 10)}` : ""}` : mod.source.type === "vortex" ? "Imported from Vortex" : mod.source.type === "project" ? `REDcode project ${mod.source.path ?? ""}` : mod.source.path ? `From ${mod.source.path}` : "",
+        mod.source.type === "github" ? `From its GitHub release${mod.source.modId ? ` (Nexus mod ${mod.source.modId})` : ""}` : mod.source.type === "nexus" || mod.source.modId ? `Nexus mod ${mod.source.modId}${mod.nexus?.author ? ` by ${mod.nexus.author}` : ""}${mod.nexus?.checked ? ` · checked ${mod.nexus.checked.slice(0, 10)}` : ""}` : mod.source.type === "vortex" ? "Imported from Vortex" : mod.source.type === "project" ? `REDcode project ${mod.source.path ?? ""}` : mod.source.path ? `From ${mod.source.path}` : "",
         status ? `Status: ${status}` : "",
         "Click for details. Expand for folders and files.",
       ].filter(Boolean).join("  \n"),

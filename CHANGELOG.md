@@ -15,6 +15,7 @@ How to keep it:
 **New**
 
 - **Move library.** The library can live anywhere you like; on the game's drive, deploy uses hardlinks, which take no extra space. **Move library...** (in the Mods view's ... menu, or from the page's footer when deploy is copying) moves it to a folder you pick: a rename on the same drive, or a copy that is checked file by file before the old folder is removed. A folder that already holds a library is used as it is. When the library and the game are on different drives, Set up offers the move.
+- **Get the frameworks.** One button gets RED4ext, Cyber Engine Tweaks, redscript, ArchiveXL, TweakXL and Codeware: on the Frameworks group's header, in Set up while any is missing, on the page, and in the `...` menu. A list shows what the library has and what is out, with the missing and older ones ticked. The files come from each author's GitHub release, the same as on Nexus, so no Nexus account is needed. Each joins the same mod as a Nexus download of it, so versions and update checks work as before. After a game patch, the page offers **Update the frameworks**.
 
 **Changed**
 

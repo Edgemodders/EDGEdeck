@@ -55,13 +55,15 @@ An `.archive` that is not in your library, such as one a contributor sent you, g
 
 Another author's assets are theirs; check the mod's permissions on Nexus before you ship them.
 
-The view's title bar has **Open EDGEdeck**, **Add mod**, **Deploy**, **Run game**, **Nexus: check for updates** and **Refresh**. Its `...` menu holds the rest: Show conflicts, Show pending changes, Import from Vortex, Undo deploy, Nexus sign in, add from a link, Add from REDcode project, Get REDbridge, Pick the game folder, Open library folder, Show log, Save and Load loadout.
+The view's title bar has **Open EDGEdeck**, **Add mod**, **Deploy**, **Run game**, **Nexus: check for updates** and **Refresh**. Its `...` menu holds the rest: Show conflicts, Show pending changes, Import from Vortex, Undo deploy, Get the frameworks, Nexus sign in, add from a link, Add from REDcode project, Get REDbridge, Pick the game folder, Open library folder, Move library, Show log, Save and Load loadout.
 
 ### The Frameworks group
 
 RED4ext, Cyber Engine Tweaks, redscript, ArchiveXL, TweakXL, Codeware, Audioware, input_loader and mod_settings are mods like any other, pinned at the top because most other mods depend on them. The group's header carries the game version: `3, 3 on · game 2.31`.
 
-A game patch is the usual reason a modded game stops starting. EDGEdeck records the game version at every deploy, and when the executable's version differs from it, the header says `game updated to 2.31` with a warning icon. If you are signed in to Nexus, EDGEdeck checks the frameworks once for that version and names the ones with newer files; otherwise it asks you to sign in. Update each framework from its `update ... available` link, then deploy.
+**Get the frameworks** (the download button on the group's header, the Set up step while any is missing, the link on the page, or the `...` menu) gets RED4ext, Cyber Engine Tweaks, redscript, ArchiveXL, TweakXL and Codeware in one go. One list shows each with what the library has and what is out; the missing and older ones are ticked. EDGEdeck downloads them from each author's GitHub release, the same files and versions as on Nexus, so it needs no Nexus account. Each one joins the same mod as a Nexus download of that framework would, so its versions, the update check and Switch version work as for any mod. Then deploy.
+
+A game patch is the usual reason a modded game stops starting. EDGEdeck records the game version at every deploy, and when the executable's version differs from it, the header says `game updated to 2.31` with a warning icon. If you are signed in to Nexus, EDGEdeck checks the frameworks once for that version and names the ones with newer files; otherwise it asks you to sign in. Update each framework from its `update ... available` link, or all at once with **Update the frameworks** on the page, then deploy.
 
 ## 4. The EDGEdeck page
 

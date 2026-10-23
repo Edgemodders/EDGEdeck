@@ -1012,6 +1012,51 @@ console.log("undo: ok");
   console.log("frameworks: ok");
 }
 
+// Get the frameworks: which of the six the library has (by Nexus id, or by a file only that framework
+// has), and which GitHub release asset is taken, against a fake GitHub with the real asset names.
+{
+  const fl = core.loadLibrary(path.join(tmp, "fw-lib"), game);
+  const placed = (to) => {
+    const from = path.join(tmp, "fw-src", to);
+    write(from, "x");
+    return [{ from, to }];
+  };
+  // Codeware from Vortex (Nexus id, older), ArchiveXL added by hand (no id, current), the rest missing.
+  core.addMod(fl, placed("red4ext/plugins/Codeware/Codeware.dll"), { name: "Codeware", version: "1.20.5", source: { type: "vortex", modId: 7780 } });
+  core.addMod(fl, placed("red4ext/plugins/ArchiveXL/ArchiveXL.dll"), { name: "ArchiveXL", version: "1.27.5", source: { type: "folder" } });
+  assert.deepEqual(core.missingFrameworks(fl).map((f) => f.name), ["RED4ext", "Cyber Engine Tweaks", "redscript", "TweakXL"]);
+  const releases = {
+    "WopsS/RED4ext": ["v1.30.0", ["red4ext-1.30.0.zip", "red4ext-symbols-1.30.0.zip"]],
+    "maximegmd/CyberEngineTweaks": ["v1.38.0", ["cet_1_38_0.zip"]],
+    "jac3km4/redscript": ["v0.5.32", ["redscript-cli-aarch64-darwin", "redscript-cli.exe", "redscript-v0.5.32-macos.zip", "redscript-v0.5.32-windows.zip"]],
+    "psiberx/cp2077-archive-xl": ["v1.27.5", ["ArchiveXL-1.27.5-pdb.zip", "ArchiveXL-1.27.5.zip"]],
+    "psiberx/cp2077-tweak-xl": ["v1.11.5", ["TweakXL-1.11.5-pdb.zip", "TweakXL-1.11.5.zip"]],
+    "psiberx/cp2077-codeware": ["v1.20.6", ["Codeware-1.20.6-pdb.zip", "Codeware-1.20.6.zip"]],
+  };
+  let asked = 0;
+  const fakeGitHub = async (url) => {
+    asked++;
+    const repo = /\/repos\/(.+)\/releases\/latest$/.exec(url)[1];
+    if (repo === "jac3km4/redscript" && asked > 6) return { ok: false, status: 403, json: async () => ({}) };
+    const [tag, assets] = releases[repo];
+    return { ok: true, status: 200, json: async () => ({ tag_name: tag, html_url: `https://github.com/${repo}/releases/tag/${tag}`, assets: assets.map((name) => ({ name, browser_download_url: `https://github.com/${repo}/releases/download/${tag}/${name}`, size: 1 })) }) };
+  };
+  const states = await core.frameworkStates(fl, fakeGitHub, "https://api.example");
+  const by = Object.fromEntries(states.map((s) => [s.source.name, s]));
+  assert.deepEqual(states.map((s) => s.release?.assetName), ["red4ext-1.30.0.zip", "cet_1_38_0.zip", "redscript-v0.5.32-windows.zip", "ArchiveXL-1.27.5.zip", "TweakXL-1.11.5.zip", "Codeware-1.20.6.zip"], "the zip to install, not symbols or other platforms");
+  assert.equal(by["Cyber Engine Tweaks"].release.version, "1.38.0");
+  assert.equal(by["RED4ext"].wanted, true, "missing");
+  assert.equal(by["Codeware"].wanted, true, "1.20.6 is newer than the library's 1.20.5");
+  assert.equal(by["Codeware"].family.nexusId, 7780);
+  assert.equal(by["ArchiveXL"].wanted, false, "current, and known by its file without a Nexus id");
+  assert.ok(by["ArchiveXL"].family.key.startsWith("name:"), "the hand-added ArchiveXL keeps its own family key; Get passes it on");
+  // GitHub's limit without an account: said in words, and a missing framework is still wanted.
+  const limited = await core.frameworkStates(fl, fakeGitHub, "https://api.example");
+  const rs = limited.find((s) => s.source.name === "redscript");
+  assert.ok(!rs.release && /limit/.test(rs.error) && rs.wanted);
+  console.log("get the frameworks: ok");
+}
+
 // Vortex's staging folder found where the user named it, or where Vortex's manifest says, or not at all.
 {
   const fakeGame = path.join(tmp, "vortex-game");

@@ -59,14 +59,14 @@ export interface PageData {
   sizes: { mods: number; downloads: number; backups: number };
   vortex: boolean;
   /** The Frameworks group's note: the game version, whether it changed since the last deploy, updates. */
-  frameworks?: { summary: string; detail: string; warn: boolean };
+  frameworks?: { summary: string; detail: string; warn: boolean; get?: string };
   /** Things not in place yet, each a button. */
   setup: { id: string; label: string; detail: string }[];
 }
 
 export interface PageMessage {
   action:
-    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary"
+    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport";
   /** loadoutView: the loadout to show. */
@@ -195,7 +195,7 @@ function render(d: PageData, csp: string): string {
 </tr>`;
   };
   const on = (rs: PageRow[]) => rs.filter((r) => r.enabled).length;
-  const note = (s: PageSection) => (s.name === "Frameworks" && !s.user && d.frameworks ? ` <span class="fwnote ${d.frameworks.warn ? "warn" : ""}" title="${esc(d.frameworks.detail)}">${esc(d.frameworks.summary)}</span>` : "");
+  const note = (s: PageSection) => (s.name === "Frameworks" && !s.user && d.frameworks ? ` <span class="fwnote ${d.frameworks.warn ? "warn" : ""}" title="${esc(d.frameworks.detail)}">${esc(d.frameworks.summary)}</span>${d.frameworks.get ? ` <a class="fwget" data-msg='${msg({ action: "getFrameworks" })}'>${esc(d.frameworks.get)}</a>` : ""}` : "");
   const users = d.sections.filter((s) => s.user);
   const groupRow = (s: PageSection) => {
     const n = on(s.rows);

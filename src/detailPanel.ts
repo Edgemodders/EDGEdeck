@@ -91,7 +91,7 @@ function render(d: DetailData, csp: string): string {
       return `<tr><td class="mono">${esc(c.path)}</td><td>${win ? `<span class="ok">this mod wins</span> over ${c.losers.map(name).join(", ")}` : `<span class="warn">${name(c.winner)} wins</span>`}</td></tr>`;
     })
     .join("");
-  const source = mod.source.type === "nexus" ? `Nexus mod ${mod.source.modId}` : mod.source.type === "vortex" ? `imported from Vortex${mod.source.modId ? ` (Nexus mod ${mod.source.modId})` : ""}` : mod.source.path ? `${mod.source.type}: ${esc(mod.source.path)}` : mod.source.type;
+  const source = mod.source.type === "github" ? `GitHub release ${esc(mod.source.path ?? "")}${mod.source.modId ? ` (Nexus mod ${mod.source.modId})` : ""}` : mod.source.type === "nexus" ? `Nexus mod ${mod.source.modId}` : mod.source.type === "vortex" ? `imported from Vortex${mod.source.modId ? ` (Nexus mod ${mod.source.modId})` : ""}` : mod.source.path ? `${mod.source.type}: ${esc(mod.source.path)}` : mod.source.type;
   const update = d.update;
   const versionsLine = d.versions.length > 1 ? `<div class="dim">Versions in the library: ${d.versions.map((v) => (v.id === mod.id ? `<b>${esc(v.version)}</b> (this one)` : `${esc(v.version)}${v.enabled ? " (on)" : ""}`)).join(", ")}. Pick one from the version list on the EDGEdeck page.</div>` : "";
   const nexusLine = mod.source.modId

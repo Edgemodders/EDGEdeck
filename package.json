@@ -187,6 +187,12 @@
         "category": "EDGEdeck"
       },
       {
+        "command": "edgedeck.getFrameworks",
+        "title": "Get the frameworks...",
+        "category": "EDGEdeck",
+        "icon": "$(cloud-download)"
+      },
+      {
         "command": "edgedeck.refresh",
         "title": "Refresh",
         "category": "EDGEdeck",
@@ -369,6 +375,11 @@
           "group": "2_folders@1"
         },
         {
+          "command": "edgedeck.getFrameworks",
+          "when": "view == edgedeck.mods",
+          "group": "1_more@3"
+        },
+        {
           "command": "edgedeck.moveLibrary",
           "when": "view == edgedeck.mods",
           "group": "2_folders@2"
@@ -430,6 +441,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "edgedeck.getFrameworks",
+          "when": "view == edgedeck.mods && viewItem == frameworksGroup",
+          "group": "inline"
+        },
         {
           "command": "edgedeck.hideSetupStep",
           "when": "view == edgedeck.mods && viewItem == setup",

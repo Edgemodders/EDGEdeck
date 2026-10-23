@@ -17,6 +17,8 @@ It keeps your mods in a library outside the game folder, resolves conflicts by l
 
 Guide, docs and design: https://edgemodders.github.io/EDGEdeck/
 
+**Get the frameworks** fetches RED4ext, CET, redscript, ArchiveXL, TweakXL and Codeware from their authors' GitHub releases in one click, no Nexus account needed.
+
 Settings: `edgedeck.gamePath` (the Cyberpunk 2077 folder) and `edgedeck.libraryPath` (where mods are kept; put it on the game's drive so deploy can use hardlinks).
 
 **Preview.** EDGEdeck is young and Windows only. Deploy, undo and the library are in daily use; Nexus downloads and REDmod deploy have had little real-world use yet. Report problems at https://github.com/Edgemodders/EDGEdeck/issues and attach the EDGEdeck log (Show log in the Mods view's menu).

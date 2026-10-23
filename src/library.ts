@@ -11,7 +11,8 @@ import type { Placement } from "./classifier";
 export type ModKind = "archive" | "xl" | "redmod" | "reds" | "tweak" | "cet" | "red4ext" | "audioware" | "input" | "config" | "asi" | "framework" | "rednode" | "other";
 
 export interface ModSource {
-  type: "folder" | "file" | "nexus" | "project" | "vortex";
+  /** github: a framework from its author's GitHub release (path is the release page, modId its Nexus id). */
+  type: "folder" | "file" | "nexus" | "project" | "vortex" | "github";
   path?: string;
   modId?: number;
   fileId?: number;
