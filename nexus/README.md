@@ -22,7 +22,7 @@ The source of EDGEdeck's Nexus Mods page lives here, so updates are edits in the
 | Permissions | MIT: open source, free to modify and redistribute with the license notice. 7-Zip's 7za.exe keeps its GNU LGPL license (`ThirdPartyNotices.txt`) |
 | Tags | Utility, mod manager, modders resource |
 
-The description has screenshot placeholders in cyan italics (`[Screenshot N: ...]`). Upload each picture to the page's Images tab, then replace its placeholder line with `[img]<the image's Nexus URL>[/img]` and a one-line caption.
+The description's pictures are already uploaded to the page's Images tab and linked by their Nexus URLs (`staticdelivery.nexusmods.com`); local copies are in `nexus/images/`. To add or replace one, upload the picture to the Images tab, then put `[img]<the image's Nexus URL>[/img]` and a one-line caption in the description.
 
 ## The download
 

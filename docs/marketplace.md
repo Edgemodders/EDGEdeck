@@ -4,7 +4,7 @@ A simple mod manager for Cyberpunk 2077 that lives inside VS Code and REDcode. O
 
 EDGEdeck was called REDdeck up to 0.26.6. It is a new extension (`edgemodders.edgedeck`); nothing carries over from REDdeck, so turn every mod off and deploy in REDdeck, uninstall it, then set up EDGEdeck as new.
 
-- A **Set up** group walks a new install through the game folder, REDbridge, Nexus and Vortex, one button each.
+- A **Set up** group walks a new install through the game folder, the library's drive, the frameworks, REDbridge, Nexus and Vortex, one button each.
 - **Get REDbridge** once, and conflicts inside archives show up too. EDGEdeck fetches it; nothing to configure.
 - **Open EDGEdeck** for the wide table with search and status filters; the sidebar is the compact view.
 - **Sign in** to Nexus Mods once; updates and download links follow.
