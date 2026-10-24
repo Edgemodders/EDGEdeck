@@ -13,7 +13,7 @@ DIM = "#8a93a8"
 COLORS = {"yellow": "#fcee0a", "cyan": "#19f3ff", "green": "#5dffa1"}
 
 BADGES = [
-    ('status', 'status', 'in use, 0.16', 'green'),
+    ('status', 'status', 'in use, 0.28', 'green'),
     ('game', 'game', 'cyberpunk 2077', 'cyan'),
     ('vscode', 'vs code', '1.80+', 'cyan'),
     ('license', 'license', 'MIT', 'green'),

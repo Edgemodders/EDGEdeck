@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://edgemodders.github.io/EDGEdeck/"><img src="docs/assets/brand/badges/docs.svg" alt="docs: read the docs"></a>
-  <img src="docs/assets/brand/badges/status.svg" alt="status: in use, 0.16">
+  <img src="docs/assets/brand/badges/status.svg" alt="status: in use, 0.28">
   <img src="docs/assets/brand/badges/game.svg" alt="game: Cyberpunk 2077">
   <img src="docs/assets/brand/badges/vscode.svg" alt="VS Code: 1.80+">
   <a href="LICENSE"><img src="docs/assets/brand/badges/license.svg" alt="license: MIT"></a>
@@ -19,7 +19,16 @@ EDGEdeck keeps your mods in a library outside the game folder, deploys the ones 
 **[Read the guide](https://edgemodders.github.io/EDGEdeck/guide.html)** &middot; [Design](https://edgemodders.github.io/EDGEdeck/design.html) &middot; [Releases](https://github.com/Edgemodders/EDGEdeck/releases) &middot; [REDcode](https://github.com/Edgemodders/REDcode) &middot; [REDbridge](https://github.com/Edgemodders/REDbridge) &middot; [REDnode](https://github.com/Edgemodders/REDnode)
 
 > [!NOTE]
-> **Status: 0.28.0, in daily use on two PCs**, on the VS Code Marketplace and Open VSX (preview), with its command line and MCP server on npm. Add from zip, 7z, rar, folder, Nexus link or Vortex; one row per mod with a version dropdown, sections and Rename; hardlink deploy with a manifest, undo and backups; a pending-changes list that explains every file; conflicts by order with Let X win, and inside archives through REDbridge, which Get REDbridge fetches and keeps current; the Frameworks group with the game version and a warning after a game patch; Nexus sign-in, daily update checks and nxm download links; a wide table page with search, facets and sizes; loadouts; Run game with `-modded`; a Set up group for new installs; REDcode's install loop; a `edgedeck` command line with `--json` and an MCP server for assistants. `npm run smoke` and `npm run test:ui` cover it. The [guide](https://edgemodders.github.io/EDGEdeck/guide.html) says how to use it.
+> **Status: 0.28.0, in daily use on two PCs**, on the VS Code Marketplace and Open VSX (preview), with its command line and MCP server on npm. Add from zip, 7z, rar, folder, Nexus link or Vortex; one row per mod with a version dropdown, sections and Rename; hardlink deploy with a manifest, undo and backups; a pending-changes list that explains every file; conflicts by order with Let X win, and inside archives through REDbridge, which Get REDbridge fetches and keeps current; the Frameworks group with the game version and a warning after a game patch; Nexus sign-in, daily update checks and nxm download links; a wide table page with search, facets and sizes; loadouts; Run game with `-modded`; a Set up group for new installs; REDcode's install loop; a `edgedeck` command line with `--json` and an MCP server for assistants. `npm run smoke` and `npm run test:ui` cover it. The [guide](https://edgemodders.github.io/EDGEdeck/guide.html) says how to use it. Built on `main` for the next release, not in 0.28.0: **Move library** and **Get the frameworks** (see the [changelog](CHANGELOG.md)).
+
+## Install
+
+| From | How |
+|---|---|
+| **VS Code Marketplace** or **Open VSX** (recommended, updates itself) | In VS Code, open the Extensions view (`Ctrl+Shift+X`), search for **EDGEdeck** and click Install. Or open its [Marketplace](https://marketplace.visualstudio.com/items?itemName=edgemodders.edgedeck) or [Open VSX](https://open-vsx.org/extension/edgemodders/edgedeck) page |
+| **A `.vsix` file** | Download `edgedeck-<version>.vsix` from the [releases page](https://github.com/Edgemodders/EDGEdeck/releases). In the Extensions view, press `...` at its top, pick **Install from VSIX...** and choose the file |
+
+Then click the EDGEdeck icon in the activity bar and follow the **Set up** group. Windows only; needs VS Code 1.80 or later (or VSCodium). The [guide](https://edgemodders.github.io/EDGEdeck/guide.html) walks through the rest.
 
 ## How it works
 
@@ -60,7 +69,8 @@ EDGEdeck keeps your mods in a library outside the game folder, deploys the ones 
 | `src/mcp.ts`, `src/verbs.ts` | The MCP server and the verbs it shares with the command line |
 | `scripts/smoke.mjs` | End-to-end test of the core against a fake game folder |
 | `images/` | Activity bar icon and extension icon |
-| `docs/` | Documentation site: the guide, the design and the dev setup |
+| `docs/` | Documentation site: the guide, the design, the tests and the dev setup; `marketplace.md` is the stores' README, `npm.md` the npm package's |
+| `nexus/` | The Nexus Mods page's source and its form fields |
 | `tools/brand/` | Generates the banner, badges and icon |
 
 ## Build
@@ -97,8 +107,9 @@ The same verbs are MCP tools: `node dist/mcp.js --library <folder> --game <folde
 - **M1 Library.** Add from archives and folders, the library layout, hardlink deploy with manifest and undo, changes made outside EDGEdeck, Vortex detection and import. Done.
 - **M2 Kinds.** Frameworks group with game version check, REDmod packages, file and archive conflicts with reorder. Done.
 - **M3 Nexus.** Sign in (OAuth with PKCE in the browser once Nexus assigns the client id, a pasted key until then and as a choice always), mod metadata, updates, nxm links. Done.
-- **M4 Loop.** Install and test a REDcode project with one click (EDGEdeck side done; the REDcode side is in that repo). REDnode packages as a mod kind.
-- **M5 Share.** Loadouts, the `edgedeck` CLI and the MCP server are done. No Marketplace publishing for now; releases carry the VSIX.
+- **M4 Loop.** Install and test a REDcode project with one click: EDGEdeck's side is done, with an API that REDcode's Install calls; the REDcode side is in that repo. REDnode packages as a mod kind since 0.20.0.
+- **M5 Share.** Loadouts, the `edgedeck` CLI and the MCP server (on npm since 0.26.4). On the VS Code Marketplace and Open VSX since 0.26.0. Done.
+- **M6 Setup.** Move library and Get the frameworks are built for the next release. Getting a Nexus mod's requirements comes after Nexus's requests are met.
 
 ## Relation to Vortex
 
