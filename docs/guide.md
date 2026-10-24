@@ -8,19 +8,21 @@ How to use EDGEdeck, from install to a modded game. EDGEdeck is a mod manager fo
 
 ## 1. Install
 
-EDGEdeck is not on the VS Code Marketplace yet. It installs from a VSIX file.
+EDGEdeck runs on Windows, in [VS Code](https://code.visualstudio.com/) 1.80 or later or in [VSCodium](https://vscodium.com/). It is a VS Code extension, not a game mod: never install it with Vortex.
 
-1. Install [VS Code](https://code.visualstudio.com/) 1.80 or later.
-2. Download `edgedeck-<version>.vsix` from the [releases page](https://github.com/Edgemodders/EDGEdeck/releases).
-3. Install it, either from a terminal or from VS Code:
+**From a store (recommended).** In VS Code, open the Extensions view (`Ctrl+Shift+X`), search for **EDGEdeck** and click Install. It is on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=edgemodders.edgedeck) and [Open VSX](https://open-vsx.org/extension/edgemodders/edgedeck) (VSCodium's store) as a preview, and updates itself from there.
+
+**From a file.** Each release's `edgedeck-<version>.vsix` is on the [releases page](https://github.com/Edgemodders/EDGEdeck/releases). Install it from a terminal:
 
 ```powershell
-code --install-extension edgedeck-0.16.0.vsix
+code --install-extension edgedeck-0.28.0.vsix
 ```
 
-In VS Code: open the Extensions view, press the `...` menu at its top right, pick **Install from VSIX...** and choose the file. Then run **Developer: Reload Window** from the command palette (`Ctrl+Shift+P`).
+or in VS Code: open the Extensions view, press the `...` menu at its top right, pick **Install from VSIX...** and choose the file. Then run **Developer: Reload Window** from the command palette (`Ctrl+Shift+P`). To update later, install the newer file the same way; your library and settings stay.
 
-A EDGEdeck icon appears in the activity bar on the left. Click it for the Mods view. To update later, install the newer VSIX the same way; your library and settings stay.
+An EDGEdeck icon appears in the activity bar on the left. Click it for the Mods view.
+
+EDGEdeck was called REDdeck up to 0.26.6. Nothing carries over from REDdeck: turn every mod off and deploy in REDdeck, uninstall it, then set up EDGEdeck as new.
 
 ## 2. Set up
 
@@ -29,7 +31,9 @@ The first time, the Mods view shows a **Set up** group with a row for each thing
 | Step | What it does | Needed? |
 |---|---|---|
 | **Find the game folder** | EDGEdeck looks for Cyberpunk 2077 in every Steam library, then GOG and Epic, on every start. This row appears only when that fails: pick the folder that contains `bin`, `archive` and `r6`. | Yes |
-| **Get REDbridge** | Downloads [REDbridge](https://github.com/Edgemodders/REDbridge), about 70 MB, into EDGEdeck's own folder, plus the .NET 10 runtime for your user account if there is none. With it, EDGEdeck sees conflicts between files *inside* mod archives. EDGEdeck checks once a day for a newer REDbridge and offers it; **Update REDbridge** in the command palette checks now. The old version is removed after an update. | No, but recommended |
+| **Move the library to the game's drive** | Shown when the library and the game are on different drives, so deploy copies every file. Runs **Move library...** (see [Deploying](#6-deploying)). New in the next release, not in 0.28.0. | No, but saves disk space |
+| **Get the frameworks** | Shown while RED4ext, Cyber Engine Tweaks, redscript, ArchiveXL, TweakXL or Codeware is missing from the library. Gets them in one go (see [The Frameworks group](#the-frameworks-group)). New in the next release, not in 0.28.0. | Most mods need them |
+| **Get REDbridge** | Downloads [REDbridge](https://github.com/Edgemodders/REDbridge), about 70 MB, into EDGEdeck's own folder, plus the .NET 10 runtime for your user account if there is none. With it, EDGEdeck sees conflicts between files *inside* mod archives. EDGEdeck checks once a day for a newer REDbridge and offers it; **Update REDbridge** in the command palette checks now. The old version is removed after an update. REDnode finds this copy and uses it too. | No, but recommended |
 | **Sign in to Nexus Mods** | For update checks and downloads from the site. Sign in opens the Nexus sign-in page in your browser; approve EDGEdeck there and the tab says "Signed in". EDGEdeck keeps the sign-in in VS Code's secret storage and renews it by itself. Until Nexus has registered EDGEdeck, sign in opens your [API Access page](https://www.nexusmods.com/users/myaccount?tab=api+access) instead, where you create a personal key and paste it in. The key works the same way, and **Nexus: set API key (paste, instead of signing in)** is always there if you prefer it. **Nexus: sign out** removes either. | No |
 | **Handle Nexus download links** | Makes the **Mod manager download** button on Nexus pages send the file to EDGEdeck. Vortex takes the links back whenever it starts, so this row returns if you use both. | No |
 | **Import from Vortex** | Copies the mods Vortex has for Cyberpunk into the library. Vortex is left alone. Shown when Vortex has mods and the library has none from it. | No |
@@ -44,7 +48,7 @@ The sidebar view is one list in three groups: **Set up** while anything is missi
 - **The line after the name** shows the version, how many other versions are in the library, the size, and the status: `deployed`, `not deployed yet`, `off`, `off, still deployed`, `changed in game folder`, `update 1.2 available`, `loses 3 archive files`.
 - **Click a mod** for its detail panel: the files it deploys, its conflicts by file path and inside archives, and buttons for turn on, move, open folder, Rename, Open on Nexus, Update and Remove.
 - **Expand a mod** for the folders it deploys into and the files in them. Click a file to open the library copy. Hover anything for a card with size, dates, where it deploys and where it came from.
-- **Hover a row** for the move buttons. The mod higher in the list wins a conflict. Right-click for the rest: Details, Open on Nexus Mods, Switch version, Reveal in File Explorer, Rename, Remove, and, when a REDcode project is open, Add to REDcode project.
+- **Hover a row** for its buttons: Move up, Move down and Switch version. The mod higher in the list wins a conflict. Right-click for the rest: Details, Open on Nexus Mods, Reveal in File Explorer, Reveal in Game Folder, Rename, Remove, and, when a REDcode project is open, Add to REDcode project.
 - **Rename** (right-click, or F2 on the selected row) gives a mod a name of your own in EDGEdeck. Every version of it gets the name, and new versions take it when they arrive. Its files and the game do not change. Rename to an empty name to go back to the first one.
 
 ### Add to REDcode project
@@ -55,15 +59,15 @@ An `.archive` that is not in your library, such as one a contributor sent you, g
 
 Another author's assets are theirs; check the mod's permissions on Nexus before you ship them.
 
-The view's title bar has **Open EDGEdeck**, **Add mod**, **Deploy**, **Run game**, **Nexus: check for updates** and **Refresh**. Its `...` menu holds the rest: Show conflicts, Show pending changes, Import from Vortex, Undo deploy, Get the frameworks, Nexus sign in, add from a link, Add from REDcode project, Get REDbridge, Pick the game folder, Open library folder, Move library, Show log, Save and Load loadout.
+The view's title bar has **Open EDGEdeck**, **Add mod**, **Deploy**, **Run game**, **Nexus: check for updates**, **Switch loadout** and **Refresh**. Its `...` menu holds the rest: Show conflicts, Show pending changes, Nexus sign in, Import from Vortex, Undo deploy (after a deploy), Nexus: add from a link, Add from REDcode project, Get REDbridge, Open library folder, Pick the game folder, Show log, the loadout commands (Switch loadout, Save as new loadout, Export the active loadout, Import a loadout), and, from the next release, Get the frameworks and Move library. Every command is also in the command palette (`Ctrl+Shift+P`) under **EDGEdeck:**.
 
 ### The Frameworks group
 
 RED4ext, Cyber Engine Tweaks, redscript, ArchiveXL, TweakXL, Codeware, Audioware, input_loader and mod_settings are mods like any other, pinned at the top because most other mods depend on them. The group's header carries the game version: `3, 3 on · game 2.31`.
 
-**Get the frameworks** (the download button on the group's header, the Set up step while any is missing, the link on the page, or the `...` menu) gets RED4ext, Cyber Engine Tweaks, redscript, ArchiveXL, TweakXL and Codeware in one go. One list shows each with what the library has and what is out; the missing and older ones are ticked. EDGEdeck downloads them from each author's GitHub release, the same files and versions as on Nexus, so it needs no Nexus account. Each one joins the same mod as a Nexus download of that framework would, so its versions, the update check and Switch version work as for any mod. Then deploy.
+**Get the frameworks** (new in the next release, not in 0.28.0: the download button on the group's header, the Set up step while any is missing, the link on the page, or the `...` menu) gets RED4ext, Cyber Engine Tweaks, redscript, ArchiveXL, TweakXL and Codeware in one go. One list shows each with what the library has and what is out; the missing and older ones are ticked. EDGEdeck downloads them from each author's GitHub release, the same files and versions as on Nexus, so it needs no Nexus account. Each one joins the same mod as a Nexus download of that framework would, so its versions, the update check and Switch version work as for any mod. Then deploy.
 
-A game patch is the usual reason a modded game stops starting. EDGEdeck records the game version at every deploy, and when the executable's version differs from it, the header says `game updated to 2.31` with a warning icon. If you are signed in to Nexus, EDGEdeck checks the frameworks once for that version and names the ones with newer files; otherwise it asks you to sign in. Update each framework from its `update ... available` link, or all at once with **Update the frameworks** on the page, then deploy.
+A game patch is the usual reason a modded game stops starting. EDGEdeck records the game version at every deploy, and when the executable's version differs from it, the header says `game updated to 2.31` with a warning icon. If you are signed in to Nexus, EDGEdeck checks the frameworks once for that version and names the ones with newer files; otherwise it asks you to sign in. Update each framework from its `update ... available` link, or, from the next release, all at once with **Update the frameworks** on the page; then deploy.
 
 ## 4. The EDGEdeck page
 
@@ -80,7 +84,7 @@ A game patch is the usual reason a modded game stops starting. EDGEdeck records 
 
 ## 5. Adding mods
 
-**From a file or folder.** Add mod takes a zip, 7z, rar, a single mod file (an `.archive`, `.reds`, `.lua` and so on) or a folder. EDGEdeck works out what kind of mod it is (archive, redscript, CET, RED4ext plugin, TweakXL, REDmod package, REDnode package, a framework) and where its files go, and asks only when it cannot tell, for example when a zip holds several options.
+**From a file or folder.** Add mod takes a zip, 7z, rar, a single mod file (an `.archive`, `.reds`, `.lua` and so on) or a folder. EDGEdeck opens zip and 7z on its own; a rar needs [7-Zip](https://7-zip.org) or WinRAR installed (or re-pack it as a zip). EDGEdeck works out what kind of mod it is (archive, redscript, CET, RED4ext plugin, TweakXL, REDmod package, REDnode package, a framework) and where its files go, and asks only when it cannot tell, for example when a zip holds several options.
 
 **From Nexus Mods.** With EDGEdeck handling download links, press **Mod manager download** on any file on the site and it lands in the library. Without that, copy the `nxm://` link and use **Nexus: add from a link**. Premium members can also download straight from an `update` link; free members go through the site, which hands EDGEdeck a link with a key.
 
@@ -88,19 +92,19 @@ A game patch is the usual reason a modded game stops starting. EDGEdeck records 
 
 **From a REDcode project.** Add from REDcode project takes a `.cpmodproj`'s packed output as a mod that follows the project: pack again and the library copy refreshes; deploy picks it up.
 
+**REDnode packages.** A mod with a `rednode-app.json` (an overlay app, HUD widget or Node mod for [REDnode](https://edgemodders.github.io/REDnode/)) deploys into `red4ext\plugins\REDnode\apps\<id>`. REDnode itself is a framework. In the game, a new package shows only in REDnode's **Mod Manager** (in the launcher, F10) until you pin it, and any permission it asks for is allowed there.
+
 **Versions.** A mod has one row however many versions are in the library. The newest, or the one that is on, stands for it; the others wait in the version dropdown and in **Switch version...**. Downloading a version already in the library does nothing twice.
 
 ## 6. Deploying
 
-Deploy puts the **active loadout** in the game (see [Loadouts](#10-loadouts)).
-
+Deploy puts the **active loadout** in the game (see [Loadouts](#10-loadouts)). Close the game first: Windows will not let EDGEdeck replace files the running game holds open, so a deploy with the game running waits until you say **The game is closed now**.
 
 After each deploy, the message says how many files went in for how many mods and how many mods are in the game. **View** opens a report of exactly what changed and where; the last 30 reports stay in the library's `deploys` folder.
 
-
 Turning mods on and off changes nothing on disk. The **Deploy** button counts the files waiting, and **Show pending changes** lists every one with the reason: added, replaced by a mod higher in the list, put back from a backup, relinked after a rebuild, removed.
 
-Deploy hardlinks the files of every mod that is on into the game folder, so they take no extra space, and writes `modlist.txt` for the archive load order. If the library sits on another drive, deploy copies instead, and Set up offers **Move library...** (also in the Mods view's ... menu). It moves the library to a folder you pick, and the next deploy turns the copies into hardlinks. It prepares REDmod packages with `redMod.exe` when any are on. Everything it did goes into a manifest in the game folder.
+Deploy hardlinks the files of every mod that is on into the game folder, so they take no extra space, and writes `modlist.txt` for the archive load order. If the library sits on another drive, deploy copies instead. From the next release (not in 0.28.0), Set up then offers **Move library...** (also in the Mods view's `...` menu and the page's footer). It moves the library to a folder you pick, and the next deploy turns the copies into hardlinks. It prepares REDmod packages with `redMod.exe` when any are on. Everything it did goes into a manifest in the game folder.
 
 **Files that changed outside EDGEdeck.** When Steam verify, the game or another tool changed a file EDGEdeck deployed, the mod shows `changed in game folder` and the next deploy asks one question per file: keep the changed file, which imports it into the library, or put the mod's file back. A foreign file in the way of a deploy is moved to the library's backup folder first and comes back on undo.
 
@@ -152,6 +156,7 @@ Open Settings (`Ctrl+,`) and search for `edgedeck`.
 | `edgedeck.libraryPath` | empty | Where mods are kept, anywhere you like. Empty means `%USERPROFILE%\EDGEdeck`. Put it on the game's drive so deploy can use hardlinks; **Move library...** moves it and sets this. |
 | `edgedeck.bridgePath` | empty | A REDbridge you built yourself. Empty means the copy Get REDbridge fetched, which the page footer names. |
 | `edgedeck.dotnetRoot` | empty | A .NET root for the REDbridge process only. Empty means the per-user .NET 10 runtime. Never set `DOTNET_ROOT` for your whole account; it breaks Vortex. |
+| `edgedeck.launch` | `auto` | How **Run game** starts the game: `auto` (through Steam for a game in a Steam library, else the exe), `steam`, or `exe` (`bin\x64\Cyberpunk2077.exe`). Every way adds `-modded`, which REDmod mods need. |
 | `edgedeck.nexusCheckUpdatesOnStart` | on | The daily Nexus update check. |
 | `edgedeck.nexusClientId` | empty | The OAuth client id Nexus assigns to EDGEdeck. With it, sign in happens in the browser and renews itself. |
 | `edgedeck.vortexStagingPath` | empty | Where Vortex keeps its mods, for Import from Vortex. Empty means EDGEdeck searches the usual places and asks when it finds none. |
@@ -167,33 +172,38 @@ Everything EDGEdeck knows is in plain files under the library folder, `%USERPROF
 | `library.json` | The order of the mods (first wins) and the game folder |
 | `downloads/` | The kept original archives. Safe to delete |
 | `backup/` | Foreign files a deploy moved aside |
+| `deploys/` | The last 30 deploy reports, in Markdown |
 | `loadouts/` | Saved loadouts |
 
-The game folder gets a manifest of what EDGEdeck deployed, which Undo deploy reads.
+The game folder gets a manifest of what EDGEdeck deployed, `edgedeck.deployment.json`, which Undo deploy reads.
 
 ## 13. Command line and assistants
 
-The same core runs from a terminal, for scripts and assistants. Every command prints JSON with `--json`.
+The same core runs from a terminal, for scripts and assistants. It is on npm as `@edgemodders/edgedeck-mcp` (Node.js 20 or later): run a command with `npx -p @edgemodders/edgedeck-mcp edgedeck list`, or install it once with `npm i -g @edgemodders/edgedeck-mcp` and type `edgedeck list`. From a clone of this repository, `node bin/edgedeck.mjs` does the same after `npm run build`. Every command prints JSON with `--json`.
 
 ```
-node bin/edgedeck.mjs list [--size]           what is in the library, its size and status
-node bin/edgedeck.mjs mod <id>                one mod in full: files, sizes, source, Nexus data, conflicts
-node bin/edgedeck.mjs add <file|folder> [--name N] [--option FOLDER]
-node bin/edgedeck.mjs on <id> | off <id>      turn a mod on or off
-node bin/edgedeck.mjs up <id> | down <id>     change the order (first wins conflicts)
-node bin/edgedeck.mjs remove <id>
-node bin/edgedeck.mjs deploy [--keep PATH...] [--restore PATH...]
-node bin/edgedeck.mjs undo
-node bin/edgedeck.mjs changes                 files changed in the game folder since the deploy
-node bin/edgedeck.mjs pending                 what the next deploy does, and why
-node bin/edgedeck.mjs conflicts               conflicts by file path
-node bin/edgedeck.mjs loadout save <name> | load <name or file> | list
-node bin/edgedeck.mjs vortex list | import
+edgedeck list [--size]           what is in the library, its size and status
+edgedeck mod <id>                one mod in full: files, sizes, source, Nexus data, conflicts
+edgedeck add <file|folder> [--name N] [--option FOLDER]
+edgedeck install-project <.cpmodproj> [--follow | --keep-both]
+                                 add a REDcode or WolvenKit project's packed output, or refresh it
+edgedeck on <id> | off <id>      turn a mod on or off
+edgedeck up <id> | down <id>     change the order (first wins conflicts)
+edgedeck rename <id> [name...]   a name of your own; no name puts the first one back
+edgedeck remove <id>
+edgedeck deploy [--keep PATH...] [--restore PATH...] [--mod ID]
+edgedeck undo
+edgedeck changes                 files changed in the game folder since the deploy
+edgedeck pending                 what the next deploy does, and why
+edgedeck conflicts               conflicts by file path (archive conflicts need the extension)
+edgedeck loadout save <name> | load <name or file> | list
+edgedeck vortex list | import
+edgedeck mcp                     serve the same verbs as MCP tools over stdio
 ```
 
-`--library <folder>` and `--game <folder>` override the folders. The command line finds the game the same way the extension does.
+`--library <folder>` and `--game <folder>` override the folders. Without `--game`, the command line uses the game folder the library remembers, else finds it through Steam, GOG or Epic like the extension. It uses the same library as the extension, and the Mods view follows what it changes.
 
-**Without VS Code:** the MCP server and the command line are also on npm as `@edgemodders/edgedeck-mcp`. `npx -y @edgemodders/edgedeck-mcp` starts the server (for Claude Code: `claude mcp add edgedeck -- npx -y @edgemodders/edgedeck-mcp`), and `npx -p @edgemodders/edgedeck-mcp edgedeck list` runs the command line. It uses the same library as the extension.
+**MCP without VS Code:** `npx -y @edgemodders/edgedeck-mcp` starts the server; for Claude Code, `claude mcp add edgedeck -- npx -y @edgemodders/edgedeck-mcp`. Its tools are listed on the [npm page](https://www.npmjs.com/package/@edgemodders/edgedeck-mcp).
 
 **An assistant can do all of this for you.** EDGEdeck is an MCP server too, with the same verbs as tools: list and inspect mods, add, turn on or off, reorder, remove, show what a deploy would do, deploy, undo, conflicts, loadouts and Vortex import. Ask "which of my mods are off?" or "deploy my mods and tell me what changed".
 
@@ -201,7 +211,7 @@ node bin/edgedeck.mjs vortex list | import
 - **Claude Code**: run **EDGEdeck: Connect an assistant (MCP)...** from the command palette, pick "Copy the Claude Code command" and paste it in a terminal once. It is a `claude mcp add` line pointing at EDGEdeck's server with your library and game folders.
 - **Other MCP clients**: the same command copies a JSON entry, or point the client at `node <extension folder>/dist/mcp.js --library <folder> --game <folder>`.
 
-The tools that write to the game folder, deploy and undo, are marked so an assistant asks before using them. Changes an assistant makes show up in the Mods view by themselves.
+The tools that write to the game folder or delete, deploy, undo and remove, are marked so the assistant asks you before every call; Claude Code asks even in auto mode. Changes an assistant makes show up in the Mods view by themselves.
 
 ## 14. When something is wrong
 
