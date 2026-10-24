@@ -370,7 +370,7 @@ deployed.json                     <span class="c">// mirror of &lt;game&gt;\edge
     <div class="panel ok"><div class="label">From project to game in one click</div>
       <p>REDcode's pack step produces <code>packed/archive/pc/mod/&lt;Mod&gt;.archive</code>. With EDGEdeck present, the project gets an "Install into EDGEdeck" command and a "Test in game" command that installs, deploys only that mod's changes and launches the game. The library entry remembers its source project, so a rebuild shows "rebuilt, not deployed" in the list and Deploy picks it up. The same path serves REDnode mods: a REDnode package is a kind, and the REDnode runtime plugin is a framework.</p></div>
     <div class="panel"><div class="label">AI-first</div>
-      <p>All state is JSON files in the library, so an assistant can read what is installed, enabled and conflicting without the UI. The exported commands (<code>edgedeck.add</code>, <code>edgedeck.setEnabled</code>, <code>edgedeck.deploy</code>, <code>edgedeck.list</code>) are callable by other extensions and by Claude through VS Code. Later, the same core ships as a <code>edgedeck</code> npm CLI and as MCP tools next to REDbridge's, so "install these three mods and tell me if anything conflicts" is one request.</p></div>
+      <p>All state is JSON files in the library, so an assistant can read what is installed, enabled and conflicting without the UI. Other extensions call the API that <code>activate()</code> returns (since 0.21.0: the game path, install a project, pending mods, deploy, deploy one mod, turn off). The same core ships as the <code>edgedeck</code> command line and an MCP server with <code>edgedeck_*</code> tools (0.17.0; on npm as <code>@edgemodders/edgedeck-mcp</code> since 0.26.4), so "install these three mods and tell me if anything conflicts" is one request.</p></div>
   </div>
 </section>
 
@@ -394,7 +394,7 @@ deployed.json                     <span class="c">// mirror of &lt;game&gt;\edge
 
 <section id="next">
   <h2><span class="id">12</span>Next: frameworks, requirements, the library</h2><div class="rule"></div>
-  <p><span class="tag y">Proposed 2026-10-22, for the owner's approval</span> Three things a new player trips over before their first mod works: getting the frameworks, chasing a mod's requirements down more than one level, and a library on the wrong drive. Each becomes one button. This is M6 in the roadmap.</p>
+  <p><span class="tag y">Agreed with the owner 2026-10-22</span> Three things a new player trips over before their first mod works: getting the frameworks, chasing a mod's requirements down more than one level, and a library on the wrong drive. Each becomes one button. This is M6 in the roadmap.</p>
 
   <h3>Get the frameworks <span class="tag g">Built 2026-10-22, for 0.29.0</span></h3>
   <div class="grid g2">
@@ -464,7 +464,7 @@ deployed.json                     <span class="c">// mirror of &lt;game&gt;\edge
 <section id="roadmap">
   <h2><span class="id">13</span>Roadmap</h2><div class="rule"></div>
   <div class="panel ok" style="margin-bottom:14px"><div class="label">Status 2026-10-22, version 0.28.0</div>
-    <p>M0 to M5 are built, released and in daily use on two PCs. EDGEdeck is on the VS Code Marketplace and Open VSX (preview), its CLI and MCP server on npm as <code>@edgemodders/edgedeck-mcp</code>. Beyond the first plan: one row per mod with a version dropdown, a pending-changes list, a wide table page with search and facets, sections, loadouts, Get REDbridge with a daily update check, game detection through Steam's library list, sizes everywhere, a Set up group, Run game, Rename, and REDcode's install loop with <code>deployMod</code>. Waiting on others: Nexus's OAuth client id (Nexus answered on 2026-10-22 with requests) and EDGEmods' install request. Next is M6. The <a href="guide.html">guide</a> covers use and the <a href="./">docs index</a> keeps the phase status.</p></div>
+    <p>M0 to M5 are built, released and in daily use on two PCs. EDGEdeck is on the VS Code Marketplace and Open VSX (preview), its CLI and MCP server on npm as <code>@edgemodders/edgedeck-mcp</code>. Beyond the first plan: one row per mod with a version dropdown, a pending-changes list, a wide table page with search and facets, sections, loadouts, Get REDbridge with a daily update check, game detection through Steam's library list, sizes everywhere, a Set up group, Run game, Rename, and REDcode's install loop with <code>deployMod</code>. Waiting on others: Nexus's OAuth client id (Nexus answered on 2026-10-22 with requests) and EDGEmods' install request. M6 is under way: Move library and Get the frameworks are built on <code>main</code> for the next release; requirements come after Nexus's requests. The <a href="guide.html">guide</a> covers use and the <a href="./">docs index</a> keeps the phase status.</p></div>
   <div class="panel">
     <div class="phase"><div class="n">M0<small>DECIDE</small></div><div>
       <h3>Name, library location, word list</h3>
@@ -486,7 +486,7 @@ deployed.json                     <span class="c">// mirror of &lt;game&gt;\edge
       <p>Save and load a list as a loadout file. <code>edgedeck</code> CLI on npm over the same core. MCP tools beside REDbridge's. Publish to Open VSX and the Marketplace.</p></div></div>
     <div class="phase"><div class="n">M6<small>SETUP</small></div><div>
       <h3>Frameworks, requirements, the library</h3>
-      <p>Proposed. Get the frameworks from their GitHub releases in one click. Walk a Nexus mod's requirements and get the missing ones, automatically for Premium, one click per file for free members. Move library, and a Set up step when the library and the game are on different drives. See <a href="#next">Next</a>.</p></div></div>
+      <p>Agreed 2026-10-22; Get the frameworks and Move library built for the next release. Get the frameworks from their GitHub releases in one click. Walk a Nexus mod's requirements and get the missing ones, automatically for Premium, one click per file for free members. Move library, and a Set up step when the library and the game are on different drives. See <a href="#next">Next</a>.</p></div></div>
   </div>
 </section>
 
