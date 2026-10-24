@@ -8,19 +8,19 @@ Every test run on EDGEdeck so far: how to run it again, what to expect, and what
 
 Releases up to 0.26.6 were published as REDdeck; this page uses the new name throughout.
 
-Last updated 2026-10-17. Dates before then come from the session records; anything not confirmed there is marked unverified.
+Last updated 2026-10-24. Dates before 2026-10-17 come from the session records; anything not confirmed there is marked unverified.
 
 ## At a glance
 
 | Test | Kind | Last run | Result |
 |---|---|---|---|
-| [Type check and build](#type-check-and-build) | Automated, every release | 2026-10-16 (0.26.6) | Pass |
-| [Smoke test](#smoke-test) | Automated, every release | 2026-10-16 (0.26.6) | Pass |
-| [UI test](#ui-test-in-a-real-vs-code) | Automated, by hand only (not in CI) | 2026-10-14 (0.26.0) | Pass |
-| [Publish workflow](#publish-workflow) | Automated, on a tag | 2026-10-16 (v0.26.6) | Pass |
+| [Type check and build](#type-check-and-build) | Automated, every release | 2026-10-22 (0.28.0) | Pass |
+| [Smoke test](#smoke-test) | Automated, every release | 2026-10-22 (0.28.0) | Pass |
+| [UI test](#ui-test-in-a-real-vs-code) | Automated, by hand only (not in CI) | 2026-10-14 (0.26.0); later runs not recorded here | Pass |
+| [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-22 (v0.28.0) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
-| [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-16 | 23 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | 1 open |
+| [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-17 | 32 runs, see the table |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 8 open |
 
 ## Automated
 
@@ -74,12 +74,12 @@ Downloads a VS Code build into `.vscode-test/` once (about 350 MB), then runs `s
 | Check | Expected |
 |---|---|
 | Activation | `edgemodders.edgedeck` activates |
-| Commands | All 32 registered |
+| Commands | The 37 it lists are registered |
 | Library | Created on refresh |
 | Deploy | A hand-made mod deploys without a dialog: the archive in the game, a manifest, `modlist.txt` reading `UiTest.archive` |
 | Views | Check conflicts opens Conflicts, Show changes opens Pending changes, Open page opens EDGEdeck, Details opens |
 
-### Publish workflow
+### Release workflow
 
 Run **Release** from the Actions tab with **Make a release** ticked (or `npm run release`). Unticked, it stops after packaging and keeps the `.vsix` and the Nexus zip as the run's artifact. `.github/workflows/release.yml` (`publish.yml` before 2026-10-22, when a pushed tag also released) checks the version is not released yet and the run is on main, stops when CHANGELOG.md has no section for it, runs typecheck, build and smoke, packages for win32-x64, builds the Nexus zip, publishes to the VS Code Marketplace and Open VSX, publishes `@edgemodders/edgedeck-mcp` to npm (skipped if that version exists), and makes the GitHub release, which makes the tag when there is none. `verify-tokens.yml`, run by hand, checks the store tokens.
 
@@ -88,9 +88,10 @@ Run **Release** from the Actions tab with **Make a release** ticked (or `npm run
 | v0.26.0 (10-14), v0.26.1 (10-15), v0.26.2, v0.26.3 (10-16) | Pass |
 | v0.26.4 (10-16) | **Failed at npm**: `npm publish dist/npm` was read as a GitHub repo; it needs `./dist/npm`. The extension reached both stores; the GitHub release was made by hand |
 | v0.26.5 (10-16) | Pass, npm included |
+| v0.26.6 (10-16) | Pass, the first with the Nexus zip (`EDGEdeck-0.26.6-nexus.zip` on the release) |
+| v0.27.3 (10-17) | Pass: the first release as EDGEdeck, on the Marketplace, Open VSX and npm (from the session records; the run itself unverified) |
 | Run workflow, unticked (10-22) | Pass: built and tested, `.vsix` and Nexus zip kept as the run's artifact, nothing published, no tag |
 | v0.28.0 (10-22), Run workflow with Make a release | Pass, the first from the Actions tab: Marketplace, Open VSX, npm and the GitHub release, tag made on the commit. A first try stopped at the changelog check (still Unreleased), as meant. npm showed it within a minute, Open VSX after about 4, the Marketplace after about 7 |
-| v0.26.6 (10-16) | Pass, the first with the Nexus zip (`EDGEdeck-0.26.6-nexus.zip` on the release) |
 | verify-tokens (10-14) | Pass on the last of four runs (one failure, cause not recorded) |
 
 ### npm package install
@@ -148,5 +149,5 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 | 4 | **A project beside a mod of the same name** | 0.28.0; REDcode | Install a project from REDcode when EDGEdeck already has a mod of that name from another folder (the two EDGEmat_M3 folders): one question. **Use this project**: no second mod, the existing one follows the new folder. Again with **Keep both**: the project becomes version `dev 2` of that mod and is on in its place. When another mod wins its files, the deploy message says "The game still has X" with **Let Y win** |
 | 5 | **Deploy one mod** | 0.28.0; a REDcode that calls `deployMod` | REDcode's Install deploys only that mod; the message says how many other changes still wait. Also `edgedeck deploy --mod <id>` |
 | 6 | **Claude Code asks before deploy, undo and remove** | 0.28.0; Claude Code in auto mode | EDGEchat's P1 test again: "deploy my mods" asks before `edgedeck_deploy` runs. The same for `edgedeck_undo` and `edgedeck_remove` |
-| 7 | **Move library** | 0.29.0 | With the library on C: and the game on another drive: Set up shows "Move the library to the game's drive". Move it there: progress, the old folder is gone, Pending changes says each file becomes a hardlink, Deploy does it, the game still starts. Move it within the same drive: instant, nothing to deploy. Pick a folder that holds another library: it asks to use it and moves nothing |
-| 8 | **Get the frameworks** | 0.29.0 | On a library without frameworks: Set up shows "Get the frameworks"; the list has all six ticked; OK adds them, one notification, Deploy offered; the game starts with CET's overlay and RED4ext's log. With a Vortex-imported Codeware one version behind: only it is ticked, and it becomes a new version of that Codeware. The download button on the Frameworks header and the page link do the same |
+| 7 | **Move library** | Next release (built 2026-10-22, on `main`) | With the library on C: and the game on another drive: Set up shows "Move the library to the game's drive". Move it there: progress, the old folder is gone, Pending changes says each file becomes a hardlink, Deploy does it, the game still starts. Move it within the same drive: instant, nothing to deploy. Pick a folder that holds another library: it asks to use it and moves nothing |
+| 8 | **Get the frameworks** | Next release (built 2026-10-22, on `main`) | On a library without frameworks: Set up shows "Get the frameworks"; the list has all six ticked; OK adds them, one notification, Deploy offered; the game starts with CET's overlay and RED4ext's log. With a Vortex-imported Codeware one version behind: only it is ticked, and it becomes a new version of that Codeware. The download button on the Frameworks header and the page link do the same |

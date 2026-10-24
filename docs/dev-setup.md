@@ -28,23 +28,24 @@ npm install
 
 | Script | Runs |
 |---|---|
-| `npm run build` | Bundles `src/extension.ts` to `dist/extension.js` with esbuild |
+| `npm run build` | Bundles `dist/extension.js`, `core.js`, `mcp.js` and `uiTest.js` with esbuild, and writes ThirdPartyNotices.txt |
 | `npm run watch` | The same, rebuilding on every change |
 | `npm run typecheck` | `tsc --noEmit` over `src/` |
 | `node bin/edgedeck.mjs <command>` | The command line over `dist/core.js`; `--library` and `--game` pick the folders, `--json` prints JSON |
 | `npm run smoke` | Runs `scripts/smoke.mjs`: classifies sample layouts, adds them to a temp library, deploys into a fake game folder with hardlinks, changes a file by hand, undoes, and imports from Vortex if it is installed (read-only) |
-| `npm run package` | Builds a `.vsix` into `dist/` with vsce |
+| `npm run package` | Builds a `.vsix` into `dist/` with vsce (README: `docs/marketplace.md`) |
+| `npm run test:ui` | Runs `src/uiTest.ts` inside a downloaded VS Code (see below) |
+| `npm run release:notes` | Prints the GitHub release notes from CHANGELOG.md; `-- --nexus` prints Nexus's plain lines |
 
-To run it, open the repo in VS Code and press F5. A second VS Code window opens with EDGEdeck loaded; its Mods view is in the activity bar. Set `edgedeck.gamePath` in that window's settings if the game is not in the Steam default folder.
+To run it, open the repo in VS Code and press F5. A second VS Code window opens with EDGEdeck loaded; its Mods view is in the activity bar. EDGEdeck finds the game through Steam, GOG or Epic; set `edgedeck.gamePath` in that window's settings only for a game they cannot see.
 
 The mod library defaults to `%USERPROFILE%\EDGEdeck`. Point `edgedeck.libraryPath` at a scratch folder while developing, so tests never touch a real library.
 
-Archives: zip and 7z are opened by the `7za.exe` from the `7zip-bin` package, which the build copies to `bin/` so the `.vsix` carries it (the folder is git-ignored). rar needs 7-Zip or WinRAR installed; EDGEdeck looks in both Program Files folders.
+Archives: zip and 7z are opened by the `7za.exe` from the `7zip-bin` package, which the build copies to `bin/` so the `.vsix` carries it (`*.exe` is git-ignored, so it is never committed). rar needs 7-Zip or WinRAR installed; EDGEdeck looks in both Program Files folders.
 
-Archive conflicts need a REDbridge build (0.4.0 or later). With the REDbridge repo cloned and built next to this one, EDGEdeck finds `..\REDbridge\src\REDbridgein\Release
-et10.0\REDbridge.exe` on its own; otherwise set `edgedeck.bridgePath`. With a per-user .NET runtime also set `edgedeck.dotnetRoot` (the smoke test reads `DOTNET_ROOT` or falls back to `%LOCALAPPDATA%\Microsoft\dotnet`).
+Archive conflicts need a REDbridge build (0.4.0 or later). With the REDbridge repo cloned and built next to this one, EDGEdeck finds `..\REDbridge\src\REDbridge\bin\Release\net10.0\REDbridge.exe` on its own; otherwise set `edgedeck.bridgePath`, or use **Get REDbridge**, which fetches the latest release. The bridge runs on the per-user .NET 10 runtime in `%LOCALAPPDATA%\Microsoft\dotnet` by default; set `edgedeck.dotnetRoot` only for a runtime somewhere else, and never a user-level `DOTNET_ROOT`, which breaks Vortex (the smoke test reads `DOTNET_ROOT` or falls back to `%LOCALAPPDATA%\Microsoft\dotnet`).
 
-Nexus: the API key is entered with the command `EDGEdeck: Nexus: set API key` and kept in VS Code's secret storage, never in settings or the library. EDGEdeck sends `EDGEdeck/<version>` as its user agent and application name, as Nexus asks. Rate limits are 2,500 requests a day; an update check costs one or two requests per mod.
+Nexus: the API key is entered with the command **EDGEdeck: Nexus: set API key (paste, instead of signing in)** and kept in VS Code's secret storage, never in settings or the library. EDGEdeck sends `EDGEdeck/<version>` as its user agent and application name, as Nexus asks. Rate limits are 2,500 requests a day; an update check costs one or two requests per mod.
 
 `npm run test:ui` downloads a VS Code build into `.vscode-test/` (about 350 MB, once) and runs `src/uiTest.ts` inside it with a scratch library and a fake game folder.
 
