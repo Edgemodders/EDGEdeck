@@ -23,7 +23,7 @@
 //   edgedeck mcp                        serve the same verbs as MCP tools over stdio
 //
 // Options: --library <folder> (default %USERPROFILE%\EDGEdeck), --game <folder> (default: the
-// library's remembered game, else the Steam folder), --json.
+// library's remembered game, else the game found through Steam, GOG or Epic), --json.
 
 import { createRequire } from "node:module";
 import * as fs from "node:fs";
