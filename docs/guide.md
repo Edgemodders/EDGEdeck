@@ -69,6 +69,8 @@ RED4ext, Cyber Engine Tweaks, redscript, ArchiveXL, TweakXL, Codeware, Audioware
 
 A game patch is the usual reason a modded game stops starting. EDGEdeck records the game version at every deploy, and when the executable's version differs from it, the header says `game updated to 2.31` with a warning icon. If you are signed in to Nexus, EDGEdeck checks the frameworks once for that version and names the ones with newer files; otherwise it asks you to sign in. Update each framework from its `update ... available` link, or, from the next release, all at once with **Update the frameworks** on the page; then deploy.
 
+**Update all** (new in the next release) updates every mod with an update waiting, frameworks or not, after one question. It is a button on the EDGEdeck page (greyed out while nothing waits) and a hover button on the Frameworks header in the Mods view while any mod has one. Each mod's row on the page also has an update button in its Actions column. Frameworks come from their GitHub releases; other mods from Nexus, where free members press Mod manager download on each file page EDGEdeck opens. The older versions stay in the library, off; deploy to put the new ones in the game.
+
 ## 4. The EDGEdeck page
 
 **Open EDGEdeck** (the first title-bar button, or the command) opens the wide table in the editor area. Use it for bigger jobs; the sidebar is its compact companion.

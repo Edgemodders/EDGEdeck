@@ -17,7 +17,7 @@ import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
-import { frameworkStates, missingFrameworks, type FrameworkState } from "./frameworkGet";
+import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrameworks, type FrameworkRelease, type FrameworkSource, type FrameworkState } from "./frameworkGet";
 import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveInSection, moveSection, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
@@ -101,6 +101,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.runGame", () => run(runGameCommand)),
     vscode.commands.registerCommand("edgedeck.moveLibrary", () => run(moveLibraryCommand)),
     vscode.commands.registerCommand("edgedeck.getFrameworks", () => run(getFrameworksCommand)),
+    vscode.commands.registerCommand("edgedeck.updateAll", () => run(updateAllCommand)),
     vscode.commands.registerCommand("edgedeck.remove", (node: ModNode) => run(() => removeCommand(modOf(node)))),
     // From the context menu with the row; from F2 with nothing, so the selected row.
     vscode.commands.registerCommand("edgedeck.rename", (node?: ModNode) => run(() => renameCommand(modOf(node ?? tree.selection[0])))),
@@ -1053,6 +1054,8 @@ async function pageAction(m: PageMessage): Promise<void> {
       return moveLibraryCommand();
     case "getFrameworks":
       return getFrameworksCommand();
+    case "updateAll":
+      return updateAllCommand();
     case "changes":
       return showChanges(m.id);
     case "getBridge":
@@ -1905,6 +1908,20 @@ async function deployCommand(): Promise<void> {
  */
 // ---- Get the frameworks: the six, from their authors' GitHub releases --------------------------------
 
+/** Downloads a framework's GitHub release into `temp` and adds it, quietly, to its family. */
+async function addFrameworkRelease(source: FrameworkSource, release: FrameworkRelease, family: Family | undefined, temp: string): Promise<ModInfo | undefined> {
+  const zip = path.join(temp, release.assetName);
+  await download(release.url, zip);
+  return addFrom(zip, {
+    name: family?.name ?? source.name,
+    version: release.version,
+    source: { type: "github", path: release.page, modId: source.nexusId },
+    quiet: true,
+    // A framework the library knows by its files only (no Nexus id) keeps its family.
+    family: family && family.key !== `nexus:${source.nexusId}` ? family.key : undefined,
+  });
+}
+
 /** The Set up step while the library lacks any of the six frameworks. */
 function frameworksStep(): SetupStep & { done: boolean } {
   const missing = library ? missingFrameworks(library) : [];
@@ -1956,16 +1973,7 @@ async function getFrameworksCommand(): Promise<void> {
         }
         progress.report({ message: `${s.source.name} ${s.release.version} (${i + 1} of ${picked.length})`, increment: 100 / picked.length });
         try {
-          const zip = path.join(temp, s.release.assetName);
-          await download(s.release.url, zip);
-          const mod = await addFrom(zip, {
-            name: s.family?.name ?? s.source.name,
-            version: s.release.version,
-            source: { type: "github", path: s.release.page, modId: s.source.nexusId },
-            quiet: true,
-            // A framework the library knows by its files only (no Nexus id) keeps its family.
-            family: s.family && s.family.key !== `nexus:${s.source.nexusId}` ? s.family.key : undefined,
-          });
+          const mod = await addFrameworkRelease(s.source, s.release, s.family, temp);
           if (mod) added.push(`${mod.name} ${mod.version}`);
         } catch (err) {
           log.appendLine(`Get the frameworks: ${s.source.name}: ${err instanceof Error ? err.message : String(err)}`);
@@ -2615,7 +2623,7 @@ async function addFromLink(link: string): Promise<void> {
  * Downloads one Nexus file into the library and adds it. When an older entry for the same Nexus
  * mod exists, the new one takes its place in the order and the old one is turned off.
  */
-async function fetchFromNexus(modId: number, fileId: number, key?: string, expires?: number): Promise<void> {
+async function fetchFromNexus(modId: number, fileId: number, key?: string, expires?: number, quiet = false): Promise<void> {
   if (!library) return;
   const client = await nexusClient(true);
   if (!client) return;
@@ -2626,7 +2634,7 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
     const r = activateVersion(library, same);
     log.appendLine(`${same.name} ${same.version} is already in the library (${same.id}); made it the active version`);
     refresh();
-    void vscode.window.showInformationMessage(`${info.name} ${same.version} is already in the library${r.previous.id === same.id ? "." : " and is now the active version."}`);
+    if (!quiet) void vscode.window.showInformationMessage(`${info.name} ${same.version} is already in the library${r.previous.id === same.id ? "." : " and is now the active version."}`);
     return;
   }
   const links = await client.downloadLinks(modId, fileId, key, expires).catch((err: Error) => {
@@ -2653,7 +2661,7 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   }
   log.appendLine(`Downloaded ${fileName} (${info.name} ${file?.version ?? ""}) from Nexus mod ${nxm.modId}, md5 ${md5Of(dest)}`);
   const existing = library.mods.find((m) => m.source.modId === nxm.modId);
-  await addFrom(dest, { name: existing?.name ?? info.name, version: file?.version ?? info.version, source: { type: "nexus", modId: nxm.modId, fileId: nxm.fileId, path: dest } });
+  await addFrom(dest, { name: existing?.name ?? info.name, version: file?.version ?? info.version, source: { type: "nexus", modId: nxm.modId, fileId: nxm.fileId, path: dest }, quiet });
   const added = library.mods[library.mods.length - 1];
   if (added && added.source.modId === nxm.modId && added.source.fileId === nxm.fileId) {
     added.nexus = { name: info.name, version: info.version, latestVersion: file?.version ?? info.version, latestFileId: nxm.fileId, latestFileName: fileName, checked: new Date().toISOString(), author: info.author, summary: info.summary };
@@ -2663,7 +2671,7 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
     const r = activateVersion(library, added);
     log.appendLine(`${added.name} ${added.version} takes the place of ${r.previous.version}, which is now off`);
     refresh();
-    offerDeploy(`${added.name} ${added.version} added in place of ${r.previous.version}${r.on ? "" : " (the mod is off)"}.`);
+    if (!quiet) offerDeploy(`${added.name} ${added.version} added in place of ${r.previous.version}${r.on ? "" : " (the mod is off)"}.`);
   }
 }
 
@@ -2691,21 +2699,107 @@ async function updateModCommand(mod: ModInfo | undefined): Promise<void> {
     void vscode.window.showInformationMessage(`${fam.name} ${newestHere} is the newest file on Nexus${fam.active.version !== newestHere ? `, and it is in the library; pick it from the version list` : ""}.`);
     return;
   }
-  const a = await vscode.window.showInformationMessage(`Update ${fam.name} from ${fam.active.version} to ${latest}?`, { modal: true, detail: "EDGEdeck downloads the newest file from Nexus into the library, puts it in this mod's place and turns this version off. The game folder changes when you deploy." }, "Update");
+  const a = await vscode.window.showInformationMessage(`Update ${fam.name} from ${fam.active.version} to ${latest}?`, { modal: true, detail: "EDGEdeck downloads the newest file into the library, puts it in this mod's place and turns this version off. The game folder changes when you deploy." }, "Update");
   if (a !== "Update") return;
-  try {
-    await fetchFromNexus(mod.source.modId, fileId);
-  } catch (err) {
-    if (!(err instanceof PremiumError)) throw err;
-    const handler = describeHandler(await currentNxmHandler());
-    const ours = /edgedeck/i.test(handler);
-    void vscode.env.openExternal(vscode.Uri.parse(`${modPageUrl(mod.source.modId)}?tab=files&file_id=${fileId}`));
-    void vscode.window.showInformationMessage(
-      ours
-        ? `Nexus gives direct downloads to Premium members only. The file page is open: press "Mod manager download" and EDGEdeck takes it from there.`
-        : `Nexus gives direct downloads to Premium members only. The file page is open: press "Mod manager download". ${handler} handles those links right now; run "EDGEdeck: Nexus: handle download links" so they land here.`,
-    );
+  if ((await applyUpdate(fam, { fileId, version: latest }, false)) === "premium") await premiumPages([{ modId: mod.source.modId, fileId }]);
+}
+
+/**
+ * Puts a newer version of a family in its place. A framework comes from its author's GitHub release
+ * when that has the version (no Premium needed); anything else from Nexus. "premium": Nexus wants a
+ * click on its site for this one.
+ */
+async function applyUpdate(fam: Family, target: { fileId: number; version: string }, quiet: boolean): Promise<"done" | "premium"> {
+  const fw = FrameworkSources.find((f) => f.nexusId === fam.nexusId);
+  if (fw) {
+    try {
+      const release = await latestFrameworkRelease(fw);
+      if (!versionNewer(target.version, release.version)) {
+        const temp = fs.mkdtempSync(path.join(os.tmpdir(), "edgedeck-update-"));
+        try {
+          const mod = await addFrameworkRelease(fw, release, fam, temp);
+          if (mod && !quiet) offerDeploy(`${mod.name} ${mod.version} is in the library in place of ${fam.active.version}.`);
+          return "done";
+        } finally {
+          fs.rmSync(temp, { recursive: true, force: true });
+        }
+      }
+    } catch (err) {
+      log.appendLine(`Update ${fam.name}: GitHub did not work (${err instanceof Error ? err.message : String(err)}); trying Nexus`);
+    }
   }
+  try {
+    await fetchFromNexus(fam.nexusId!, target.fileId, undefined, undefined, quiet);
+    return "done";
+  } catch (err) {
+    if (err instanceof PremiumError) return "premium";
+    throw err;
+  }
+}
+
+/** For free Nexus members: opens each file's page, where "Mod manager download" sends the file here. */
+async function premiumPages(files: { modId: number; fileId: number }[]): Promise<void> {
+  for (const f of files) void vscode.env.openExternal(vscode.Uri.parse(`${modPageUrl(f.modId)}?tab=files&file_id=${f.fileId}`));
+  const handler = describeHandler(await currentNxmHandler());
+  const pages = files.length === 1 ? "The file page is open" : `${files.length} file pages are open`;
+  void vscode.window.showInformationMessage(
+    /edgedeck/i.test(handler)
+      ? `Nexus gives direct downloads to Premium members only. ${pages}: press "Mod manager download" on ${files.length === 1 ? "it" : "each"} and EDGEdeck takes it from there.`
+      : `Nexus gives direct downloads to Premium members only. ${pages}: press "Mod manager download". ${handler} handles those links right now; run "EDGEdeck: Nexus: handle download links" so they land here.`,
+  );
+}
+
+/** The families with a newer version waiting on Nexus, as the last update check found. */
+function familiesWithUpdates(): Family[] {
+  return library ? families(library).filter((f) => f.update && f.nexusId) : [];
+}
+
+/** "Update all": every mod with an update waiting, after one question, with one summary. */
+async function updateAllCommand(): Promise<void> {
+  if (!library) return;
+  const fams = familiesWithUpdates();
+  if (!fams.length) {
+    void vscode.window.showInformationMessage("No updates are waiting. Check updates asks Nexus for newer files.");
+    return;
+  }
+  const list = fams.map((f) => `${f.name} ${f.active.version || "?"} to ${f.update!.version}`);
+  const a = await vscode.window.showInformationMessage(
+    `Update ${fams.length === 1 ? fams[0].name : `${fams.length} mods`}?`,
+    { modal: true, detail: `${list.join("\n")}\n\nEDGEdeck downloads each newest file into the library and puts it in its mod's place; the older versions stay, off. The game folder changes when you deploy.` },
+    "Update all",
+  );
+  if (a !== "Update all") return;
+  const updated: string[] = [];
+  const premium: { modId: number; fileId: number }[] = [];
+  const failed: string[] = [];
+  let client: NexusClient | undefined;
+  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Updating mods" }, async (progress) => {
+    for (const [i, fam] of fams.entries()) {
+      progress.report({ message: `${fam.name} ${fam.update!.version} (${i + 1} of ${fams.length})`, increment: 100 / fams.length });
+      try {
+        let fileId = fam.update!.fileId;
+        if (!fileId) {
+          client ??= await nexusClient(true);
+          if (!client) throw new Error("not signed in to Nexus");
+          fileId = newestFile(await client.files(fam.nexusId!))?.file_id;
+          if (!fileId) throw new Error("Nexus lists no file for it");
+        }
+        if ((await applyUpdate(fam, { fileId, version: fam.update!.version }, true)) === "premium") {
+          premium.push({ modId: fam.nexusId!, fileId });
+          continue;
+        }
+        const now = families(library!).find((f) => f.key === fam.key)?.active;
+        updated.push(`${fam.name} ${now?.version ?? fam.update!.version}`);
+      } catch (err) {
+        log.appendLine(`Update all: ${fam.name}: ${err instanceof Error ? err.message : String(err)}`);
+        failed.push(fam.name);
+      }
+    }
+  });
+  refresh();
+  if (premium.length) await premiumPages(premium);
+  if (failed.length) void vscode.window.showWarningMessage(`EDGEdeck could not update ${failed.join(", ")}. See the log.`, "Show log").then((x) => x && log.show(true));
+  if (updated.length) offerDeploy(`Updated ${updated.join(", ")}.`);
 }
 
 async function nexusHandleLinksCommand(): Promise<void> {

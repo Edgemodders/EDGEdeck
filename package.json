@@ -193,6 +193,12 @@
         "icon": "$(cloud-download)"
       },
       {
+        "command": "edgedeck.updateAll",
+        "title": "Update all",
+        "category": "EDGEdeck",
+        "icon": "$(arrow-circle-up)"
+      },
+      {
         "command": "edgedeck.refresh",
         "title": "Refresh",
         "category": "EDGEdeck",
@@ -380,6 +386,11 @@
           "group": "1_more@3"
         },
         {
+          "command": "edgedeck.updateAll",
+          "when": "view == edgedeck.mods",
+          "group": "1_more@3"
+        },
+        {
           "command": "edgedeck.moveLibrary",
           "when": "view == edgedeck.mods",
           "group": "2_folders@2"
@@ -443,8 +454,13 @@
       "view/item/context": [
         {
           "command": "edgedeck.getFrameworks",
-          "when": "view == edgedeck.mods && viewItem == frameworksGroup",
-          "group": "inline"
+          "when": "view == edgedeck.mods && viewItem =~ /^frameworksGroup/",
+          "group": "inline@2"
+        },
+        {
+          "command": "edgedeck.updateAll",
+          "when": "view == edgedeck.mods && viewItem == frameworksGroupUpdates",
+          "group": "inline@1"
         },
         {
           "command": "edgedeck.hideSetupStep",

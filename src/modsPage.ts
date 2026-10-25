@@ -66,7 +66,7 @@ export interface PageData {
 
 export interface PageMessage {
   action:
-    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks"
+    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport";
   /** loadoutView: the loadout to show. */
@@ -95,6 +95,7 @@ const Icons: Record<string, string> = {
   nexus: '<path d="M9.2 2.5h4.3v4.3"/><path d="M13.5 2.5 7.6 8.4"/><path d="M12 9.6v3.9H2.5V4h3.9"/>',
   remove: '<path d="M2.5 4.4h11"/><path d="M6 4.4V2.6h4v1.8"/><path d="M4 4.4l.7 9h6.6l.7-9"/><path d="M6.8 6.8v4.4M9.2 6.8v4.4"/>',
   rename: '<path d="M10.6 2.6l2.8 2.8-7.9 7.9H2.7v-2.8z"/>',
+  update: '<path d="M8 13.5V5.5"/><path d="M4.8 8.7 8 5.5l3.2 3.2"/><path d="M3 2.5h10"/>',
   close: '<path d="M4 4l8 8M12 4l-8 8"/>',
   add: '<path d="M8 3v10M3 8h10"/>',
   export: '<path d="M8 10V2.5"/><path d="M5 5.5 8 2.5l3 3"/><path d="M2.5 9.5v4h11v-4"/>',
@@ -118,12 +119,12 @@ export class ModsPage {
       this.panel.onDidDispose(() => (this.panel = undefined));
       this.panel.webview.onDidReceiveMessage((m: PageMessage) => this.onMessage(m));
     }
-    this.panel.webview.html = render(data, this.panel.webview.cspSource);
+    this.panel.webview.html = renderPage(data, this.panel.webview.cspSource);
     this.panel.reveal(undefined, false);
   }
 
   update(data: PageData): void {
-    if (this.panel) this.panel.webview.html = render(data, this.panel.webview.cspSource);
+    if (this.panel) this.panel.webview.html = renderPage(data, this.panel.webview.cspSource);
   }
 }
 
@@ -155,7 +156,8 @@ const FacetLabels: [string, string][] = [
 
 const fmt = (n: number): string => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(n >= 10 * (1 << 30) ? 0 : 1)} GB` : n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(n >= 10 * (1 << 20) ? 0 : 1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
 
-function render(d: PageData, csp: string): string {
+/** The page's HTML from its data; exported so a check can render it without a webview. */
+export function renderPage(d: PageData, csp: string): string {
   const nonce = Math.random().toString(36).slice(2);
   const msg = (m: PageMessage) => esc(JSON.stringify(m));
   const counts = new Map<string, number>([["all", d.rows.length]]);
@@ -172,7 +174,8 @@ function render(d: PageData, csp: string): string {
       { m: { action: "moveDown", id: r.id }, icon: "down", title: "Move down", off: last },
       { m: { action: "pickSection", id: r.id }, icon: "section", title: "Put in a section" },
       { m: { action: "open", id: r.id }, icon: "folder", title: "Open its library folder" },
-      // A mod not from Nexus keeps a blank slot, so the icons line up down the column.
+      // A mod without an update or not from Nexus keeps a blank slot, so the icons line up down the column.
+      { m: { action: "update", id: r.id }, icon: "update", title: r.update ? `Update to ${r.update}` : "", cls: r.update ? "upd" : "blank" },
       { m: { action: "nexus", id: r.id }, icon: "nexus", title: "Open on Nexus", cls: r.nexusId ? "" : "blank" },
       { m: { action: "remove", id: r.id }, icon: "remove", title: r.versions.length > 1 ? `Remove version ${r.version} from the library` : "Remove from the library", cls: "danger" },
     ] as { m: PageMessage; icon: string; title: string; off?: boolean; cls?: string }[];
@@ -267,6 +270,8 @@ button.ico svg { width: 15px; height: 15px; fill: none; stroke: currentColor; st
 tr:hover button.ico { color: var(--fg); }
 button.ico:hover, tr:hover button.ico:hover { color: var(--yellow); border-color: var(--yellow); } button.ico.danger:hover, tr:hover button.ico.danger:hover { color: var(--red); border-color: var(--red); }
 button.ico.blank { visibility: hidden; }
+button.ico.upd { color: var(--yellow); }
+button:disabled { opacity: .4; cursor: default; }
 button.ico:disabled, tr:hover button.ico:disabled { color: var(--dim); opacity: .3; cursor: default; border-color: transparent; }
 .gline { display: flex; align-items: center; gap: 6px; } .gline .glabel { color: var(--cyan); } .gline .dim, .gline .fwnote { letter-spacing: 0; text-transform: none; }
 .gline button.ico { width: 22px; height: 20px; }
@@ -302,6 +307,10 @@ input[type=checkbox] { accent-color: var(--yellow); width: 15px; height: 15px; c
   <span class="spacer"></span>
   <button data-msg='${msg({ action: "add" })}'>+ Add mod</button>
   <button data-msg='${msg({ action: d.signedIn ? "updates" : "signIn" })}' title="${d.signedIn ? "Ask Nexus for newer files" : "Sign in to Nexus Mods"}">${d.signedIn ? "Check updates" : "Nexus sign in"}</button>
+  ${(() => {
+    const n = d.rows.filter((r) => r.update).length;
+    return `<button data-msg='${msg({ action: "updateAll" })}' ${n ? "" : "disabled"} title="${n ? `Download the newest file of the ${n === 1 ? "mod" : `${n} mods`} with an update waiting, each in its mod's place` : "No updates waiting; Check updates asks Nexus"}">Update all${n ? ` <b>${n}</b>` : ""}</button>`;
+  })()}
   <button data-msg='${msg({ action: "conflicts" })}'>Conflicts${d.rows.some((r) => r.conflicts) ? ` <b>${d.rows.filter((r) => r.conflicts).length}</b>` : ""}</button>
   ${d.lastDeploy ? `<button data-msg='${msg({ action: "undo" })}' title="Remove every deployed file and put backups back">Undo deploy</button>` : ""}
   ${d.pending ? `<a class="changes" data-msg='${msg({ action: "changes" })}' title="Every file the next deploy touches, and why">${d.pending} change${d.pending === 1 ? "" : "s"}</a>` : ""}

@@ -95,7 +95,8 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
       item.description = `${node.mods.length}, ${on} on`;
       item.contextValue = "group";
       const check = node.label === "Frameworks" && !node.user ? this.frameworks() : undefined;
-      if (node.label === "Frameworks" && !node.user) item.contextValue = "frameworksGroup";
+      // The Frameworks header carries Get the frameworks, and Update all while any mod has an update waiting.
+      if (node.label === "Frameworks" && !node.user) item.contextValue = families(this.library()!).some((f) => f.update && f.nexusId) ? "frameworksGroupUpdates" : "frameworksGroup";
       if (check) {
         const summary = frameworkSummary(check);
         if (summary) item.description += ` · ${summary}`;
