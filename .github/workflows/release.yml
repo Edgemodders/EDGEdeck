@@ -7,13 +7,27 @@
 #                                               the version), if it is not run on main, or if
 #                                               CHANGELOG.md has no section for it
 #   npm run release                             the same as ticking the box, from a terminal
+#   ... and "Update Nexus Mods" ticked          also, after the GitHub release, uploads the Nexus zip
+#                                               to the page as the main file's new version (the old
+#                                               one archived, Mod Manager Download off: an extension,
+#                                               not a game mod), adds its changelog and pushes
+#                                               nexus/description.bbcode (tools/nexus/nexus.mjs,
+#                                               copied from REDnode; NEXUS_KEY). It checks the page
+#                                               first and stops before building if nexus/nexus.json
+#                                               names no page, or if the description changed on Nexus
+#                                               since the last pull (node tools/nexus/nexus.mjs pull,
+#                                               merge, commit, run again). If the upload fails after
+#                                               the GitHub release, run tools/nexus/nexus.mjs release
+#                                               on the dev PC with the release's zip: it skips what is
+#                                               already done.
 #
 # A release publishes to the VS Code Marketplace (VSCE_PAT) and Open VSX (OVSX_PAT, skipped while that
 # secret is not set), publishes the MCP server and CLI to npm as @edgemodders/edgedeck-mcp at the same
 # version (NPM_TOKEN), and makes the GitHub release with the .vsix, the Nexus Mods zip
-# (scripts/nexus-zip.mjs, uploaded to Nexus by hand) and the version's CHANGELOG.md section as notes
-# (scripts/release-notes.mjs). The tokens are Edgemodders organisation secrets. The tag is made by the
-# GitHub release step, last, so a run that fails partway can be run again.
+# (scripts/nexus-zip.mjs) and the version's CHANGELOG.md section as notes (scripts/release-notes.mjs).
+# The tokens are Edgemodders organisation secrets (NEXUS_KEY shared with REDnode's, EDGEmat's and
+# EDGEchat's workflows). The tag is made by the GitHub release step, so a run that fails partway can
+# be run again.
 #
 # Release gate: make a release only after every hand test of the changes since the last release has
 # passed (docs/testing.md, "Waiting for a hand test"). Untested or failed means no release.
@@ -24,6 +38,10 @@ on:
     inputs:
       release:
         description: Make a release (publishes and tags this commit v<version>). Only after every hand test has passed
+        type: boolean
+        default: false
+      nexus:
+        description: Update Nexus Mods (with Make a release) - upload the Nexus zip, its changelog and the page's description
         type: boolean
         default: false
 
@@ -46,6 +64,8 @@ jobs:
       RELEASE: ${{ inputs.release == true }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the tags: the Nexus check compares with the previous release's description
 
       - uses: actions/setup-node@v5
         with:
@@ -74,7 +94,20 @@ jobs:
       # Before anything is built or published: no CHANGELOG.md section for the version stops a release here.
       - name: Release notes from CHANGELOG.md
         if: env.RELEASE == 'true'
-        run: node scripts/release-notes.mjs "${VERSION}" --out "${RUNNER_TEMP}/notes.md"
+        run: |
+          node scripts/release-notes.mjs "${VERSION}" --out "${RUNNER_TEMP}/notes.md"
+          node scripts/release-notes.mjs "${VERSION}" --nexus --out "${RUNNER_TEMP}/nexus-notes.txt"
+
+      - name: Nexus Mods can take this release
+        if: env.RELEASE == 'true' && inputs.nexus
+        env:
+          NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
+        run: |
+          if [ -z "$(node -p "require('./nexus/nexus.json').page ?? ''")" ]; then
+            echo "::error::nexus/nexus.json names no page yet. Put the page's number in it as \"page\", then run node tools/nexus/nexus.mjs pull (nexus/README.md)."
+            exit 1
+          fi
+          node tools/nexus/nexus.mjs check --version "${VERSION}"
 
       - run: npm ci
       - run: npm run typecheck
@@ -142,3 +175,10 @@ jobs:
             exit 0
           fi
           gh release create "${TAG}" "dist/edgedeck-${VERSION}.vsix" "dist/EDGEdeck-${VERSION}-nexus.zip" --target "${GITHUB_SHA}" --title "EDGEdeck ${VERSION}" --notes-file "${RUNNER_TEMP}/notes.md"
+
+      # Skips what is already on Nexus, so a re-run is safe.
+      - name: Nexus Mods
+        if: env.RELEASE == 'true' && inputs.nexus
+        env:
+          NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
+        run: node tools/nexus/nexus.mjs release --version "${VERSION}" --zip "dist/EDGEdeck-${VERSION}-nexus.zip" --notes "${RUNNER_TEMP}/nexus-notes.txt"

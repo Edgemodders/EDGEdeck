@@ -2,10 +2,13 @@
 
 The source of EDGEdeck's Nexus Mods page lives here, so updates are edits in the repo, not in Nexus's text box.
 
+Since 2026-10-26 the page is kept through Nexus's v3 API, as REDnode's, EDGEmat's and EDGEchat's are: `tools/nexus/` (copied from REDnode; keep the copies the same) and `nexus.json` (the page, and how a release uploads: Mod Manager Download off, the old version archived). The release workflow's **Update Nexus Mods** box uploads the Nexus zip, adds the changelog and pushes `description.bbcode`. Until `nexus.json` names the page (`"page": <number>`, then `node tools/nexus/nexus.mjs pull`), a run with that box ticked stops before it builds.
+
 | File | What it is |
 |---|---|
-| `description.bbcode` | The page's description, in Nexus's BBCode. Paste the whole file into the description field (the editor's source mode, or switch to BBCode) |
+| `description.bbcode` | The page's description, in Nexus's BBCode |
 | `README.md` | This page: the other fields of the Nexus form, the download file, and how to update |
+| `nexus.json` | The page, its internal mod id and main file (written by `pull`), how a release uploads, and the hash of the description last pulled |
 
 ## The Nexus form
 
@@ -42,17 +45,18 @@ File description on Nexus:
 
 ### Building it
 
-The release workflow (`.github/workflows/release.yml`) builds it with every release and attaches it to the GitHub release, beside the `.vsix`. A release: bump the version, give it its CHANGELOG.md section, push, then run **Release** from the Actions tab with **Make a release** ticked (or `npm run release`). Download the zip from the release and upload it to Nexus.
+The release workflow (`.github/workflows/release.yml`) builds it with every release and attaches it to the GitHub release, beside the `.vsix`. A release: bump the version, give it its CHANGELOG.md section, push, then run **Release** from the Actions tab with **Make a release** ticked (or `npm run release`). Tick **Update Nexus Mods** too to upload it to Nexus (below).
 
 By hand, after `npm run package`: `node scripts/nexus-zip.mjs` writes `dist/EDGEdeck-<version>-nexus.zip`.
 
 ## Updating the page
 
-1. Edit `description.bbcode` here, commit, push.
-2. Check it: `node scripts/check-bbcode.mjs nexus/description.bbcode`.
-3. Paste the whole file into the description field on Nexus and save.
-4. For a new version: upload the release's Nexus zip as the main file with the version from `package.json`, Mod Manager Download off. Archive the old file.
-5. Also for a new version: paste the output of `npm run release:notes -- --nexus` (one plain line per change, from the version's CHANGELOG.md section) into the page's changelog for that version.
+1. Edit `description.bbcode` here, check it with `node scripts/check-bbcode.mjs nexus/description.bbcode`, commit, push.
+2. With a release: tick **Update Nexus Mods** beside **Make a release** (or `npm run release:nexus`). After the GitHub release the workflow uploads `EDGEdeck-<version>-nexus.zip` as the main file's new version (the old one archived, Mod Manager Download off), adds the version's changelog (`npm run release:notes -- --nexus`) and pushes `description.bbcode` when it differs from the live one.
+3. The push never overwrites an edit made on Nexus: if the live description is neither the one last pulled nor the one the previous release pushed, the run stops before it builds. Then `node tools/nexus/nexus.mjs pull`, merge with `git diff`, commit, and run again. `node tools/nexus/nexus.mjs status` shows the page's version, files and whether its description matches.
+4. Screenshots uploaded on Nexus show in the description as `staticdelivery.nexusmods.com` links; keep them when editing.
+
+The key: in CI the organisation secret `NEXUS_KEY`; on the dev PC the DPAPI file `%APPDATA%\Edgemodders\nexus-key.txt` (`tools/nexus/api.mjs`). Never print it or pass it on a command line.
 
 Keep these in step with the extension (docs/marketplace.md, CHANGELOG.md):
 
