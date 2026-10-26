@@ -14,10 +14,10 @@ Last updated 2026-10-26. Dates before 2026-10-17 come from the session records; 
 
 | Test | Kind | Last run | Result |
 |---|---|---|---|
-| [Type check and build](#type-check-and-build) | Automated, every release | 2026-10-22 (0.28.0) | Pass |
-| [Smoke test](#smoke-test) | Automated, every release | 2026-10-22 (0.28.0) | Pass |
+| [Type check and build](#type-check-and-build) | Automated, every release | 2026-10-26 (0.29.0) | Pass |
+| [Smoke test](#smoke-test) | Automated, every release | 2026-10-26 (0.29.0) | Pass |
 | [UI test](#ui-test-in-a-real-vs-code) | Automated, by hand only (not in CI) | 2026-10-25 (`main` before 0.29.0) | Pass |
-| [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-22 (v0.28.0) | Pass |
+| [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-26 (v0.29.0) | Pass on the third attempt |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-26 | 35 runs, see the table |
 | [Waiting](#waiting-for-a-hand-test) | By hand | | 7 open |
@@ -91,6 +91,7 @@ Run **Release** from the Actions tab with **Make a release** ticked (or `npm run
 | v0.26.6 (10-16) | Pass, the first with the Nexus zip (`EDGEdeck-0.26.6-nexus.zip` on the release) |
 | v0.27.3 (10-17) | Pass: the first release as EDGEdeck, on the Marketplace, Open VSX and npm (from the session records; the run itself unverified) |
 | Run workflow, unticked (10-22) | Pass: built and tested, `.vsix` and Nexus zip kept as the run's artifact, nothing published, no tag |
+| v0.29.0 (10-26), with Update Nexus Mods | The stores published, then **npm failed**: `E404` on the PUT (the `NPM_TOKEN` no longer valid), then `EOTP` with a new token without Bypass 2FA. With a token that bypasses 2FA, Re-run failed jobs passed: the stores skipped 0.29.0, npm, the GitHub release, and Nexus (zip as the main file's new version, 0.28.0 archived, changelog, description pushed). The first release to reach Nexus from the workflow |
 | v0.28.0 (10-22), Run workflow with Make a release | Pass, the first from the Actions tab: Marketplace, Open VSX, npm and the GitHub release, tag made on the commit. A first try stopped at the changelog check (still Unreleased), as meant. npm showed it within a minute, Open VSX after about 4, the Marketplace after about 7 |
 | verify-tokens (10-14) | Pass on the last of four runs (one failure, cause not recorded) |
 
