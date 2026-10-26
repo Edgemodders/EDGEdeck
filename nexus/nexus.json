@@ -1,4 +1,5 @@
 {
+  "page": 35420,
   "upload": {
     "name": "EDGEdeck",
     "category": "main",
@@ -6,5 +7,12 @@
     "modManager": false,
     "archivePrevious": true,
     "description": "EDGEdeck {version}, the VS Code extension. Extract, then in VS Code: Extensions view, ..., Install from VSIX. Or install it from the Marketplace or Open VSX, where it updates itself."
+  },
+  "mod": "14315126032988",
+  "file": 8181837,
+  "pulled": {
+    "sha256": "fe4159222a65b080caedd9edf7a90e34a9e3a7a9367a9e4181950ade31021f0f",
+    "at": "2026-10-26T15:32:15.689Z",
+    "version": "0.28.0"
   }
 }
