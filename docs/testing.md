@@ -8,7 +8,7 @@ Every test run on EDGEdeck so far: how to run it again, what to expect, and what
 
 Releases up to 0.26.6 were published as REDdeck; this page uses the new name throughout.
 
-Last updated 2026-10-24. Dates before 2026-10-17 come from the session records; anything not confirmed there is marked unverified.
+Last updated 2026-10-26. Dates before 2026-10-17 come from the session records; anything not confirmed there is marked unverified.
 
 ## At a glance
 
@@ -16,11 +16,11 @@ Last updated 2026-10-24. Dates before 2026-10-17 come from the session records; 
 |---|---|---|---|
 | [Type check and build](#type-check-and-build) | Automated, every release | 2026-10-22 (0.28.0) | Pass |
 | [Smoke test](#smoke-test) | Automated, every release | 2026-10-22 (0.28.0) | Pass |
-| [UI test](#ui-test-in-a-real-vs-code) | Automated, by hand only (not in CI) | 2026-10-14 (0.26.0); later runs not recorded here | Pass |
+| [UI test](#ui-test-in-a-real-vs-code) | Automated, by hand only (not in CI) | 2026-10-25 (`main` before 0.29.0) | Pass |
 | [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-22 (v0.28.0) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
-| [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-17 | 32 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | 8 open |
+| [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-26 | 35 runs, see the table |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 7 open |
 
 ## Automated
 
@@ -74,7 +74,7 @@ Downloads a VS Code build into `.vscode-test/` once (about 350 MB), then runs `s
 | Check | Expected |
 |---|---|
 | Activation | `edgemodders.edgedeck` activates |
-| Commands | The 37 it lists are registered |
+| Commands | The 38 it lists are registered |
 | Library | Created on refresh |
 | Deploy | A hand-made mod deploys without a dialog: the archive in the game, a manifest, `modlist.txt` reading `UiTest.archive` |
 | Views | Check conflicts opens Conflicts, Show changes opens Pending changes, Open page opens EDGEdeck, Details opens |
@@ -137,6 +137,10 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 10-17 | 0.27.3 | PC | Add to Project into a REDcode project: loose files (0.18.0) and an archive (0.25.0), all resources, chosen ones, and a second time | **Passed.** Loose files went under `source\resources`, archive resources under `source\archive`, a repeat counted them as already there. The owner: this replaces installing a contributor's .archive into the game for WolvenKit to expand, copying out and removing it again. Seen: "project" alone read as EDGEdeck's library at first |
 | 10-17 | 0.27.3 | PC | REDmod deploy (M1): the REDmod DLC installed, a REDmod package added and deployed | **Passed.** The first time a REDmod package went through EDGEdeck's deploy and `redMod.exe deploy` |
 
+| 10-26 | Test build from `main` (after 0.28.0) | Not recorded | **Move library** (0.29.0) | **Passed.** |
+| 10-26 | Test build from `main` (after 0.28.0) | Not recorded | **Get the frameworks** (0.29.0) | **Passed.** |
+| 10-26 | Test build from `main` (after 0.28.0) | Not recorded | **Update all** and the row's update button (0.29.0) | **Passed.** |
+
 ## Waiting for a hand test
 
 Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table:
@@ -149,6 +153,4 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 | 4 | **A project beside a mod of the same name** | 0.28.0; REDcode | Install a project from REDcode when EDGEdeck already has a mod of that name from another folder (the two EDGEmat_M3 folders): one question. **Use this project**: no second mod, the existing one follows the new folder. Again with **Keep both**: the project becomes version `dev 2` of that mod and is on in its place. When another mod wins its files, the deploy message says "The game still has X" with **Let Y win** |
 | 5 | **Deploy one mod** | 0.28.0; a REDcode that calls `deployMod` | REDcode's Install deploys only that mod; the message says how many other changes still wait. Also `edgedeck deploy --mod <id>` |
 | 6 | **Claude Code asks before deploy, undo and remove** | 0.28.0; Claude Code in auto mode | EDGEchat's P1 test again: "deploy my mods" asks before `edgedeck_deploy` runs. The same for `edgedeck_undo` and `edgedeck_remove` |
-| 7 | **Move library** | Next release (built 2026-10-22, on `main`) | With the library on C: and the game on another drive: Set up shows "Move the library to the game's drive". Move it there: progress, the old folder is gone, Pending changes says each file becomes a hardlink, Deploy does it, the game still starts. Move it within the same drive: instant, nothing to deploy. Pick a folder that holds another library: it asks to use it and moves nothing |
-| 8 | **Get the frameworks** | Next release (built 2026-10-22, on `main`) | On a library without frameworks: Set up shows "Get the frameworks"; the list has all six ticked; OK adds them, one notification, Deploy offered; the game starts with CET's overlay and RED4ext's log. With a Vortex-imported Codeware one version behind: only it is ticked, and it becomes a new version of that Codeware. The download button on the Frameworks header and the page link do the same |
-| 9 | **Update all and the row's update button** | Next release (built 2026-10-25); signed in to Nexus | After Check updates finds some: the page's **Update all** shows the count (greyed out when none), one question lists them, each new version takes its mod's place, one summary offers Deploy. The Frameworks header in the Mods view shows the update button only while something waits and does the same. A row's update icon in Actions updates that mod only. A free account: frameworks come from GitHub without a click, other mods open their file pages |
+| 7 | **Check one mod for an update** | 0.29.0; signed in to Nexus | On the page, the check icon (a circular arrow) shows on mods from Nexus only. On a mod with a newer file: "X 1.2 is on Nexus" with **Update**, which updates it, and the row gets its update icon. On an up-to-date mod: "X is up to date". The daily check of all mods still runs as before |
