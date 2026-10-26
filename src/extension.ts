@@ -1161,6 +1161,9 @@ async function pageAction(m: PageMessage): Promise<void> {
     case "nexus":
       await nexusOpenCommand(mod);
       break;
+    case "checkUpdate":
+      await checkUpdatesCommand(false, [mod]);
+      break;
     case "update":
       await updateModCommand(mod);
       break;
@@ -2582,11 +2585,19 @@ async function checkUpdatesCommand(quiet: boolean, only?: ModInfo[]): Promise<vo
       }
     }
   });
-  await globalState.update("edgedeck.lastUpdateCheck", Date.now());
+  // Checking a few mods does not put off the daily check of all of them.
+  if (!only) await globalState.update("edgedeck.lastUpdateCheck", Date.now());
   refresh();
   const rate = client.rate ? ` (${client.rate.dailyRemaining} Nexus requests left today)` : "";
   log.appendLine(`Nexus: ${mods.length} mods checked, ${updates} updates, ${failed} failed${rate}`);
-  if (!quiet || updates) {
+  if (mods.length === 1 && !quiet) {
+    // One mod, from its row: say what Nexus has for it, and offer the update.
+    const mod = mods[0];
+    const latest = mod.nexus?.latestVersion;
+    if (failed) void vscode.window.showWarningMessage(`${mod.name} could not be checked; see the log.`);
+    else if (updates) void vscode.window.showInformationMessage(`${mod.name} ${latest} is on Nexus; the library has ${mod.version || "no version"}.`, "Update").then((a) => a && run(() => updateModCommand(mod)));
+    else void vscode.window.showInformationMessage(`${mod.name} is up to date${latest ? ` (${latest} on Nexus)` : ""}.`);
+  } else if (!quiet || updates) {
     void vscode.window.showInformationMessage(updates ? `${updates} mod${updates === 1 ? " has" : "s have"} a newer file on Nexus. Open a mod's details to see.` : `All ${mods.length} Nexus mods are up to date.${failed ? ` ${failed} could not be checked, see the log.` : ""}`);
   }
 }

@@ -66,7 +66,7 @@ export interface PageData {
 
 export interface PageMessage {
   action:
-    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll"
+    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport";
   /** loadoutView: the loadout to show. */
@@ -96,6 +96,7 @@ const Icons: Record<string, string> = {
   remove: '<path d="M2.5 4.4h11"/><path d="M6 4.4V2.6h4v1.8"/><path d="M4 4.4l.7 9h6.6l.7-9"/><path d="M6.8 6.8v4.4M9.2 6.8v4.4"/>',
   rename: '<path d="M10.6 2.6l2.8 2.8-7.9 7.9H2.7v-2.8z"/>',
   update: '<path d="M8 13.5V5.5"/><path d="M4.8 8.7 8 5.5l3.2 3.2"/><path d="M3 2.5h10"/>',
+  check: '<path d="M13.2 8a5.2 5.2 0 1 1-1.5-3.7"/><path d="M12.2 1.9v2.8H9.4"/>',
   close: '<path d="M4 4l8 8M12 4l-8 8"/>',
   add: '<path d="M8 3v10M3 8h10"/>',
   export: '<path d="M8 10V2.5"/><path d="M5 5.5 8 2.5l3 3"/><path d="M2.5 9.5v4h11v-4"/>',
@@ -175,6 +176,7 @@ export function renderPage(d: PageData, csp: string): string {
       { m: { action: "pickSection", id: r.id }, icon: "section", title: "Put in a section" },
       { m: { action: "open", id: r.id }, icon: "folder", title: "Open its library folder" },
       // A mod without an update or not from Nexus keeps a blank slot, so the icons line up down the column.
+      { m: { action: "checkUpdate", id: r.id }, icon: "check", title: r.nexusId ? "Check Nexus for a newer file of this mod" : "", cls: r.nexusId ? "" : "blank" },
       { m: { action: "update", id: r.id }, icon: "update", title: r.update ? `Update to ${r.update}` : "", cls: r.update ? "upd" : "blank" },
       { m: { action: "nexus", id: r.id }, icon: "nexus", title: "Open on Nexus", cls: r.nexusId ? "" : "blank" },
       { m: { action: "remove", id: r.id }, icon: "remove", title: r.versions.length > 1 ? `Remove version ${r.version} from the library` : "Remove from the library", cls: "danger" },
