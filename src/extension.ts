@@ -21,7 +21,7 @@ import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrame
 import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveInSection, moveSection, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
-import { findSevenZip, unpackOrCopy } from "./extract";
+import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
 import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, steamLibraries } from "./game";
 import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove";
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
@@ -1638,14 +1638,23 @@ async function addFrom(source: string, preset?: { name: string; version: string;
     refresh();
     return mod;
   } finally {
-    if (temp) fs.rmSync(temp, { recursive: true, force: true });
+    if (temp) logTempLeft(temp);
   }
 }
 
-/** "Codeware-7780-1-20-3-1777845006" and "CET 1.37.1 - Scripting fixes-107-1-37-1-1759193708" are Nexus names. */
+function logTempLeft(temp: string): void {
+  const left = removeTemp(temp);
+  if (left) log.appendLine(`Note: ${left}`);
+}
+
+/**
+ * "Codeware-7780-1-20-3-1777845006" and "CET 1.37.1 - Scripting fixes-107-1-37-1-1759193708" are Nexus
+ * names; "REDnode-0.40.1" and "Codeware v1.20.3" end in their version, which goes in the version field.
+ */
 function cleanName(base: string): string {
   const m = /^(.*?)-(\d+)-([\d-]+)-(\d{10})$/.exec(base);
-  return (m ? m[1] : base).replace(/[_]+/g, " ").trim();
+  const name = (m ? m[1] : base).replace(/[_]+/g, " ").trim();
+  return name.replace(/[\s-]+v?\d+(?:\.\d+)+$/i, "").trim() || name;
 }
 
 function versionFrom(base: string): string {
@@ -1985,7 +1994,7 @@ async function getFrameworksCommand(): Promise<void> {
       }
     });
   } finally {
-    fs.rmSync(temp, { recursive: true, force: true });
+    logTempLeft(temp);
   }
   refresh();
   void refreshSetup();
@@ -2732,7 +2741,7 @@ async function applyUpdate(fam: Family, target: { fileId: number; version: strin
           if (mod && !quiet) offerDeploy(`${mod.name} ${mod.version} is in the library in place of ${fam.active.version}.`);
           return "done";
         } finally {
-          fs.rmSync(temp, { recursive: true, force: true });
+          logTempLeft(temp);
         }
       }
     } catch (err) {

@@ -8,7 +8,7 @@ import * as path from "node:path";
 import { classify, rednodeManifest } from "./classifier";
 import { familyOf, renameFamily, settleNewVersion } from "./families";
 import { deploy, detectChanges, modStatus, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, type Decision, type Lost } from "./deploy";
-import { findSevenZip, unpackOrCopy } from "./extract";
+import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
 import { checkFrameworks, frameworkSummary } from "./frameworks";
 import { findGame, gameRunning, gameVersion, isGameFolder } from "./game";
 import { addMod, defaultLibraryPath, keepDownload, loadLibrary, modFolder, moveMod, removeMod, saveLibrary, saveMod, type Library, type ModInfo } from "./library";
@@ -135,7 +135,7 @@ export const verbs = {
       const note = settled.replaced ? `; a new version of ${settled.replaced.name} ${settled.replaced.version}, which is off now` : settled.older ? `; older than ${settled.older.version}, so it is off` : "";
       return { data: { added: { id: mod.id, name: mod.name, version: mod.version, kinds: mod.kinds, files: mod.files.length, enabled: mod.enabled }, replaced: settled.replaced?.id, unplaced: c.unplaced }, text: `added ${mod.id} (${mod.files.length} files, ${mod.kinds.join(", ")})${note}; ${mod.enabled ? "it is on, " : ""}deploy to put it in the game${c.unplaced.length ? `; not placed: ${c.unplaced.join(", ")}` : ""}` };
     } finally {
-      if (temp) fs.rmSync(temp, { recursive: true, force: true });
+      if (temp) removeTemp(temp);
     }
   },
 

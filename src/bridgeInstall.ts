@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { extractArchive } from "./extract";
+import { extractArchive, removeTemp } from "./extract";
 import { download } from "./nexus";
 
 export const BridgeRepo = "Edgemodders/REDbridge";
@@ -66,7 +66,7 @@ export async function installDotnetRuntime(log: (line: string) => void): Promise
       });
     });
   } finally {
-    fs.rmSync(temp, { recursive: true, force: true });
+    removeTemp(temp);
   }
   if (!hasNet10(root)) throw new Error("The .NET 10 runtime did not install. See the log.");
   return root;
@@ -124,7 +124,7 @@ export async function installBridge(release: BridgeRelease, storageDir: string, 
     fs.mkdirSync(target, { recursive: true });
     await extractArchive(zip, target, sevenZa);
   } finally {
-    fs.rmSync(temp, { recursive: true, force: true });
+    removeTemp(temp);
   }
   if (!fs.existsSync(exe)) throw new Error("The zip did not contain REDbridge.exe.");
   log(`REDbridge ${release.version} installed at ${exe}`);

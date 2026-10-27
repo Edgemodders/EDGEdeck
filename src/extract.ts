@@ -33,6 +33,20 @@ function findRarTool(): { exe: string; args: (file: string, dest: string) => str
   return undefined;
 }
 
+/**
+ * Removes a temporary folder, retrying while Windows still holds a file in it (an antivirus scanning
+ * a freshly unpacked .exe, say). Never throws: what it says went wrong is for the log, since a
+ * leftover in the temp folder harms nothing.
+ */
+export function removeTemp(dir: string): string | undefined {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 6, retryDelay: 250 });
+    return undefined;
+  } catch (err) {
+    return `could not remove the temporary folder ${dir} (${err instanceof Error ? err.message : String(err)}); Windows clears its temp folder in time`;
+  }
+}
+
 /** Extracts `file` into `dest` (created if needed). Throws with a readable message when it cannot. */
 /**
  * Gets a file ready to classify in `dest`: a zip, 7z or rar is unpacked, any other file (a loose

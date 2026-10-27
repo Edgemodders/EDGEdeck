@@ -102,7 +102,8 @@ function folderName(name: string): string {
 
 /** The name and version a REDnode package gives itself, from the manifest among the placements. */
 export function rednodeManifest(placements: Placement[]): { id: string; name?: string; version?: string } | undefined {
-  const p = placements.find((x) => /^red4ext\/plugins\/REDnode\/apps\/[^/]+\/rednode-app\.json$/i.test(x.to));
+  const to = singleRednodeApp(placements.map((x) => x.to));
+  const p = to === undefined ? undefined : placements.find((x) => x.to === to);
   if (!p) return undefined;
   try {
     const m = JSON.parse(fs.readFileSync(p.from, "utf8")) as { id?: unknown; name?: unknown; version?: unknown };
@@ -111,6 +112,18 @@ export function rednodeManifest(placements: Placement[]): { id: string; name?: s
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The deploy path of the one app's rednode-app.json when these files are a single REDnode app. REDnode
+ * itself ships with apps of its own (REDnode.dll, host/, apps/ask-mod, apps/timer, ...), so files
+ * under red4ext/plugins/REDnode/ outside apps/, or more than one app, are not one app's package.
+ */
+export function singleRednodeApp(paths: string[]): string | undefined {
+  const manifests = paths.filter((f) => /^red4ext\/plugins\/REDnode\/apps\/[^/]+\/rednode-app\.json$/i.test(f));
+  if (manifests.length !== 1) return undefined;
+  if (paths.some((f) => /^red4ext\/plugins\/REDnode\//i.test(f) && !/^red4ext\/plugins\/REDnode\/apps\//i.test(f))) return undefined;
+  return manifests[0];
 }
 
 /** The package id from a REDnode manifest, or undefined when the file is not one. */

@@ -12,6 +12,12 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- **Adding REDnode itself.** REDnode's zip comes with apps of its own, and EDGEdeck took the first of them for the mod: the name offered was "Ask mod", and REDnode's versions were grouped as that app. Now only a zip holding one REDnode app is named and grouped by that app; REDnode is named from its file.
+- **A version at the end of a file name stays out of the name.** Adding `REDnode-0.40.1.zip` offers the name `REDnode`, with 0.40.1 as its version.
+- **"EPERM, Permission denied" after adding a large mod.** Removing the temporary unpacked copy could fail while Windows still held a file in it (an antivirus checking a new .exe, for example), and the add was reported as an error though the mod was in the library. EDGEdeck now retries, and a leftover only goes in the log.
+
 ## 0.29.0 (2026-10-26)
 
 **New**

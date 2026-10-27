@@ -4,6 +4,7 @@
 // id, else the project path, else the name without version tokens. Only one version of a family is
 // on at a time.
 
+import { singleRednodeApp } from "./classifier";
 import { placeAbove, saveMod, type Library, type ModInfo } from "./library";
 import { versionNewer } from "./nexus";
 
@@ -33,11 +34,8 @@ export function baseName(name: string): string {
 
 /** A REDnode package's id, from where its manifest deploys: red4ext/plugins/REDnode/apps/<id>/rednode-app.json. */
 export function rednodePackageId(mod: Pick<ModInfo, "files">): string | undefined {
-  for (const f of mod.files) {
-    const m = /^red4ext\/plugins\/REDnode\/apps\/([^/]+)\/rednode-app\.json$/i.exec(f);
-    if (m) return m[1].toLowerCase();
-  }
-  return undefined;
+  const manifest = singleRednodeApp(mod.files);
+  return manifest ? /^red4ext\/plugins\/REDnode\/apps\/([^/]+)\//i.exec(manifest)![1].toLowerCase() : undefined;
 }
 
 export function familyKey(mod: ModInfo): string {

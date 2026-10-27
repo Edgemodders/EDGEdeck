@@ -410,6 +410,20 @@ console.log("changes: ok");
     const pkg = (id, ver) => [{ from: path.join(tmp, `pkg-${ver}.json`), to: `red4ext/plugins/REDnode/apps/${id}/rednode-app.json`, kind: "rednode" }];
     for (const v of ["0.1.1", "0.2.0", "0.0.9"]) fs.writeFileSync(path.join(tmp, `pkg-${v}.json`), JSON.stringify({ id: "edgebuilder", name: "EDGEbuilder", version: v }));
     assert.deepEqual(core.rednodeManifest(pkg("edgebuilder", "0.2.0")), { id: "edgebuilder", name: "EDGEbuilder", version: "0.2.0" });
+    // REDnode itself ships with apps: neither its name nor its family comes from the first of them.
+    const bundle = [
+      { from: path.join(tmp, "pkg-0.2.0.json"), to: "red4ext/plugins/REDnode/REDnode.dll", kind: "framework" },
+      ...pkg("ask-mod", "0.2.0"),
+      { from: path.join(tmp, "pkg-0.2.0.json"), to: "red4ext/plugins/REDnode/apps/timer/rednode-app.json", kind: "rednode" },
+    ];
+    assert.equal(core.rednodeManifest(bundle), undefined, "REDnode's own zip is not one app");
+    assert.equal(core.rednodeManifest(bundle.filter((p) => !p.to.endsWith(".dll"))), undefined, "two apps are not one app");
+    assert.equal(core.singleRednodeApp(bundle.slice(1, 2).map((p) => p.to)), "red4ext/plugins/REDnode/apps/ask-mod/rednode-app.json");
+    assert.equal(core.rednodePackageId({ files: bundle.map((p) => p.to) }), undefined, "REDnode's family is not rednode:ask-mod");
+    const leftover = fs.mkdtempSync(path.join(tmp, "temp-"));
+    fs.writeFileSync(path.join(leftover, "a.txt"), "a");
+    assert.equal(core.removeTemp(leftover), undefined);
+    assert.ok(!fs.existsSync(leftover), "removeTemp removes the folder");
     const first = core.addMod(lib, pkg("edgebuilder", "0.1.1"), { name: "EDGEbuilder", version: "0.1.1", source: { type: "folder", path: tmp } });
     assert.deepEqual(core.settleNewVersion(lib, first), {}, "the first version settles nothing");
     const second = core.addMod(lib, pkg("edgebuilder", "0.2.0"), { name: "edgebuilder-0.2.0", version: "0.2.0", source: { type: "folder", path: tmp } });
