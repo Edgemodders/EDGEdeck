@@ -12,6 +12,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.29.1 (2026-10-27)
+
 **Fixed**
 
 - **Adding REDnode itself.** REDnode's zip comes with apps of its own, and EDGEdeck took the first of them for the mod: the name offered was "Ask mod", and REDnode's versions were grouped as that app. Now only a zip holding one REDnode app is named and grouped by that app; REDnode is named from its file.
