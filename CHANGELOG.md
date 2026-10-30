@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- **A mod hidden in a project's row.** A project that carries a copy of a REDnode app beside its own files (a test mod with EDGEbuilder in it, say) was taken for a new version of that app, so the app vanished into the project's version list. Now a mod counts as a REDnode app only when all its files are that app's.
+
 ## 0.29.1 (2026-10-27)
 
 **Fixed**

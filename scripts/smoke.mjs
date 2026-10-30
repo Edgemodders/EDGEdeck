@@ -420,6 +420,10 @@ console.log("changes: ok");
     assert.equal(core.rednodeManifest(bundle.filter((p) => !p.to.endsWith(".dll"))), undefined, "two apps are not one app");
     assert.equal(core.singleRednodeApp(bundle.slice(1, 2).map((p) => p.to)), "red4ext/plugins/REDnode/apps/ask-mod/rednode-app.json");
     assert.equal(core.rednodePackageId({ files: bundle.map((p) => p.to) }), undefined, "REDnode's family is not rednode:ask-mod");
+    // A project that carries a copy of an app beside its own files is not that app.
+    const carrier = ["mods/TestMod/info.json", "red4ext/plugins/REDnode/apps/edgebuilder/app.js", "red4ext/plugins/REDnode/apps/edgebuilder/rednode-app.json"];
+    assert.equal(core.rednodePackageId({ files: carrier }), undefined, "TestMod is not grouped with EDGEbuilder");
+    assert.equal(core.rednodePackageId({ files: carrier.slice(1) }), "edgebuilder", "the app alone is");
     const leftover = fs.mkdtempSync(path.join(tmp, "temp-"));
     fs.writeFileSync(path.join(leftover, "a.txt"), "a");
     assert.equal(core.removeTemp(leftover), undefined);

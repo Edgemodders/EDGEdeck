@@ -115,15 +115,16 @@ export function rednodeManifest(placements: Placement[]): { id: string; name?: s
 }
 
 /**
- * The deploy path of the one app's rednode-app.json when these files are a single REDnode app. REDnode
- * itself ships with apps of its own (REDnode.dll, host/, apps/ask-mod, apps/timer, ...), so files
- * under red4ext/plugins/REDnode/ outside apps/, or more than one app, are not one app's package.
+ * The deploy path of the one app's rednode-app.json when these files are a single REDnode app and
+ * nothing else. REDnode itself ships with apps of its own (REDnode.dll, host/, apps/ask-mod, ...), and
+ * a project can carry a copy of an app beside its own files (a TestMod with EDGEbuilder in it): neither
+ * is that app's package, so neither is named or grouped as it.
  */
 export function singleRednodeApp(paths: string[]): string | undefined {
   const manifests = paths.filter((f) => /^red4ext\/plugins\/REDnode\/apps\/[^/]+\/rednode-app\.json$/i.test(f));
   if (manifests.length !== 1) return undefined;
-  if (paths.some((f) => /^red4ext\/plugins\/REDnode\//i.test(f) && !/^red4ext\/plugins\/REDnode\/apps\//i.test(f))) return undefined;
-  return manifests[0];
+  const folder = manifests[0].slice(0, -"rednode-app.json".length).toLowerCase();
+  return paths.every((f) => f.toLowerCase().startsWith(folder)) ? manifests[0] : undefined;
 }
 
 /** The package id from a REDnode manifest, or undefined when the file is not one. */
