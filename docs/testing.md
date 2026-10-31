@@ -8,16 +8,16 @@ Every test run on EDGEdeck so far: how to run it again, what to expect, and what
 
 Releases up to 0.26.6 were published as REDdeck; this page uses the new name throughout.
 
-Last updated 2026-10-26. Dates before 2026-10-17 come from the session records; anything not confirmed there is marked unverified.
+Last updated 2026-10-31. Dates before 2026-10-17 come from the session records; anything not confirmed there is marked unverified.
 
 ## At a glance
 
 | Test | Kind | Last run | Result |
 |---|---|---|---|
-| [Type check and build](#type-check-and-build) | Automated, every release | 2026-10-26 (0.29.0) | Pass |
-| [Smoke test](#smoke-test) | Automated, every release | 2026-10-26 (0.29.0) | Pass |
+| [Type check and build](#type-check-and-build) | Automated, every release | 2026-10-31 (0.29.2) | Pass |
+| [Smoke test](#smoke-test) | Automated, every release | 2026-10-31 (0.29.2) | Pass |
 | [UI test](#ui-test-in-a-real-vs-code) | Automated, by hand only (not in CI) | 2026-10-25 (`main` before 0.29.0) | Pass |
-| [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-26 (v0.29.0) | Pass on the third attempt |
+| [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-31 (v0.29.2) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-26 | 35 runs, see the table |
 | [Waiting](#waiting-for-a-hand-test) | By hand | | 12 open |
