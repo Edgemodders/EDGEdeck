@@ -310,8 +310,9 @@ input[type=checkbox] { accent-color: var(--yellow); width: 15px; height: 15px; c
   <button data-msg='${msg({ action: "add" })}'>+ Add mod</button>
   <button data-msg='${msg({ action: d.signedIn ? "updates" : "signIn" })}' title="${d.signedIn ? "Ask Nexus for newer files" : "Sign in to Nexus Mods"}">${d.signedIn ? "Check updates" : "Nexus sign in"}</button>
   ${(() => {
+    // The script keeps this in step with the search and the filter: it updates the rows they leave showing.
     const n = d.rows.filter((r) => r.update).length;
-    return `<button data-msg='${msg({ action: "updateAll" })}' ${n ? "" : "disabled"} title="${n ? `Download the newest file of the ${n === 1 ? "mod" : `${n} mods`} with an update waiting, each in its mod's place` : "No updates waiting; Check updates asks Nexus"}">Update all${n ? ` <b>${n}</b>` : ""}</button>`;
+    return `<button id="updall" ${n ? "" : "disabled"} title="${n ? `Download the newest file of the ${n === 1 ? "mod" : `${n} mods`} with an update waiting, each in its mod's place` : "No updates waiting; Check updates asks Nexus"}">Update all${n ? ` <b>${n}</b>` : ""}</button>`;
   })()}
   <button data-msg='${msg({ action: "conflicts" })}'>Conflicts${d.rows.some((r) => r.conflicts) ? ` <b>${d.rows.filter((r) => r.conflicts).length}</b>` : ""}</button>
   ${d.lastDeploy ? `<button data-msg='${msg({ action: "undo" })}' title="Remove every deployed file and put backups back">Undo deploy</button>` : ""}
@@ -393,8 +394,26 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
     for (const h of document.querySelectorAll("tr.hint")) h.hidden = state.bySize || filtering || folded.has(h.dataset.hintfor);
     for (const c of document.querySelectorAll(".chip")) c.classList.toggle("active", c.dataset.facet === state.facet);
     const none = document.getElementById("none"); if (none) none.hidden = shown > 0;
+    const upd = document.getElementById("updall");
+    if (upd) {
+      const n = toUpdate().length;
+      upd.disabled = !n;
+      upd.innerHTML = (filtering ? "Update shown" : "Update all") + (n ? " <b>" + n + "</b>" : "");
+      upd.title = n
+        ? "Download the newest file of the " + (n === 1 ? "mod" : n + " mods") + (filtering ? " shown" : "") + " with an update waiting, each in its mod's place"
+        : filtering ? "None of the mods shown has an update waiting" : "No updates waiting; Check updates asks Nexus";
+    }
     vscode.setState(state);
   }
+  // The rows Update all acts on: those the search and the filter leave showing that have an update.
+  function toUpdate() {
+    return rows.filter((r) => r.dataset.match && r.dataset.facets.split(" ").includes("update")).map((r) => r.dataset.id);
+  }
+  const updall = document.getElementById("updall");
+  if (updall) updall.addEventListener("click", () => {
+    const filtering = !!state.q.trim() || state.facet !== "all";
+    post(filtering ? { action: "updateAll", ids: toUpdate() } : { action: "updateAll" });
+  });
   if (q) { q.value = state.q; q.addEventListener("input", () => { state.q = q.value; apply(); }); }
   for (const c of document.querySelectorAll(".chip[data-facet]")) c.addEventListener("click", () => { state.facet = c.dataset.facet; apply(); });
   document.getElementById("bysize").addEventListener("click", () => { state.bySize = !state.bySize; order(); apply(); });

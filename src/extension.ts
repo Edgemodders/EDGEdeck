@@ -1055,7 +1055,7 @@ async function pageAction(m: PageMessage): Promise<void> {
     case "getFrameworks":
       return getFrameworksCommand();
     case "updateAll":
-      return updateAllCommand();
+      return updateAllCommand(m.ids);
     case "changes":
       return showChanges(m.id);
     case "getBridge":
@@ -2587,7 +2587,6 @@ async function checkUpdatesCommand(quiet: boolean, only?: ModInfo[]): Promise<vo
           summary: info?.summary ?? mod.nexus?.summary,
         };
         saveMod(library!, mod);
-        if (newest && versionNewer(newest.version, mod.version)) updates++;
       } catch (err) {
         failed++;
         log.appendLine(`Nexus check failed for ${mod.name}: ${err instanceof Error ? err.message : String(err)}`);
@@ -2597,17 +2596,28 @@ async function checkUpdatesCommand(quiet: boolean, only?: ModInfo[]): Promise<vo
   // Checking a few mods does not put off the daily check of all of them.
   if (!only) await globalState.update("edgedeck.lastUpdateCheck", Date.now());
   refresh();
+  // Counted per mod as the table shows it, not per library entry: an older version kept off beside
+  // the newest is not an update waiting.
+  const checked = new Set(mods.map((m) => familyKey(m)));
+  const checkedFams = families(library).filter((f) => checked.has(f.key));
+  const waiting = checkedFams.filter((f) => f.update);
+  updates = waiting.length;
   const rate = client.rate ? ` (${client.rate.dailyRemaining} Nexus requests left today)` : "";
-  log.appendLine(`Nexus: ${mods.length} mods checked, ${updates} updates, ${failed} failed${rate}`);
+  log.appendLine(`Nexus: ${checkedFams.length} mods checked, ${updates} updates${updates ? ` (${waiting.map((f) => `${f.name} ${f.update!.version}`).join(", ")})` : ""}, ${failed} failed${rate}`);
   if (mods.length === 1 && !quiet) {
     // One mod, from its row: say what Nexus has for it, and offer the update.
     const mod = mods[0];
     const latest = mod.nexus?.latestVersion;
     if (failed) void vscode.window.showWarningMessage(`${mod.name} could not be checked; see the log.`);
-    else if (updates) void vscode.window.showInformationMessage(`${mod.name} ${latest} is on Nexus; the library has ${mod.version || "no version"}.`, "Update").then((a) => a && run(() => updateModCommand(mod)));
+    else if (updates) void vscode.window.showInformationMessage(`${mod.name} ${waiting[0].update!.version} is on Nexus; the library has ${waiting[0].mods[0].version || "no version"}.`, "Update").then((a) => a && run(() => updateModCommand(mod)));
     else void vscode.window.showInformationMessage(`${mod.name} is up to date${latest ? ` (${latest} on Nexus)` : ""}.`);
-  } else if (!quiet || updates) {
-    void vscode.window.showInformationMessage(updates ? `${updates} mod${updates === 1 ? " has" : "s have"} a newer file on Nexus. Open a mod's details to see.` : `All ${mods.length} Nexus mods are up to date.${failed ? ` ${failed} could not be checked, see the log.` : ""}`);
+  } else if (updates) {
+    const names = waiting.map((f) => `${f.name} ${f.update!.version}`);
+    void vscode.window
+      .showInformationMessage(`${updates === 1 ? "1 mod has" : `${updates} mods have`} a newer file on Nexus: ${names.slice(0, 5).join(", ")}${names.length > 5 ? ` and ${names.length - 5} more` : ""}. The page's Update available filter shows them.`, "Update all")
+      .then((a) => a && run(() => updateAllCommand()));
+  } else if (!quiet) {
+    void vscode.window.showInformationMessage(`All ${checkedFams.length} Nexus mods are up to date.${failed ? ` ${failed} could not be checked, see the log.` : ""}`);
   }
 }
 
@@ -2774,12 +2784,16 @@ function familiesWithUpdates(): Family[] {
   return library ? families(library).filter((f) => f.update && f.nexusId) : [];
 }
 
-/** "Update all": every mod with an update waiting, after one question, with one summary. */
-async function updateAllCommand(): Promise<void> {
+/**
+ * "Update all": every mod with an update waiting, after one question, with one summary. From the
+ * page, `ids` are the rows its search and filter leave showing, and only those are updated.
+ */
+async function updateAllCommand(ids?: string[]): Promise<void> {
   if (!library) return;
-  const fams = familiesWithUpdates();
+  const shown = ids && new Set(ids);
+  const fams = familiesWithUpdates().filter((f) => !shown || f.mods.some((m) => shown.has(m.id)));
   if (!fams.length) {
-    void vscode.window.showInformationMessage("No updates are waiting. Check updates asks Nexus for newer files.");
+    void vscode.window.showInformationMessage(shown ? "None of the mods shown has an update waiting." : "No updates are waiting. Check updates asks Nexus for newer files.");
     return;
   }
   const list = fams.map((f) => `${f.name} ${f.active.version || "?"} to ${f.update!.version}`);

@@ -12,8 +12,13 @@ How to keep it:
 
 ## Unreleased
 
+**Changed**
+
+- **Update all follows the search and the filter.** On the EDGEdeck page, with a search typed or a filter chip picked (**Update available** shows just the mods with updates), the button reads **Update shown** and updates only the mods left showing, with their count. With nothing narrowing the list it updates every mod, as before.
+
 **Fixed**
 
+- **The update check counted mods the table did not show.** After Check updates, the message counted every older version kept off in the library as a mod with a newer file, so it could say 11 while the table marked one. It now counts each mod once, as the table does, names them, and offers **Update all**.
 - **A mod hidden in a project's row.** A project that carries a copy of a REDnode app beside its own files (a test mod with EDGEbuilder in it, say) was taken for a new version of that app, so the app vanished into the project's version list. Now a mod counts as a REDnode app only when all its files are that app's.
 
 ## 0.29.1 (2026-10-27)
