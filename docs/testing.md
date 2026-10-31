@@ -20,7 +20,7 @@ Last updated 2026-10-26. Dates before 2026-10-17 come from the session records; 
 | [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-26 (v0.29.0) | Pass on the third attempt |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-26 | 35 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | 7 open |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 12 open |
 
 ## Automated
 
@@ -155,3 +155,8 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 | 5 | **Deploy one mod** | 0.28.0; a REDcode that calls `deployMod` | REDcode's Install deploys only that mod; the message says how many other changes still wait. Also `edgedeck deploy --mod <id>` |
 | 6 | **Claude Code asks before deploy, undo and remove** | 0.28.0; Claude Code in auto mode | EDGEchat's P1 test again: "deploy my mods" asks before `edgedeck_deploy` runs. The same for `edgedeck_undo` and `edgedeck_remove` |
 | 7 | **Check one mod for an update** | 0.29.0; signed in to Nexus | On the page, the check icon (a circular arrow) shows on mods from Nexus only. On a mod with a newer file: "X 1.2 is on Nexus" with **Update**, which updates it, and the row gets its update icon. On an up-to-date mod: "X is up to date". The daily check of all mods still runs as before |
+| 8 | **Adding REDnode itself** | 0.29.1 | Add `REDnode-<version>.zip`: the name offered is **REDnode** (not "Ask mod") and the version is the zip's. No "EPERM, Permission denied" toast after it is added. A zip with one REDnode app (EDGEbuilder) is still named from its manifest |
+| 9 | **EDGEbuilder in its own row** | 0.29.2 | With the TestMod dev build and EDGEbuilder both in the library: two rows, EDGEbuilder and TestMod, and TestMod's version list has no EDGEbuilder in it |
+| 10 | **The update check counts what the table shows** | 0.29.2; signed in to Nexus | Check updates with older versions kept off in the library: the message names the same mods the table marks (one on 10-31, not 11) and offers **Update all** |
+| 11 | **Update shown** | 0.29.2; two or more updates waiting | On the page, pick the **Update available** chip or type a search: the button reads **Update shown** with the count of mods showing that have an update, and the question lists only those. With nothing narrowing the list it reads **Update all** again. A search with no update showing greys it out |
+| 12 | **A project that drops files** | 0.29.2; a REDcode project in the library | Remove a file from the project and pack again: after a refresh, that file leaves the project's mod (Pending changes says it is removed), and Deploy takes it out of the game |
