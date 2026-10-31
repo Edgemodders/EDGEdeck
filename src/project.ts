@@ -2,6 +2,7 @@
 // laid out like the game folder, so a project's output is a mod like any other. A mod added from a
 // project remembers it and is re-synced when the project is packed again.
 
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { classify, type Classification } from "./classifier";
@@ -81,13 +82,23 @@ export function classifyProject(projectFile: string): Classification {
   return classify(packed, projectName(projectFile));
 }
 
-function newest(dir: string): number {
-  let t = 0;
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, e.name);
-    t = Math.max(t, e.isDirectory() ? newest(p) : fs.statSync(p).mtimeMs);
-  }
-  return t;
+/** The newest file time in a packed folder, and a hash of its file list, from one walk. */
+function packedState(dir: string): { newest: number; list: string } {
+  let newest = 0;
+  const files: string[] = [];
+  const walk = (d: string, rel: string) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(p, r);
+      else {
+        newest = Math.max(newest, fs.statSync(p).mtimeMs);
+        files.push(r.toLowerCase());
+      }
+    }
+  };
+  walk(dir, "");
+  return { newest, list: createHash("sha1").update(files.sort().join("\n")).digest("hex").slice(0, 16) };
 }
 
 /**
@@ -107,7 +118,17 @@ export function syncProjects(lib: Library): ModInfo[] {
         return t;
       }
     }, 0);
-    if (newest(packed) <= libNewest + 1000) continue;
+    const state = packedState(packed);
+    // A newer file, or a different list of files: a pack that only removed or renamed files counts too.
+    // A mod with no list yet (added before lists were kept) gets one now and re-syncs only on later changes.
+    const listChanged = mod.packedList !== undefined && mod.packedList !== state.list;
+    if (state.newest <= libNewest + 1000 && !listChanged) {
+      if (mod.packedList === undefined) {
+        mod.packedList = state.list;
+        saveMod(lib, mod);
+      }
+      continue;
+    }
     const c = classifyProject(mod.source.path);
     if (!c.placements.length) continue;
     // Replace the library copy file by file; files the project no longer produces are removed.
@@ -121,6 +142,7 @@ export function syncProjects(lib: Library): ModInfo[] {
     for (const f of mod.files) if (!keep.has(f)) fs.rmSync(sourcePath(lib, mod, f), { force: true });
     mod.files = [...keep].sort();
     mod.kinds = c.kinds;
+    mod.packedList = state.list;
     saveMod(lib, mod);
     refreshed.push(mod);
   }
@@ -216,6 +238,7 @@ export function installProject(lib: Library, projectFile: string, beside?: { mod
   for (const f of existing.files) if (!keep.has(f)) fs.rmSync(sourcePath(lib, existing, f), { force: true });
   existing.files = [...keep].sort();
   existing.kinds = c.kinds;
+  existing.packedList = packedState(packedFolder(projectFile)).list;
   // On, in the place of whichever version of its family was on.
   activateVersion(lib, existing);
   existing.enabled = true;

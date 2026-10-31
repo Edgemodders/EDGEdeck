@@ -273,6 +273,17 @@ console.log("changes: ok");
   assert.deepEqual(synced.map((m) => m.id), ["test-mod"]);
   assert.deepEqual(pm.files, ["archive/pc/mod/TestMod.archive", "r6/tweaks/TestMod/x.yaml"]);
   assert.equal(fs.readFileSync(path.join(libRoot, "library", "test-mod", "archive", "pc", "mod", "TestMod.archive"), "utf8"), "v2");
+  // A pack that only removes a file re-syncs too: no file is newer, but the list changed.
+  assert.deepEqual(core.syncProjects(lib), [], "nothing changed since");
+  fs.rmSync(path.join(proj, "packed", "r6"), { recursive: true });
+  assert.deepEqual(core.syncProjects(lib).map((m) => m.id), ["test-mod"], "a removal re-syncs");
+  assert.deepEqual(pm.files, ["archive/pc/mod/TestMod.archive"]);
+  assert.ok(!fs.existsSync(path.join(libRoot, "library", "test-mod", "r6", "tweaks", "TestMod", "x.yaml")), "the removed file leaves the library copy");
+  assert.deepEqual(core.syncProjects(lib), [], "and once is enough");
+  // A mod from before lists were kept gets one quietly, without a re-sync.
+  delete pm.packedList;
+  assert.deepEqual(core.syncProjects(lib), [], "no list yet: no re-sync");
+  assert.ok(pm.packedList, "the list is recorded");
   core.removeMod(lib, pm);
   console.log("project: ok");
 
