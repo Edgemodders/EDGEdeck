@@ -690,7 +690,8 @@ function watchLibrary(libraryRoot: string, gamePath: string): void {
   if (library) {
     try {
       syncActiveLoadout(library, state.version);
-      tree.description = `Loadout: ${activeLoadout(library, state.version)}`;
+      const mods = families(library).length;
+      tree.description = `Library: ${mods} mod${mods === 1 ? "" : "s"} · Loadout: ${activeLoadout(library, state.version)}`;
     } catch (err) {
       log.appendLine(`Loadout: ${err instanceof Error ? err.message : String(err)}`);
     }

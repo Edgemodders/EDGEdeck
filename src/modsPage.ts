@@ -281,6 +281,7 @@ button.ico:disabled, tr:hover button.ico:disabled { color: var(--dim); opacity: 
 .loadouts .ltitle { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
 .loadouts select { font: inherit; font-size: 12px; color: var(--fg); background: var(--vscode-dropdown-background, var(--bg)); border: 1px solid var(--vscode-dropdown-border, var(--line)); padding: 3px 8px; min-width: 220px; cursor: pointer; }
 .loadouts select:hover, .loadouts select:focus { border-color: var(--yellow); outline: none; }
+.loadouts .lib { font-size: 12px; color: var(--fg); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); } .loadouts .lib:hover { color: var(--yellow); }
 button.activate { color: var(--yellow); border-color: var(--yellow); margin-left: 6px; }
 .editing { border: 1px solid var(--cyan); color: var(--cyan); padding: 7px 12px; margin-bottom: 12px; } .editing b { color: var(--fg); font-weight: 600; }
 .stfor { text-transform: none; letter-spacing: 0; color: var(--cyan); }
@@ -339,6 +340,13 @@ ${d.setup.length ? `<div class="setup"><span>Set up:</span>${d.setup.map((s) => 
     .map((b) => `<button class="ico ${b.cls ?? ""}" data-msg='${msg(b.m)}' title="${b.title}" aria-label="${b.title}" ${b.off ? "disabled" : ""}>${icon(b.icon)}</button>`)
     .join("")}
   ${d.viewing !== d.activeLoadout ? `<button class="activate" data-msg='${msg({ action: "loadoutActivate" })}' title="Make ${esc(d.viewing)} the active loadout: its mods go on, the others off. Deploy afterwards.">Make active</button>` : ""}
+  <span class="spacer"></span>
+  ${(() => {
+    // Every row is a mod in the library; say so where the eye starts, not only in the footer.
+    const versions = d.rows.reduce((n, r) => n + Math.max(1, r.versions.length), 0);
+    const what = `${d.rows.length} mod${d.rows.length === 1 ? "" : "s"}${versions > d.rows.length ? `, ${versions} versions` : ""}`;
+    return `<span class="ltitle">Library</span><a class="lib" data-msg='${msg({ action: "library" })}' title="Every mod in this list, on or off, is kept here: ${esc(d.library)}. The edgedeck.libraryPath setting; Move library... moves it">${what}</a>`;
+  })()}
 </div>
 ${d.viewing !== d.activeLoadout ? `<div class="editing">Editing the loadout <b>${esc(d.viewing)}</b>. The game, the sidebar and Deploy still use <b>${esc(d.activeLoadout)}</b>. Turning mods on or off here changes ${esc(d.viewing)} only; the order, sections and the library are shared.</div>` : ""}
 <div class="filters">

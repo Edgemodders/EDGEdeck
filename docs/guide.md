@@ -44,6 +44,8 @@ The status bar at the bottom of VS Code shows EDGEdeck's state in one line: how 
 
 The sidebar view is one list in three groups: **Set up** while anything is missing, **Frameworks**, and **Mods**.
 
+**The list is your library.** Every mod in it, on or off, is a copy EDGEdeck keeps in the library folder (the `edgedeck.libraryPath` setting; empty means `%USERPROFILE%\EDGEdeck`). A mod that is not in the list is not in the library. The view's header says how many mods it holds and which loadout is active; on the EDGEdeck page, **Library** at the right of the loadout row says the same, and clicking it opens the folder. To put the library somewhere else, use **Move library...**, which moves the mods too: changing the setting by hand only points EDGEdeck at another folder.
+
 - **The checkbox** turns a mod on or off. Nothing touches the game until you deploy.
 - **The line after the name** shows the version, how many other versions are in the library, the size, and the status: `deployed`, `not deployed yet`, `off`, `off, still deployed`, `changed in game folder`, `update 1.2 available`, `loses 3 archive files`.
 - **Click a mod** for its detail panel: the files it deploys, its conflicts by file path and inside archives, and buttons for turn on, move, open folder, Rename, Open on Nexus, Update and Remove.

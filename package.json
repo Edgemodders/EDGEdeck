@@ -613,7 +613,7 @@
         "edgedeck.libraryPath": {
           "type": "string",
           "default": "",
-          "description": "Where EDGEdeck keeps your mods. Empty means %USERPROFILE%\\EDGEdeck. Put it on the same drive as the game so deploy can use hardlinks instead of copies."
+          "description": "The library: the folder where EDGEdeck keeps every mod in its list, on or off. Empty means %USERPROFILE%\\EDGEdeck. Put it on the same drive as the game so deploy can use hardlinks instead of copies. To change it, use EDGEdeck: Move library..., which moves the mods too; editing this setting only points EDGEdeck at another folder."
         },
         "edgedeck.bridgePath": {
           "type": "string",
