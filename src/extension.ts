@@ -106,6 +106,8 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.getFrameworks", () => run(getFrameworksCommand)),
     vscode.commands.registerCommand("edgedeck.updateAll", () => run(updateAllCommand)),
     vscode.commands.registerCommand("edgedeck.remove", (node: ModNode) => run(() => removeCommand(modOf(node)))),
+    vscode.commands.registerCommand("edgedeck.deployMod", (node: ModNode) => run(() => deployModCommand(modOf(node)))),
+    vscode.commands.registerCommand("edgedeck.undeployMod", (node: ModNode) => run(() => undeployModCommand(modOf(node)))),
     // From the context menu with the row; from F2 with nothing, so the selected row.
     vscode.commands.registerCommand("edgedeck.rename", (node?: ModNode) => run(() => renameCommand(modOf(node ?? tree.selection[0])))),
     vscode.commands.registerCommand("edgedeck.details", (node: ModNode) => run(() => showDetails(modOf(node)))),
@@ -906,6 +908,7 @@ async function scanArchives(explicit: boolean): Promise<void> {
 function detailData(mod: ModInfo) {
   return {
     mod,
+    oneMod: oneModAction(mod),
     status: statusFor(mod),
     plan: state.plan,
     archive: state.archive,
@@ -952,6 +955,8 @@ function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo
     conflicts: p ? p.conflicts.filter((c) => c.winner === mod.id || c.losers.includes(mod.id)).length : 0,
     update: fam.update?.version,
     nexusId: fam.nexusId,
+    // Another loadout than the active one: the game is not its business here.
+    oneMod: viewed ? undefined : oneModAction(mod),
   };
 }
 
@@ -1174,6 +1179,9 @@ async function pageAction(m: PageMessage): Promise<void> {
       break;
     case "checkUpdate":
       await checkUpdatesCommand(false, [mod]);
+      break;
+    case "deployOne":
+      await deployOrUndeployCommand(mod);
       break;
     case "update":
       await updateModCommand(mod);
@@ -1566,6 +1574,9 @@ async function detailAction(action: string, id: string): Promise<void> {
       break;
     case "update":
       await updateModCommand(mod);
+      break;
+    case "deployOne":
+      await deployOrUndeployCommand(mod);
       break;
   }
 }
@@ -2261,22 +2272,73 @@ async function deployNow(only?: ModInfo): Promise<DeployResult | undefined> {
     if (a === "View" && report) void vscode.commands.executeCommand("markdown.showPreview", vscode.Uri.file(report)).then(undefined, () => vscode.window.showTextDocument(vscode.Uri.file(report!)));
     else if (a === "Show conflicts") void showConflicts();
   });
-  warnLostProjects(result);
+  warnLostProjects(result, only);
   return result;
 }
 
 /**
- * A project whose files lost to another mod: the game is not running the build just packed, which
- * a conflict count alone does not make plain. Said once per pair, with a button to let it win.
+ * What one mod's Deploy/Undeploy button offers: Undeploy while its files are in the game and none of
+ * its changes wait, or while it is off with files still in the game; Deploy otherwise.
  */
-function warnLostProjects(result: DeployResult): void {
+function oneModAction(mod: ModInfo): "deploy" | "undeploy" {
+  const p = state.plan;
+  const inGame = (readManifest(settings().gamePath)?.files ?? []).some((e) => e.mod === mod.id);
+  const waiting = !!p && (p.add.some((d) => d.mod?.id === mod.id) || p.stale.some((e) => e.mod === mod.id));
+  return inGame && (!mod.enabled || !waiting) ? "undeploy" : "deploy";
+}
+
+/** The row's button: Deploy or Undeploy, by the mod's state. */
+async function deployOrUndeployCommand(mod: ModInfo | undefined): Promise<void> {
+  if (!mod) return;
+  return oneModAction(mod) === "deploy" ? deployModCommand(mod) : undeployModCommand(mod);
+}
+
+/**
+ * Deploy this mod only: turned on first (so the next full Deploy agrees), then only its changes go
+ * into the game; other mods' changes keep waiting.
+ */
+async function deployModCommand(mod: ModInfo | undefined): Promise<void> {
+  if (!mod || !library || !(await gameClosed("deploying"))) return;
+  if (!mod.enabled) {
+    mod.enabled = true;
+    saveMod(library, mod);
+    log.appendLine(`${mod.name}: on`);
+    refresh();
+  }
+  await deployNow(mod);
+}
+
+/** Undeploy: turned off, then only its files leave the game; other mods' changes keep waiting. */
+async function undeployModCommand(mod: ModInfo | undefined): Promise<void> {
+  if (!mod || !library) return;
+  const inGame = (readManifest(settings().gamePath)?.files ?? []).some((e) => e.mod === mod.id);
+  if (!inGame) {
+    void vscode.window.showInformationMessage(`${mod.name} is not in the game.${mod.enabled ? " It is on, so the next Deploy puts it there; turn it off to keep it out." : ""}`);
+    return;
+  }
+  if (!(await gameClosed("undeploying"))) return;
+  if (mod.enabled) {
+    mod.enabled = false;
+    saveMod(library, mod);
+    log.appendLine(`${mod.name}: off`);
+    refresh();
+  }
+  await deployNow(mod);
+}
+
+/**
+ * A project whose files lost to another mod: the game is not running the build just packed, which
+ * a conflict count alone does not make plain. Said once per pair, with a button to let it win. The
+ * same for the one mod a row's Deploy sent, whatever its source.
+ */
+function warnLostProjects(result: DeployResult, only?: ModInfo): void {
   if (!library) return;
   const lib = library;
   for (const l of result.lost) {
     const mod = lib.mods.find((m) => m.id === l.mod);
     const winner = lib.mods.find((m) => m.id === l.winner);
-    if (!mod || !winner || mod.source.type !== "project") continue;
-    const text = `The game still has ${describeMod(winner)} for ${l.files} file${l.files === 1 ? "" : "s"}, not the project ${describeMod(mod)}.`;
+    if (!mod || !winner || (mod.source.type !== "project" && mod.id !== only?.id)) continue;
+    const text = `The game still has ${describeMod(winner)} for ${l.files} file${l.files === 1 ? "" : "s"}, not ${mod.source.type === "project" ? "the project " : ""}${describeMod(mod)}.`;
     log.appendLine(text);
     void vscode.window.showWarningMessage(text, `Let ${mod.name} win`).then((a) => {
       if (!a) return;

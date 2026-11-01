@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- **Deploy or undeploy one mod from its row.** The first button in each row's Actions on the EDGEdeck page puts that mod alone in the game (**Deploy**, yellow while its changes wait) or takes it out (**Undeploy**), turning it on or off to match; every other mod's changes keep waiting for the full Deploy. The detail panel has the same button, and the Mods view's right-click menu has **Deploy this mod** and **Undeploy**. See https://edgemodders.github.io/EDGEdeck/guide.html#one-mod-at-a-time
+
 **Changed**
 
 - **The library shows where you look.** The Mods view's header reads `Library: 38 mods · Loadout: Default`, and the EDGEdeck page has **Library** at the right of the loadout row, with the count of mods and versions; clicking it opens the folder. The list is the library: every mod in it, on or off, is kept there. The `edgedeck.libraryPath` setting says so too, and that **Move library...** is the way to change it.

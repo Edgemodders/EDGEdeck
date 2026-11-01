@@ -48,9 +48,9 @@ The sidebar view is one list in three groups: **Set up** while anything is missi
 
 - **The checkbox** turns a mod on or off. Nothing touches the game until you deploy.
 - **The line after the name** shows the version, how many other versions are in the library, the size, and the status: `deployed`, `not deployed yet`, `off`, `off, still deployed`, `changed in game folder`, `update 1.2 available`, `loses 3 archive files`.
-- **Click a mod** for its detail panel: the files it deploys, its conflicts by file path and inside archives, and buttons for turn on, move, open folder, Rename, Open on Nexus, Update and Remove.
+- **Click a mod** for its detail panel: the files it deploys, its conflicts by file path and inside archives, and buttons for turn on, **Deploy this mod** or **Undeploy** (see [One mod at a time](#one-mod-at-a-time)), move, open folder, Rename, Open on Nexus, Update and Remove.
 - **Expand a mod** for the folders it deploys into and the files in them. Click a file to open the library copy. Hover anything for a card with size, dates, where it deploys and where it came from.
-- **Hover a row** for its buttons: Move up, Move down and Switch version. The mod higher in the list wins a conflict. Right-click for the rest: Details, Open on Nexus Mods, Reveal in File Explorer, Reveal in Game Folder, Rename, Remove, and, when a REDcode project is open, Add to REDcode project.
+- **Hover a row** for its buttons: Move up, Move down and Switch version. The mod higher in the list wins a conflict. Right-click for the rest: Deploy this mod, Undeploy, Details, Open on Nexus Mods, Reveal in File Explorer, Reveal in Game Folder, Rename, Remove, and, when a REDcode project is open, Add to REDcode project.
 - **Rename** (right-click, or F2 on the selected row) gives a mod a name of your own in EDGEdeck. Every version of it gets the name, and new versions take it when they arrive. Its files and the game do not change. Rename to an empty name to go back to the first one.
 
 ### Add to REDcode project
@@ -77,7 +77,7 @@ A game patch is the usual reason a modded game stops starting. EDGEdeck records 
 
 **Open EDGEdeck** (the first title-bar button, or the command) opens the wide table in the editor area. Use it for bigger jobs; the sidebar is its compact companion.
 
-- **Columns:** on/off, name, version, kinds, size, status, and Actions: icon buttons for Details, Move up, Move down, Section, Open folder, Check for an update and Update (for a mod from Nexus; Update only while one waits), Open on Nexus and Remove. Drag the edge of a column heading to resize it; double-click the edge for automatic widths.
+- **Columns:** on/off, name, version, kinds, size, status, and Actions: icon buttons for Deploy or Undeploy (this mod alone; yellow while its changes wait), Details, Move up, Move down, Section, Open folder, Check for an update and Update (for a mod from Nexus; Update only while one waits), Open on Nexus and Remove. Drag the edge of a column heading to resize it; double-click the edge for automatic widths.
 - **Sections.** Mods are grouped into Frameworks, sections of your own, and Mods. **+ Section** makes one. Put a mod in it with the mod's Section button, or drag the row onto the section's header. A section's header can rename, move or delete it; deleting sends its mods back to Mods and removes nothing. Click a section's name to fold it down to its header. The box on a header turns every mod in that section on or off. Two buttons on every header act on the mods the section shows, after the search and filter: put them all in another section, or remove them all from the library. Filter to **Off** and remove, to clear out mods you no longer use. A section of your own also has rename, move up, move down and X to delete the section. Sections only group the list: the order still decides who wins a conflict.
 - **Order.** Move up and Move down move a mod past its neighbour in its section. Or drag a row onto another to put it directly above or below that one.
 - **Search** matches name, version, kind and status. **Facet chips** narrow to On, Off, Deployed, Not deployed, Needs deploy, Changed in game folder, Conflicts and Update available, each with its count. A search or a filter opens folded sections while it lasts. **Largest first** sorts by size across every section. The page remembers your filters.
@@ -109,6 +109,19 @@ After each deploy, the message says how many files went in for how many mods and
 Turning mods on and off changes nothing on disk. The **Deploy** button counts the files waiting, and **Show pending changes** lists every one with the reason: added, replaced by a mod higher in the list, put back from a backup, relinked after a rebuild, removed.
 
 Deploy hardlinks the files of every mod that is on into the game folder, so they take no extra space, and writes `modlist.txt` for the archive load order. If the library sits on another drive, deploy copies instead. From the next release (not in 0.28.0), Set up then offers **Move library...** (also in the Mods view's `...` menu and the page's footer). It moves the library to a folder you pick, and the next deploy turns the copies into hardlinks. It prepares REDmod packages with `redMod.exe` when any are on. Everything it did goes into a manifest in the game folder.
+
+### One mod at a time
+
+Each row's first action button deploys or undeploys that mod alone, and leaves every other mod's changes waiting for the next full Deploy. It shows what fits the mod:
+
+| The mod | Button | What it does |
+|---|---|---|
+| On, with changes waiting | **Deploy** (yellow) | Puts only its changes in the game |
+| Off, not in the game | **Deploy** | Turns it on and puts it in the game |
+| On and in the game, nothing waiting | **Undeploy** | Turns it off and takes only its files out |
+| Off, its files still in the game | **Undeploy** | Takes only its files out |
+
+It turns the mod on or off as part of it, so the next full Deploy agrees. It asks the same questions as Deploy, refuses while the game runs, and when another mod higher in the list wins some of its files, says so with **Let ... win**. The detail panel has the same button, and the Mods view's right-click menu has **Deploy this mod** and **Undeploy**. While the page shows another loadout than the active one, the button is not there: the game follows the active loadout.
 
 **Files that changed outside EDGEdeck.** When Steam verify, the game or another tool changed a file EDGEdeck deployed, the mod shows `changed in game folder` and the next deploy asks one question per file: keep the changed file, which imports it into the library, or put the mod's file back. A foreign file in the way of a deploy is moved to the library's backup folder first and comes back on undo.
 

@@ -155,6 +155,16 @@
         "category": "EDGEdeck"
       },
       {
+        "command": "edgedeck.deployMod",
+        "title": "Deploy this mod",
+        "category": "EDGEdeck"
+      },
+      {
+        "command": "edgedeck.undeployMod",
+        "title": "Undeploy",
+        "category": "EDGEdeck"
+      },
+      {
         "command": "edgedeck.moveUp",
         "title": "Move up (wins conflicts)",
         "category": "EDGEdeck",
@@ -508,6 +518,16 @@
           "group": "9_remove@1"
         },
         {
+          "command": "edgedeck.deployMod",
+          "when": "view == edgedeck.mods && viewItem == mod",
+          "group": "0_deploy@1"
+        },
+        {
+          "command": "edgedeck.undeployMod",
+          "when": "view == edgedeck.mods && viewItem == mod",
+          "group": "0_deploy@2"
+        },
+        {
           "command": "edgedeck.switchVersion",
           "when": "view == edgedeck.mods && viewItem == mod",
           "group": "inline@9"
@@ -531,6 +551,14 @@
       "commandPalette": [
         {
           "command": "edgedeck.remove",
+          "when": "false"
+        },
+        {
+          "command": "edgedeck.deployMod",
+          "when": "false"
+        },
+        {
+          "command": "edgedeck.undeployMod",
           "when": "false"
         },
         {

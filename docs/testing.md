@@ -20,7 +20,7 @@ Last updated 2026-11-01. Dates before 2026-10-17 come from the session records; 
 | [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-31 (v0.29.2) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-11-01 | 36 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | 13 open |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 14 open |
 
 ## Automated
 
@@ -161,6 +161,7 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 | 12 | **A project that drops files** | 0.29.2; a REDcode project in the library | Remove a file from the project and pack again: after a refresh, that file leaves the project's mod (Pending changes says it is removed), and Deploy takes it out of the game |
 | 13 | **Mod manager download in EDGEkit** | 0.29.3; EDGEkit | In EDGEkit, run **Nexus: handle download links (nxm)**, then press Mod manager download on a Nexus file: the file lands in EDGEdeck's library in EDGEkit (not in VS Code, and not nowhere). After a reload the log says `Nexus download links go to: EDGEdeck, current` |
 | 14 | **Old link handlers update themselves** | 0.29.3; links handled by EDGEdeck 0.29.2 or older | The first start after updating logs `updated EDGEdeck's handler to the current forwarder`, and Mod manager download still works in VS Code. With Vortex holding the links, the Set up group shows **Handle Nexus download links** before signing in to Nexus |
+| 15 | **Deploy or undeploy one mod from its row** | Unreleased (after 0.29.3); the game closed | On the page, a mod that is on with changes waiting shows a yellow Deploy button first in Actions: it deploys that mod only, and another mod's waiting change stays waiting. A mod in the game with nothing waiting shows Undeploy: it turns the mod off and takes only its files out. An off mod not in the game shows Deploy: it turns it on and deploys it. The detail panel's button does the same; the Mods view's right-click menu has Deploy this mod and Undeploy (Undeploy on a mod not in the game says so). With the game running, it asks to close it first. Viewing another loadout: no button |
 
 ### Test 5, step by step
 

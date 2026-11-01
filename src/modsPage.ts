@@ -23,6 +23,8 @@ export interface PageRow {
   conflicts: number;
   update?: string;
   nexusId?: number;
+  /** What the row's Deploy/Undeploy button does; none while the page shows another loadout. */
+  oneMod?: "deploy" | "undeploy";
 }
 
 export interface PageSection {
@@ -66,7 +68,7 @@ export interface PageData {
 
 export interface PageMessage {
   action:
-    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate"
+    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate" | "deployOne"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport";
   /** loadoutView: the loadout to show. */
@@ -97,6 +99,9 @@ const Icons: Record<string, string> = {
   rename: '<path d="M10.6 2.6l2.8 2.8-7.9 7.9H2.7v-2.8z"/>',
   update: '<path d="M8 13.5V5.5"/><path d="M4.8 8.7 8 5.5l3.2 3.2"/><path d="M3 2.5h10"/>',
   check: '<path d="M13.2 8a5.2 5.2 0 1 1-1.5-3.7"/><path d="M12.2 1.9v2.8H9.4"/>',
+  // Into the game (down onto the floor line) and out of it (up off it).
+  deploy: '<path d="M8 2.5v8"/><path d="M4.8 7.3 8 10.5l3.2-3.2"/><path d="M2.5 13.5h11"/>',
+  undeploy: '<path d="M8 10.5v-8"/><path d="M4.8 5.7 8 2.5l3.2 3.2"/><path d="M2.5 13.5h11"/>',
   close: '<path d="M4 4l8 8M12 4l-8 8"/>',
   add: '<path d="M8 3v10M3 8h10"/>',
   export: '<path d="M8 10V2.5"/><path d="M5 5.5 8 2.5l3 3"/><path d="M2.5 9.5v4h11v-4"/>',
@@ -169,7 +174,16 @@ export function renderPage(d: PageData, csp: string): string {
 
   const row = (r: PageRow, section: string, first: boolean, last: boolean) => {
     const statusClass = r.changed || r.conflicts ? "warn" : r.needsDeploy ? "pend" : r.deployed && r.enabled ? "ok" : "dim";
+    const oneTitle =
+      r.oneMod === "undeploy"
+        ? r.enabled
+          ? `Undeploy ${r.name}: turn it off and take only its files out of the game`
+          : `Undeploy ${r.name}: take its files out of the game`
+        : r.enabled
+          ? `Deploy ${r.name} only: its changes go into the game now, other mods' changes keep waiting`
+          : `Deploy ${r.name} only: turn it on and put it in the game now, other mods' changes keep waiting`;
     const buttons = [
+      { m: { action: "deployOne", id: r.id }, icon: r.oneMod ?? "deploy", title: r.oneMod ? oneTitle : "", cls: r.oneMod ? `one ${r.oneMod}${r.oneMod === "deploy" && r.enabled && r.needsDeploy ? " upd" : ""}` : "blank" },
       { m: { action: "details", id: r.id }, icon: "details", title: "Details" },
       { m: { action: "moveUp", id: r.id }, icon: "up", title: "Move up: wins conflicts against the mod above", off: first },
       { m: { action: "moveDown", id: r.id }, icon: "down", title: "Move down", off: last },

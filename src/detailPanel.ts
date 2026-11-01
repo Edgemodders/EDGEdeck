@@ -8,6 +8,8 @@ import type { ModInfo } from "./library";
 
 export interface DetailData {
   mod: ModInfo;
+  /** The Deploy/Undeploy button: this mod alone into the game, or out of it. */
+  oneMod: "deploy" | "undeploy";
   status: string;
   plan: Plan | undefined;
   archive: ArchiveConflictSummary | undefined;
@@ -133,6 +135,7 @@ ${versionsLine}
 ${nexusLine}
 <div class="bar">
   <button data-action="toggle">${mod.enabled ? "Turn off" : "Turn on"}</button>
+  ${d.oneMod === "undeploy" ? `<button data-action="deployOne" title="${mod.enabled ? "Turn it off and take" : "Take"} only its files out of the game">Undeploy</button>` : `<button data-action="deployOne" title="${mod.enabled ? "Its" : "Turn it on; its"} changes go into the game now, other mods' changes keep waiting">Deploy this mod</button>`}
   <button data-action="moveUp" title="Wins conflicts against the mods below it">Move up</button>
   <button data-action="moveDown">Move down</button>
   <button data-action="open">Open folder</button>
