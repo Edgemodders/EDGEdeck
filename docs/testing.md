@@ -19,8 +19,8 @@ Last updated 2026-11-01. Dates before 2026-10-17 come from the session records; 
 | [UI test](#ui-test-in-a-real-vs-code) | Automated, by hand only (not in CI) | 2026-10-25 (`main` before 0.29.0) | Pass |
 | [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-31 (v0.29.2) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
-| [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-11-01 | 36 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | 14 open |
+| [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-11-01 | 42 runs, see the table |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | none open |
 
 ## Automated
 
@@ -142,43 +142,13 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 10-26 | Test build from `main` (after 0.28.0) | Not recorded | **Update all** and the row's update button (0.29.0) | **Passed.** |
 | 11-01 | 0.29.3 | PC | **A project beside a mod of the same name** (0.28.0; waiting test 4, all 16 steps with a copy of TestMod2) | **Passed.** One question; Use this project kept one row, following the copy; Keep both made `dev 2`. Found: removing one version, the question named only the mod, not the version. Fixed for the next build: it names the version and its project folder, and says the others stay |
 | 11-01 | 0.29.3 | Not recorded | **Adding REDnode itself** (waiting test 8) | **Failed.** `Error: ENOENT, not found in ...\red4ext\plugins\REDnode\host\resources\app.asar`, after "could not remove the temporary folder ... (EPERM)". Inside VS Code, Electron's fs reads every `.asar` as a folder; the 0.29.1 fix (retries) had been checked with plain Node, where that does not happen, so it missed the cause. Fixed for the next build: EDGEdeck's file work uses Electron's `original-fs` (`src/fsx.ts`); the UI test now adds a `.asar` inside the real extension host, and fails without the fix |
+| 11-01 | 0.29.4 | Not recorded | Waiting tests 1 to 3 and 5 to 7: **Add to REDcode project** for an `.archive` (0.27.4), **Run game**, **Rename**, **Deploy one mod** from REDcode's Install and `deploy --mod`, **Claude Code asks before deploy, undo and remove** (0.28.0), **Check one mod for an update** (0.29.0) | **Passed.** Found on the way, fixed in 0.29.4 or in the steps: the menu item needed an open project folder (the steps said so after), its name is now Add to REDcode project, the library is named where it shows, and the command line needs `--library` |
+| 11-01 | 0.29.4 | Not recorded | **Adding REDnode itself** again (test 8, after the `.asar` fix) | **Passed.** Named REDnode, no EPERM note, no `app.asar` error |
+| 11-01 | 0.29.4 | Not recorded | Waiting tests 9 to 12: **EDGEbuilder in its own row** (a folder mod carrying its app), **the update check counts what the table shows**, **Update shown**, **a project that drops files** (0.29.2) | **Passed.** |
+| 11-01 | 0.29.4 | Not recorded | Waiting tests 13 and 14: **Mod manager download in EDGEkit**, **old link setups update themselves** (0.29.3) | **Passed.** |
+| 11-01 | 0.29.4 | Not recorded | Waiting test 15: **Deploy or undeploy one mod from its row** (0.29.4) | **Passed.** |
+| 11-01 | EDGEkit 1.140.2 test build with the Nexus links task | PC | EDGEkit's installer checkbox, on a first install after uninstalling EDGEkit | **Passed.** The box started unticked with Vortex holding the links; ticked, the links went to EDGEkit's EDGEdeck; every step as written |
 
 ## Waiting for a hand test
 
-Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table; a passed one moves to the table above, and the others keep their numbers until the list is done:
-
-| # | Test | Since | Steps |
-|---|---|---|---|
-| 1 | **Add an archive to the REDcode project** | 0.27.4; REDcode 0.6.1+; a REDcode project folder open in the workspace, its `.cpmodproj` at the folder's top (File, Add Folder to Workspace...); without one the menu item is hidden | Right-click an `.archive` outside the library in the Explorer and pick **Add to REDcode project** (or run **EDGEdeck: Add to REDcode project** and pick one): all or chosen resources land under `source\archive`. No new row appears in the mods list (the library), and the deploy count in the status bar stays the same (the game). Again: Keep mine and Replace. The right-click menu on a mod says **Add to REDcode project** |
-| 2 | **Run game** | 0.28.0 | With nothing to deploy, the play button in the Mods view starts the game through Steam with `-modded` (REDmod mods load). Turn a mod on, click it again: it deploys first, then starts. With the game open: "already running", no second copy. On the page, **Run game** does the same. `edgedeck.launch` set to exe starts `bin\x64\Cyberpunk2077.exe -modded` |
-| 3 | **Rename** | 0.28.0 | Right-click a mod with two versions (its row has a version list) > Rename...: the row shows the new name and stays in its section. Pick the other version in the version list: the row still shows the new name (then pick the first one again; nothing reaches the game without a deploy). The loadouts still know it. F2 on a selected row does the same. Download a newer version from Nexus: it arrives with the new name. Rename to empty: the first names come back |
-| 5 | **Deploy one mod** | 0.28.0; REDcode; the game closed | EDGEdeck's own Deploy always deploys everything; one mod alone is for REDcode's Install, the command line and assistants. Numbered steps in [Test 5, step by step](#test-5-step-by-step) |
-| 6 | **Claude Code asks before deploy, undo and remove** | 0.28.0; Claude Code in auto mode | EDGEchat's P1 test again: "deploy my mods" asks before `edgedeck_deploy` runs. The same for `edgedeck_undo` and `edgedeck_remove` |
-| 7 | **Check one mod for an update** | 0.29.0; signed in to Nexus | On the page, the check icon (a circular arrow) shows on mods from Nexus only. On a mod with a newer file: "X 1.2 is on Nexus" with **Update**, which updates it, and the row gets its update icon. On an up-to-date mod: "X is up to date". The daily check of all mods still runs as before |
-| 8 | **Adding REDnode itself** | 0.29.1; again on 0.29.4 (failed on 0.29.3: `.asar`) | Add `REDnode-<version>.zip`: the name offered is **REDnode** (not "Ask mod") and the version is the zip's. No "EPERM, Permission denied" toast after it is added. A zip with one REDnode app (EDGEbuilder) is still named from its manifest |
-| 9 | **EDGEbuilder in its own row** | 0.29.2 | A mod that carries a REDnode app among its own files is not that app's version. Numbered steps in [Test 9, step by step](#test-9-step-by-step) |
-| 10 | **The update check counts what the table shows** | 0.29.2; signed in to Nexus | Check updates with older versions kept off in the library: the message names the same mods the table marks (one on 10-31, not 11) and offers **Update all** |
-| 11 | **Update shown** | 0.29.2; two or more updates waiting | On the page, pick the **Update available** chip or type a search: the button reads **Update shown** with the count of mods showing that have an update, and the question lists only those. With nothing narrowing the list it reads **Update all** again. A search with no update showing greys it out |
-| 12 | **A project that drops files** | 0.29.2; a REDcode project in the library | Remove a file from the project and pack again: after a refresh, that file leaves the project's mod (Pending changes says it is removed), and Deploy takes it out of the game |
-| 13 | **Mod manager download in EDGEkit** | 0.29.3; EDGEkit | In EDGEkit, run **Nexus: handle download links (nxm)**, then press Mod manager download on a Nexus file: the file lands in EDGEdeck's library in EDGEkit (not in VS Code, and not nowhere). After a reload the log says `Nexus download links go to: EDGEdeck, current` |
-| 14 | **Old link handlers update themselves** | 0.29.3; links handled by EDGEdeck 0.29.2 or older | The first start after updating logs `updated EDGEdeck's handler to the current forwarder`, and Mod manager download still works in VS Code. With Vortex holding the links, the Set up group shows **Handle Nexus download links** before signing in to Nexus |
-| 15 | **Deploy or undeploy one mod from its row** | 0.29.4; the game closed | On the page, a mod that is on with changes waiting shows a yellow Deploy button first in Actions: it deploys that mod only, and another mod's waiting change stays waiting. A mod in the game with nothing waiting shows Undeploy: it turns the mod off and takes only its files out. An off mod not in the game shows Deploy: it turns it on and deploys it. The detail panel's button does the same; the Mods view's right-click menu has Deploy this mod and Undeploy (Undeploy on a mod not in the game says so). With the game running, it asks to close it first. Viewing another loadout: no button |
-
-### Test 5, step by step
-
-1. **Leave another change waiting:** turn some other mod on or off, so the status bar shows a change that is not TestMod2's.
-2. Open `Projects\TestMod2` in VS Code and run **REDcode: Install**.
-3. **Expect:** only TestMod2's files go into the game. The message says how many other changes still wait, and **Show changes** still lists the other mod's change.
-4. **The command line:** turn TestMod2 off, then in a terminal at the EDGEdeck repo run `node bin/edgedeck.mjs --library "e:\Modding\EDGEdek-Staging" deploy --mod testmod2`. The command line does not read VS Code's `edgedeck.libraryPath`, so `--library` names your library; `list` with the same option shows the ids. **Expect:** only TestMod2's change deploys; the other mod's change still waits.
-5. **Clean up:** set the other mod back as it was, and Deploy.
-
-### Test 9, step by step
-
-On 10-29 the TestMod build carried EDGEbuilder's app, so it joined EDGEbuilder's family and hid EDGEbuilder's row. TestMod no longer carries it, so this builds a carrier as a folder mod: nothing to deploy, no project question.
-
-1. Make a folder `E:\Modding\Cyberpunk 2077\Projects\Copies\CarrierTest`.
-2. Copy into it the whole `Projects\TestMod2\packed\mods` folder and the whole `e:\Modding\EDGEdek-Staging\library\edgebuilder-0-5-0\red4ext` folder. CarrierTest now holds `mods\TestMod2\...` and `red4ext\plugins\REDnode\apps\edgebuilder\...`.
-3. On the EDGEdeck page, **+ Add mod > A folder**, and pick `CarrierTest`.
-4. **Expect:** the name offered is **CarrierTest**, not EDGEbuilder. Keep it.
-5. **Expect:** a new **CarrierTest** row with no version list, and the **EDGEbuilder** row still there, its version list 0.3.4, 0.4.0, 0.4.1, 0.5.0 and no CarrierTest.
-6. **Clean up, without deploying:** remove the CarrierTest row (its remove icon) and delete `Projects\Copies\CarrierTest`.
+None open: every hand test through 0.29.4 has passed (2026-11-01). New ones go in a table here, with the columns # (kept until the list is done), Test, Since and Steps; a passed one moves to the table above.
