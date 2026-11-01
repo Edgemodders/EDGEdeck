@@ -151,7 +151,7 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 | 1 | **Add an archive to the REDcode project** | 0.27.4; REDcode 0.6.1+; a REDcode project folder open in the workspace, its `.cpmodproj` at the folder's top (File, Add Folder to Workspace...); without one the menu item is hidden | Right-click an `.archive` outside the library in the Explorer and pick **Add to REDcode project** (or run **EDGEdeck: Add to REDcode project** and pick one): all or chosen resources land under `source\archive`. No new row appears in the mods list (the library), and the deploy count in the status bar stays the same (the game). Again: Keep mine and Replace. The right-click menu on a mod says **Add to REDcode project** |
 | 2 | **Run game** | 0.28.0 | With nothing to deploy, the play button in the Mods view starts the game through Steam with `-modded` (REDmod mods load). Turn a mod on, click it again: it deploys first, then starts. With the game open: "already running", no second copy. On the page, **Run game** does the same. `edgedeck.launch` set to exe starts `bin\x64\Cyberpunk2077.exe -modded` |
 | 3 | **Rename** | 0.28.0 | Right-click a mod with two versions (its row has a version list) > Rename...: the row shows the new name and stays in its section. Pick the other version in the version list: the row still shows the new name (then pick the first one again; nothing reaches the game without a deploy). The loadouts still know it. F2 on a selected row does the same. Download a newer version from Nexus: it arrives with the new name. Rename to empty: the first names come back |
-| 4 | **A project beside a mod of the same name** | 0.28.0; REDcode | Install a project from REDcode when EDGEdeck already has a mod of that name from another folder (the two EDGEmat_M3 folders): one question. **Use this project**: no second mod, the existing one follows the new folder. Again with **Keep both**: the project becomes version `dev 2` of that mod and is on in its place. When another mod wins its files, the deploy message says "The game still has X" with **Let Y win** |
+| 4 | **A project beside a mod of the same name** | 0.28.0; REDcode; the game closed | One question when a second folder of the same project is installed; **Use this project** and **Keep both** do what they say. Numbered steps in [Test 4, step by step](#test-4-step-by-step) |
 | 5 | **Deploy one mod** | 0.28.0; a REDcode that calls `deployMod` | REDcode's Install deploys only that mod; the message says how many other changes still wait. Also `edgedeck deploy --mod <id>` |
 | 6 | **Claude Code asks before deploy, undo and remove** | 0.28.0; Claude Code in auto mode | EDGEchat's P1 test again: "deploy my mods" asks before `edgedeck_deploy` runs. The same for `edgedeck_undo` and `edgedeck_remove` |
 | 7 | **Check one mod for an update** | 0.29.0; signed in to Nexus | On the page, the check icon (a circular arrow) shows on mods from Nexus only. On a mod with a newer file: "X 1.2 is on Nexus" with **Update**, which updates it, and the row gets its update icon. On an up-to-date mod: "X is up to date". The daily check of all mods still runs as before |
@@ -162,3 +162,38 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 | 12 | **A project that drops files** | 0.29.2; a REDcode project in the library | Remove a file from the project and pack again: after a refresh, that file leaves the project's mod (Pending changes says it is removed), and Deploy takes it out of the game |
 | 13 | **Mod manager download in EDGEkit** | 0.29.3; EDGEkit | In EDGEkit, run **Nexus: handle download links (nxm)**, then press Mod manager download on a Nexus file: the file lands in EDGEdeck's library in EDGEkit (not in VS Code, and not nowhere). After a reload the log says `Nexus download links go to: EDGEdeck, current` |
 | 14 | **Old link handlers update themselves** | 0.29.3; links handled by EDGEdeck 0.29.2 or older | The first start after updating logs `updated EDGEdeck's handler to the current forwarder`, and Mod manager download still works in VS Code. With Vortex holding the links, the Set up group shows **Handle Nexus download links** before signing in to Nexus |
+
+### Test 4, step by step
+
+TestMod2 is in the library from `Projects\TestMod2`. A copy of that folder is a second project with the same name, which is what the test needs.
+
+**Set up**
+
+1. In File Explorer, copy the whole folder `E:\Modding\Cyberpunk 2077\Projects\TestMod2` into a new folder `E:\Modding\Cyberpunk 2077\Projects\Copies`, so the copy is `Projects\Copies\TestMod2`. Keep its `packed` folder.
+2. Close the game. Installing deploys.
+
+**Part A: Use this project**
+
+3. In VS Code, **File > Open Folder...** and open `Projects\Copies\TestMod2`.
+4. Run **REDcode: Install** from the Command Palette.
+5. **Expect one question:** "EDGEdeck already has TestMod2 dev ... What should happen to it?", with **Use this project** and **Keep both**.
+6. Pick **Use this project**.
+7. **Expect:** the mods list still has one TestMod2 row, not two, and it is on. Its details say it comes from `Projects\Copies\TestMod2`.
+8. Run **REDcode: Install** again. **Expect:** no question this time.
+
+**Part B: Keep both**
+
+9. **File > Open Folder...** and open the original `Projects\TestMod2`.
+10. Run **REDcode: Install**. **Expect** the same question, since TestMod2 now follows the copy.
+11. Pick **Keep both**.
+12. **Expect:** still one TestMod2 row. Its version list has `dev` and `dev 2`; `dev 2` (the original folder) is chosen and on.
+
+**Part C, only if it happens: Let ... win**
+
+13. If another mod higher in the list deploys the same files as TestMod2, the message after the install says "The game still has *that mod* for N files, not the project TestMod2" with **Let TestMod2 win**. Clicking it moves TestMod2 above that mod; Deploy then puts TestMod2's files in the game. No such mod: skip this part.
+
+**Clean up**
+
+14. In TestMod2's version list pick `dev` (the copy), then press the row's remove icon and confirm. `dev` leaves the library; `dev 2`, from the original folder, stays, turned off, as TestMod2 was before the test.
+15. **Deploy**, which takes the copy's files out of the game.
+16. Delete `Projects\Copies`.
