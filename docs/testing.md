@@ -8,7 +8,7 @@ Every test run on EDGEdeck so far: how to run it again, what to expect, and what
 
 Releases up to 0.26.6 were published as REDdeck; this page uses the new name throughout.
 
-Last updated 2026-10-31. Dates before 2026-10-17 come from the session records; anything not confirmed there is marked unverified.
+Last updated 2026-11-01. Dates before 2026-10-17 come from the session records; anything not confirmed there is marked unverified.
 
 ## At a glance
 
@@ -20,7 +20,7 @@ Last updated 2026-10-31. Dates before 2026-10-17 come from the session records; 
 | [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-31 (v0.29.2) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-10-26 | 35 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | 12 open |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 14 open |
 
 ## Automated
 
@@ -160,3 +160,5 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 | 10 | **The update check counts what the table shows** | 0.29.2; signed in to Nexus | Check updates with older versions kept off in the library: the message names the same mods the table marks (one on 10-31, not 11) and offers **Update all** |
 | 11 | **Update shown** | 0.29.2; two or more updates waiting | On the page, pick the **Update available** chip or type a search: the button reads **Update shown** with the count of mods showing that have an update, and the question lists only those. With nothing narrowing the list it reads **Update all** again. A search with no update showing greys it out |
 | 12 | **A project that drops files** | 0.29.2; a REDcode project in the library | Remove a file from the project and pack again: after a refresh, that file leaves the project's mod (Pending changes says it is removed), and Deploy takes it out of the game |
+| 13 | **Mod manager download in EDGEkit** | 0.29.3; EDGEkit | In EDGEkit, run **Nexus: handle download links (nxm)**, then press Mod manager download on a Nexus file: the file lands in EDGEdeck's library in EDGEkit (not in VS Code, and not nowhere). After a reload the log says `Nexus download links go to: EDGEdeck, current` |
+| 14 | **Old link handlers update themselves** | 0.29.3; links handled by EDGEdeck 0.29.2 or older | The first start after updating logs `updated EDGEdeck's handler to the current forwarder`, and Mod manager download still works in VS Code. With Vortex holding the links, the Set up group shows **Handle Nexus download links** before signing in to Nexus |

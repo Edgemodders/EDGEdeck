@@ -12,6 +12,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.29.3 (2026-11-01)
+
 **Changed**
 
 - **The Set up group offers Handle Nexus download links from the start.** It used to wait until you had signed in to Nexus Mods, so the choice stayed hidden on a new install.
