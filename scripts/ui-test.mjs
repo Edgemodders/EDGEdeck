@@ -2,6 +2,7 @@
 // folder, a scratch library and a fake game folder, and runs src/uiTest.ts inside it.
 //   npm run test:ui            after npm run build
 import { runTests } from "@vscode/test-electron";
+import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -16,6 +17,12 @@ fs.mkdirSync(path.join(game, "bin", "x64"), { recursive: true });
 fs.writeFileSync(path.join(game, "bin", "x64", "Cyberpunk2077.exe"), "not really");
 fs.mkdirSync(path.join(tmp, "workspace"), { recursive: true });
 
+// A downloaded VS Code registers itself for vscode:// links when it starts, and the links (Nexus
+// downloads through EDGEdeck among them) would go to the test copy from then on: put it back after.
+const protocolKey = "HKCU\\Software\\Classes\\vscode\\shell\\open\\command";
+const readProtocol = () => /REG_SZ\s+(.+)$/m.exec(spawnSync("reg", ["query", protocolKey, "/ve"], { encoding: "utf8" }).stdout ?? "")?.[1].trim();
+const protocolBefore = readProtocol();
+
 try {
   await runTests({
     extensionDevelopmentPath: root,
@@ -29,4 +36,8 @@ try {
   process.exitCode = 1;
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
+  if (protocolBefore && readProtocol() !== protocolBefore) {
+    spawnSync("reg", ["add", protocolKey, "/ve", "/d", protocolBefore, "/f"]);
+    console.log("ui test: gave vscode:// links back to " + protocolBefore);
+  }
 }

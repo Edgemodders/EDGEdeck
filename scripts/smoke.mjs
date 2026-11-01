@@ -975,15 +975,30 @@ console.log("undo: ok");
   assert.equal(newest.file_id, 2);
   assert.equal(core.modPageUrl(7780), "https://www.nexusmods.com/cyberpunk2077/mods/7780");
   assert.match(core.forwarderCommand(), /vscode:\/\/edgemodders\.edgedeck\/nxm\?url=/);
-  // The forwarder as Windows runs it (the registry's command line, %1 replaced), printing instead of
-  // opening: a real link has & between its parameters, which PowerShell code cannot hold bare.
+  // The forwarder as Windows runs it (the registry's command line, %1 replaced): a real link has &
+  // between its parameters, which PowerShell code cannot hold bare. Without an exe, printing the
+  // link instead of opening it; with one (the editor's own exe, so whatever holds the vscode://
+  // protocol does not matter), a stand-in exe in a folder with a quote and a space, which writes
+  // down what it was given.
   {
     const link = "nxm://cyberpunk2077/mods/107/files/1234?key=a-b_c&expires=1760000000&user_id=42";
-    const line = core.forwarderCommand().replace("%1", link).replace("Start-Process", "Write-Output");
-    const out = spawnSync("powershell.exe", [line.slice("powershell.exe ".length)], { windowsVerbatimArguments: true, encoding: "utf8" });
+    const runLine = (line) => spawnSync("powershell.exe", [line.replace("%1", link).slice("powershell.exe ".length)], { windowsVerbatimArguments: true, encoding: "utf8" });
+    const out = runLine(core.forwarderCommand().replace("Start-Process $u", "Write-Output $u"));
     assert.equal(out.stdout.trim(), `vscode://edgemodders.edgedeck/nxm?url=${encodeURIComponent(link)}`, out.stderr);
+    const dir = path.join(tmp, "V's editor");
+    fs.mkdirSync(dir, { recursive: true });
+    const exe = path.join(dir, "Code.cmd");
+    const got = path.join(dir, "got.txt");
+    fs.writeFileSync(exe, `@echo %*>"${got}"\r\n`);
+    const res = runLine(core.forwarderCommand({ exe, scheme: "vscode-insiders" }).replace("-ArgumentList", "-Wait -ArgumentList"));
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(fs.readFileSync(got, "utf8").trim(), `--open-url -- vscode-insiders://edgemodders.edgedeck/nxm?url=${encodeURIComponent(link)}`);
   }
   assert.equal(core.describeHandler(core.forwarderCommand()), "EDGEdeck");
+  assert.equal(core.describeHandler(core.forwarderCommand({ exe: "C:\\Code\\Code.exe", scheme: "vscode" })), "EDGEdeck");
+  // The exe read back out of a forwarder, so EDGEdeck in one editor leaves another editor's alone.
+  assert.equal(core.forwarderExe(core.forwarderCommand({ exe: "C:\\V's Code\\Code.exe" })), "C:\\V's Code\\Code.exe");
+  assert.equal(core.forwarderExe(core.forwarderCommand()), undefined);
   assert.equal(core.describeHandler('"C:\\Vortex\\Vortex.exe" -d "%1"'), "Vortex");
   const handler = await core.currentNxmHandler();
   console.log(`nexus: ok (nxm links on this machine: ${core.describeHandler(handler)})`);

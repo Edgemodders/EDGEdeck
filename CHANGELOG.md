@@ -12,6 +12,11 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- **Mod manager download works whichever program holds `vscode://` links.** EDGEdeck's link forwarder now hands Nexus links straight to the editor EDGEdeck runs in, instead of relying on the `vscode://` protocol. Before, a test build of VS Code, VS Code Insiders, Cursor or VSCodium holding that protocol sent the links somewhere else, and the button seemed to do nothing. Existing setups switch over the next time EDGEdeck starts.
+- **A Nexus link that arrives while EDGEdeck has no library open says so.** It used to be dropped without a word.
+
 ## 0.29.2 (2026-10-31)
 
 **Changed**

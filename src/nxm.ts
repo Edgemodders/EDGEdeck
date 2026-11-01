@@ -1,7 +1,8 @@
 // nxm:// links: what the "Mod manager download" button on Nexus opens. VS Code cannot register a
 // protocol for an extension, so EDGEdeck registers a small PowerShell forwarder under the current
-// user's classes that opens vscode://edgemodders.edgedeck/nxm?url=<link>, which the extension's
-// URI handler receives. Registration is explicit, and so is giving the links back.
+// user's classes that hands vscode://edgemodders.edgedeck/nxm?url=<link> to the editor it runs in,
+// whose URI handler passes it to the extension. Registration is explicit, and so is giving the
+// links back.
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -55,24 +56,38 @@ export function parseNxm(link: string): NxmLink {
   };
 }
 
+/** The editor links go to: its exe, and its own link scheme (vscode, vscode-insiders, cursor, vscodium). */
+export interface LinkTarget {
+  exe?: string;
+  scheme?: string;
+}
+
 /**
- * The command the registry runs for an nxm link: forward it to VS Code, percent-encoded. The link
- * goes in single quotes inside the PowerShell code: -Command joins its arguments into code, and
+ * The command the registry runs for an nxm link: forward it to the editor, percent-encoded. With an
+ * exe, the link goes straight to that exe's --open-url, the way the editor's own protocol entry does
+ * it, so whatever holds the vscode:// protocol (a test build, another editor) does not matter. The
+ * link goes in single quotes inside the PowerShell code: -Command joins its arguments into code, and
  * the & between a link's query parameters is a parse error there. Nexus links have no quotes.
  */
-export function forwarderCommand(): string {
-  const ps = `Start-Process ('${UriScheme}://${UriAuthority}/nxm?url=' + [uri]::EscapeDataString('%1'))`;
-  return `powershell.exe -NoProfile -WindowStyle Hidden -Command "${ps}"`;
+export function forwarderCommand(target: LinkTarget = {}): string {
+  const url = `$u = '${target.scheme ?? UriScheme}://${UriAuthority}/nxm?url=' + [uri]::EscapeDataString('%1')`;
+  const open = target.exe ? `Start-Process -FilePath '${target.exe.replace(/'/g, "''")}' -ArgumentList '--open-url','--',$u` : "Start-Process $u";
+  return `powershell.exe -NoProfile -WindowStyle Hidden -Command "${url}; ${open}"`;
+}
+
+/** The editor exe a forwarder sends links to, if it names one. */
+export function forwarderExe(command: string): string | undefined {
+  return /-FilePath '((?:[^']|'')+)'/.exec(command)?.[1].replace(/''/g, "'");
 }
 
 const Key = "HKCU\\Software\\Classes\\nxm";
 
 /** Registers EDGEdeck as the handler for nxm links for this user. Returns what handled them before, if known. */
-export async function registerNxmHandler(): Promise<string | undefined> {
+export async function registerNxmHandler(target: LinkTarget = {}): Promise<string | undefined> {
   const before = await currentNxmHandler();
   await run("reg", ["add", Key, "/ve", "/d", "URL:Nexus Mods link", "/f"], { windowsHide: true });
   await run("reg", ["add", Key, "/v", "URL Protocol", "/d", "", "/f"], { windowsHide: true });
-  await run("reg", ["add", `${Key}\\shell\\open\\command`, "/ve", "/d", forwarderCommand(), "/f"], { windowsHide: true });
+  await run("reg", ["add", `${Key}\\shell\\open\\command`, "/ve", "/d", forwarderCommand(target), "/f"], { windowsHide: true });
   return before;
 }
 

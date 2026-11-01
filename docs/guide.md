@@ -225,6 +225,8 @@ The tools that write to the game folder or delete, deploy, undo and remove, are 
 
 **A mod's file is missing or changed after a Steam verify.** The row says `changed in game folder` or `changed, deploy again`. Deploy puts the mod's files back, asking first about any file that changed.
 
+**Mod manager download does nothing.** Another mod manager has taken the links back: Vortex does it every time it starts. Run **Nexus: handle download links (nxm)** again; the log line `Nexus download links go to:` says who has them each time EDGEdeck starts. The first time a link arrives, VS Code asks whether EDGEdeck may open it, and that question can sit behind your browser. EDGEdeck installed in two editors (VS Code and Cursor, say) sends the links to the one you last ran the command in.
+
 **"Premium only" when updating.** Nexus serves direct downloads to Premium members only. EDGEdeck opens the file's page instead; press Mod manager download there and the file arrives through the link.
 
 **The log.** Show log in the view's menu, or View, Output, then EDGEdeck in the dropdown. The first lines say where the library and game are and how the game was found.

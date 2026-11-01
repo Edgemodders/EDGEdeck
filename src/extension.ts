@@ -30,7 +30,7 @@ import { ModsView, type ModNode, type SetupStep } from "./modsView";
 import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
-import { currentNxmHandler, describeHandler, forwarderCommand, nxmFromQuery, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority } from "./nxm";
+import { currentNxmHandler, describeHandler, forwarderCommand, forwarderExe, nxmFromQuery, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority, type LinkTarget } from "./nxm";
 import { deployedRedmodPackages, deployRedmod, enabledRedmodPackages } from "./redmod";
 import { addToProject, classifyProject, findProjectFile, installProject, projectName, sameNameMod, syncProjects, type BesideHow, type InstallProjectResult } from "./project";
 import { importFromVortex, listVortexMods, vortexDisplayName, vortexStagingCandidates } from "./vortex";
@@ -47,6 +47,8 @@ let storageDir = "";
 /** The game folder found through Steam, GOG or Epic, looked up once per reload. */
 let detectedGame: string | undefined;
 let extensionVersion = "0.0.0";
+/** Started by a test runner, in a throwaway editor: leaves the user's nxm registration alone. */
+let testRun = false;
 let secrets: vscode.SecretStorage;
 let globalState: vscode.Memento;
 let bridge: BridgeClient | undefined;
@@ -59,6 +61,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
   extensionRoot = context.extensionPath;
   storageDir = context.globalStorageUri.fsPath;
   extensionVersion = String((context.extension.packageJSON as { version?: string }).version ?? "0.0.0");
+  testRun = context.extensionMode === vscode.ExtensionMode.Test;
   secrets = context.secrets;
   globalState = context.globalState;
   log = vscode.window.createOutputChannel("EDGEdeck");
@@ -334,19 +337,26 @@ async function allSetupSteps(): Promise<(SetupStep & { done: boolean })[]> {
 
 /** Recomputes the steps to show; `full` re-reads the nxm handler from the registry. */
 async function refreshSetup(full = false): Promise<void> {
+  const target = linkTarget();
+  let stale = false;
   if (full) {
     // Read first, then store: refresh() replaces `state` while the read waits, and
     // `state.nxmHandler = await ...` would write into the object it replaced.
     const handler = await currentNxmHandler();
     state.nxmHandler = handler;
-    const current = handler === forwarderCommand() ? ", current" : handler?.includes(UriAuthority) ? ", from an older build" : "";
+    // Our own forwarder, but not the current one: from an older build (no exe), for an editor no
+    // longer there, or for another editor that is (the user handed the links to it there; left alone).
+    const exe = handler && forwarderExe(handler);
+    const elsewhere = exe && fs.existsSync(exe) && exe.toLowerCase() !== target.exe?.toLowerCase() ? exe : undefined;
+    stale = !!handler?.includes(UriAuthority) && handler !== forwarderCommand(target) && !elsewhere;
+    const current = handler === forwarderCommand(target) ? ", current" : elsewhere ? `, through ${elsewhere}` : stale ? ", from an older build" : "";
     log.appendLine(`Nexus download links go to: ${describeHandler(handler)}${current}${nxmReadError ? ` (${nxmReadError.trim()})` : ""}`);
   }
-  // Our own registration from an older build: write the current forwarder over it.
-  if (full && state.nxmHandler?.includes(UriAuthority) && state.nxmHandler !== forwarderCommand()) {
+  // Never from a test run: its editor is a throwaway copy.
+  if (stale && !testRun) {
     try {
-      await registerNxmHandler();
-      state.nxmHandler = forwarderCommand();
+      await registerNxmHandler(target);
+      state.nxmHandler = forwarderCommand(target);
       log.appendLine("Nexus download links: updated EDGEdeck's handler to the current forwarder");
     } catch (err) {
       log.appendLine(`Nexus download links: could not update the handler: ${(err as Error).message}`);
@@ -2636,7 +2646,7 @@ async function handleUri(uri: vscode.Uri): Promise<void> {
 }
 
 async function addFromLink(link: string): Promise<void> {
-  if (!library) return;
+  if (!library) throw new Error("EDGEdeck has no library open, so it could not add the file from Nexus. The EDGEdeck log says why.");
   const page = /nexusmods\.com\/cyberpunk2077\/mods\/(\d+)/i.exec(link);
   if (page) {
     void vscode.window
@@ -2836,6 +2846,16 @@ async function updateAllCommand(ids?: string[]): Promise<void> {
   if (updated.length) offerDeploy(`Updated ${updated.join(", ")}.`);
 }
 
+/**
+ * Where the nxm forwarder sends links: this editor's own exe (the extension host runs as it on the
+ * desktop) and its link scheme. Without a usable exe, the scheme's protocol entry is used.
+ */
+function linkTarget(): LinkTarget {
+  const exe = process.execPath;
+  const usable = /\.exe$/i.test(exe) && !/^node\.exe$/i.test(path.basename(exe)) && fs.existsSync(exe);
+  return { scheme: vscode.env.uriScheme, ...(usable ? { exe } : {}) };
+}
+
 async function nexusHandleLinksCommand(): Promise<void> {
   const before = await currentNxmHandler();
   const who = describeHandler(before);
@@ -2843,8 +2863,10 @@ async function nexusHandleLinksCommand(): Promise<void> {
     const a = await vscode.window.showWarningMessage(`${who} handles Nexus download links right now. Hand them to EDGEdeck? ${who} can take them back from its own settings.`, { modal: true }, "Hand them to EDGEdeck");
     if (!a) return;
   }
-  await registerNxmHandler();
-  log.appendLine(`nxm links: now handled by EDGEdeck (before: ${who})`);
+  await registerNxmHandler(linkTarget());
+  state.nxmHandler = forwarderCommand(linkTarget());
+  void run(() => refreshSetup());
+  log.appendLine(`nxm links: now handled by EDGEdeck (before: ${who}), through ${linkTarget().exe ?? `${vscode.env.uriScheme}://`}`);
   void vscode.window.showInformationMessage("EDGEdeck now handles Nexus download links. On a mod page, press Mod manager download and the file lands in the library.");
 }
 
