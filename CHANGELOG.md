@@ -12,9 +12,13 @@ How to keep it:
 
 ## Unreleased
 
+**Changed**
+
+- **The Set up group offers Handle Nexus download links from the start.** It used to wait until you had signed in to Nexus Mods, so the choice stayed hidden on a new install.
+
 **Fixed**
 
-- **Mod manager download works whichever program holds `vscode://` links.** EDGEdeck's link forwarder now hands Nexus links straight to the editor EDGEdeck runs in, instead of relying on the `vscode://` protocol. Before, a test build of VS Code, VS Code Insiders, Cursor or VSCodium holding that protocol sent the links somewhere else, and the button seemed to do nothing. Existing setups switch over the next time EDGEdeck starts.
+- **Mod manager download works in EDGEkit, and whichever program holds `vscode://` links.** EDGEdeck's link forwarder now hands Nexus links straight to the editor EDGEdeck runs in, with that editor's own link scheme. Before, it always used `vscode://`, so in [EDGEkit](https://edgemodders.github.io/EDGEkit/) the button opened VS Code or nothing, and a test build of VS Code, VS Code Insiders, Cursor or VSCodium holding that protocol sent the links somewhere else. Existing setups switch over the next time EDGEdeck starts.
 - **A Nexus link that arrives while EDGEdeck has no library open says so.** It used to be dropped without a word.
 
 ## 0.29.2 (2026-10-31)

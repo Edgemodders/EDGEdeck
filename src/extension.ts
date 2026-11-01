@@ -330,7 +330,7 @@ async function allSetupSteps(): Promise<(SetupStep & { done: boolean })[]> {
     frameworksStep(),
     { id: "bridge", label: "Get REDbridge", detail: "Sees conflicts inside archives; a 70 MB download", command: "edgedeck.getBridge", done: !!bridgeExe },
     { id: "nexus", label: "Sign in to Nexus Mods", detail: "For updates and downloads from the site", command: "edgedeck.nexusSignIn", done: signedIn },
-    { id: "links", label: "Handle Nexus download links", detail: `Mod manager download buttons go to ${handler} now`, command: "edgedeck.nexusHandleLinks", done: !signedIn || handler === "EDGEdeck" },
+    { id: "links", label: "Handle Nexus download links", detail: `Mod manager download buttons go to ${handler} now`, command: "edgedeck.nexusHandleLinks", done: handler === "EDGEdeck" },
     { id: "vortex", label: "Import from Vortex", detail: `${state.vortexMods} mod${state.vortexMods === 1 ? "" : "s"} in Vortex, none in the library yet`, command: "edgedeck.importVortex", done: !state.vortexMods || !!library?.mods.some((m) => m.source.type === "vortex") },
   ];
 }
