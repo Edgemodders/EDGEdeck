@@ -2327,7 +2327,12 @@ async function renameCommand(mod: ModInfo | undefined): Promise<void> {
 
 async function removeCommand(mod: ModInfo | undefined): Promise<void> {
   if (!mod || !library) return;
-  const a = await vscode.window.showWarningMessage(`Remove ${mod.name} from the library? Its files leave the game on the next deploy.`, { modal: true }, "Remove");
+  // One version of several: name it (and its project folder), so the version going is plain.
+  const others = familyOf(library, mod).mods.length - 1;
+  const where = mod.source.type === "project" && mod.source.path ? ` (${path.dirname(mod.source.path)})` : "";
+  const what = others > 0 ? `version ${mod.version || "without a number"}${where} of ${mod.name}` : mod.name;
+  const keep = others > 0 ? ` The other version${others === 1 ? "" : "s"} stay${others === 1 ? "s" : ""}.` : "";
+  const a = await vscode.window.showWarningMessage(`Remove ${what} from the library?${keep} Its files leave the game on the next deploy.`, { modal: true }, "Remove");
   if (a !== "Remove") return;
   removeMod(library, mod);
   log.appendLine(`Removed ${mod.name}`);
