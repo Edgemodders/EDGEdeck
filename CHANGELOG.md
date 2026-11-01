@@ -12,6 +12,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.29.4 (2026-11-01)
+
 **New**
 
 - **Deploy or undeploy one mod from its row.** The first button in each row's Actions on the EDGEdeck page puts that mod alone in the game (**Deploy**, yellow while its changes wait) or takes it out (**Undeploy**), turning it on or off to match; every other mod's changes keep waiting for the full Deploy. The detail panel has the same button, and the Mods view's right-click menu has **Deploy this mod** and **Undeploy**. See https://edgemodders.github.io/EDGEdeck/guide.html#one-mod-at-a-time
