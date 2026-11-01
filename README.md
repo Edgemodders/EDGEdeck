@@ -57,7 +57,7 @@ Then click the EDGEdeck icon in the activity bar and follow the **Set up** group
 | **Run game** | Starts Cyberpunk 2077 with `-modded`, through Steam for a Steam install and from the exe otherwise. Deploys the changes waiting first. The play button in the Mods view's title bar, or Run game on the EDGEdeck page. |
 | **Rename** | A name of your own for a mod in EDGEdeck, for all its versions and the ones that come later. Right-click a mod, or F2. Files and the game do not change. |
 | **Remove** | Deletes the mod from the library. Deployed files come out on the next deploy. |
-| **Add to REDcode project** | With a REDcode project open, copies a mod's loose files into its `source/resources` under their deploy paths, and an archive's resources, all or a pick, into `source/archive` through REDcode. **Add an archive to the REDcode project...** does the same for any `.archive` file, without adding it to the library. |
+| **Add to REDcode project** | With a REDcode project open, copies a mod's loose files into its `source/resources` under their deploy paths, and an archive's resources, all or a pick, into `source/archive` through REDcode. The same item on an `.archive` in the Explorer does it for any archive, without adding it to the library. |
 | Undo deploy | Removes every file in the manifest and nothing else. |
 
 ## Repository layout

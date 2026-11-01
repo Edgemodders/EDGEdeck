@@ -15,6 +15,7 @@ How to keep it:
 **Changed**
 
 - **The library shows where you look.** The Mods view's header reads `Library: 38 mods · Loadout: Default`, and the EDGEdeck page has **Library** at the right of the loadout row, with the count of mods and versions; clicking it opens the folder. The list is the library: every mod in it, on or off, is kept there. The `edgedeck.libraryPath` setting says so too, and that **Move library...** is the way to change it.
+- **The Explorer's menu item on an `.archive` is now Add to REDcode project**, the same words as on a mod. It used to read "Add an archive to the REDcode project...".
 
 ## 0.29.3 (2026-11-01)
 

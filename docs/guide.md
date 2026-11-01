@@ -57,7 +57,7 @@ The sidebar view is one list in three groups: **Set up** while anything is missi
 
 With a REDcode project open in the workspace (a folder with a `.cpmodproj` file), right-click a mod, a folder or a file and pick **Add to REDcode project**. Loose files, such as scripts, CET Lua, TweakXL YAML, ArchiveXL files and configs, are copied into the project's `source/resources` under their deploy paths, so the packed mod carries them at the same place in the game. A file the project already has with other content is left alone unless you say Replace. For an `.archive` file, EDGEdeck lists what is inside and asks for all of it or a pick; REDcode then extracts those meshes, textures and entities into `source/archive` at their game paths (this needs REDcode 0.6.1 and REDbridge 0.7.1 or newer). Resources the project already has are kept unless you say Replace.
 
-An `.archive` that is not in your library, such as one a contributor sent you, goes in the same way without installing it anywhere: right-click it in VS Code's Explorer and pick **Add an archive to the REDcode project...**, or run that command and pick the file.
+An `.archive` that is not in your library, such as one a contributor sent you, goes in the same way without installing it anywhere: right-click it in VS Code's Explorer and pick **Add to REDcode project**, or run **EDGEdeck: Add to REDcode project** from the Command Palette and pick the file.
 
 Another author's assets are theirs; check the mod's permissions on Nexus before you ship them.
 

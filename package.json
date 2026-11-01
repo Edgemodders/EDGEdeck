@@ -319,7 +319,7 @@
       },
       {
         "command": "edgedeck.addArchiveToProject",
-        "title": "Add an archive to the REDcode project...",
+        "title": "Add to REDcode project",
         "category": "EDGEdeck"
       }
     ],
