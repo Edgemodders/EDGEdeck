@@ -156,7 +156,7 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 | 6 | **Claude Code asks before deploy, undo and remove** | 0.28.0; Claude Code in auto mode | EDGEchat's P1 test again: "deploy my mods" asks before `edgedeck_deploy` runs. The same for `edgedeck_undo` and `edgedeck_remove` |
 | 7 | **Check one mod for an update** | 0.29.0; signed in to Nexus | On the page, the check icon (a circular arrow) shows on mods from Nexus only. On a mod with a newer file: "X 1.2 is on Nexus" with **Update**, which updates it, and the row gets its update icon. On an up-to-date mod: "X is up to date". The daily check of all mods still runs as before |
 | 8 | **Adding REDnode itself** | 0.29.1; again on 0.29.4 (failed on 0.29.3: `.asar`) | Add `REDnode-<version>.zip`: the name offered is **REDnode** (not "Ask mod") and the version is the zip's. No "EPERM, Permission denied" toast after it is added. A zip with one REDnode app (EDGEbuilder) is still named from its manifest |
-| 9 | **EDGEbuilder in its own row** | 0.29.2 | With the TestMod dev build and EDGEbuilder both in the library: two rows, EDGEbuilder and TestMod, and TestMod's version list has no EDGEbuilder in it |
+| 9 | **EDGEbuilder in its own row** | 0.29.2 | A mod that carries a REDnode app among its own files is not that app's version. Numbered steps in [Test 9, step by step](#test-9-step-by-step) |
 | 10 | **The update check counts what the table shows** | 0.29.2; signed in to Nexus | Check updates with older versions kept off in the library: the message names the same mods the table marks (one on 10-31, not 11) and offers **Update all** |
 | 11 | **Update shown** | 0.29.2; two or more updates waiting | On the page, pick the **Update available** chip or type a search: the button reads **Update shown** with the count of mods showing that have an update, and the question lists only those. With nothing narrowing the list it reads **Update all** again. A search with no update showing greys it out |
 | 12 | **A project that drops files** | 0.29.2; a REDcode project in the library | Remove a file from the project and pack again: after a refresh, that file leaves the project's mod (Pending changes says it is removed), and Deploy takes it out of the game |
@@ -171,3 +171,14 @@ Every hand test before 0.27.4 has passed (2026-10-17). New ones go in this table
 3. **Expect:** only TestMod2's files go into the game. The message says how many other changes still wait, and **Show changes** still lists the other mod's change.
 4. **The command line:** turn TestMod2 off, then in a terminal at the EDGEdeck repo run `node bin/edgedeck.mjs --library "e:\Modding\EDGEdek-Staging" deploy --mod testmod2`. The command line does not read VS Code's `edgedeck.libraryPath`, so `--library` names your library; `list` with the same option shows the ids. **Expect:** only TestMod2's change deploys; the other mod's change still waits.
 5. **Clean up:** set the other mod back as it was, and Deploy.
+
+### Test 9, step by step
+
+On 10-29 the TestMod build carried EDGEbuilder's app, so it joined EDGEbuilder's family and hid EDGEbuilder's row. TestMod no longer carries it, so this builds a carrier as a folder mod: nothing to deploy, no project question.
+
+1. Make a folder `E:\Modding\Cyberpunk 2077\Projects\Copies\CarrierTest`.
+2. Copy into it the whole `Projects\TestMod2\packed\mods` folder and the whole `e:\Modding\EDGEdek-Staging\library\edgebuilder-0-5-0\red4ext` folder. CarrierTest now holds `mods\TestMod2\...` and `red4ext\plugins\REDnode\apps\edgebuilder\...`.
+3. On the EDGEdeck page, **+ Add mod > A folder**, and pick `CarrierTest`.
+4. **Expect:** the name offered is **CarrierTest**, not EDGEbuilder. Keep it.
+5. **Expect:** a new **CarrierTest** row with no version list, and the **EDGEbuilder** row still there, its version list 0.3.4, 0.4.0, 0.4.1, 0.5.0 and no CarrierTest.
+6. **Clean up, without deploying:** remove the CarrierTest row (its remove icon) and delete `Projects\Copies\CarrierTest`.
