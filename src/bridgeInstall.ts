@@ -3,7 +3,7 @@
 // REDbridge is GPL-3.0 and lives in its own repository; EDGEdeck only downloads it.
 
 import { execFile } from "node:child_process";
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as os from "node:os";
 import * as path from "node:path";
 import { extractArchive, removeTemp } from "./extract";

@@ -8,10 +8,11 @@ import * as path from "node:path";
 
 const watch = process.argv.includes("--watch");
 
-const common = { bundle: true, platform: "node", format: "cjs", target: "node18", sourcemap: true, logLevel: "info" };
-const extension = { ...common, entryPoints: ["src/extension.ts"], outfile: "dist/extension.js", external: ["vscode"] };
+// original-fs is Electron's own (src/fsx.ts): required at run time, where it exists.
+const common = { bundle: true, platform: "node", format: "cjs", target: "node18", sourcemap: true, logLevel: "info", external: ["original-fs"] };
+const extension = { ...common, entryPoints: ["src/extension.ts"], outfile: "dist/extension.js", external: ["vscode", "original-fs"] };
 const core = { ...common, entryPoints: ["src/core.ts"], outfile: "dist/core.js" };
-const uiTest = { ...common, entryPoints: ["src/uiTest.ts"], outfile: "dist/uiTest.js", external: ["vscode"] };
+const uiTest = { ...common, entryPoints: ["src/uiTest.ts"], outfile: "dist/uiTest.js", external: ["vscode", "original-fs"] };
 // The MCP server ships in the .vsix with the SDK bundled in, so it runs from any Node without node_modules.
 const mcp = { ...common, entryPoints: ["src/mcp.ts"], outfile: "dist/mcp.js" };
 

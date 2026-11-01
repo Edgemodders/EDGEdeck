@@ -2,7 +2,7 @@
 // folder, already laid out like the game folder, and names folders from Nexus
 // "<name>-<modId>-<version>-<timestamp>". Its deployment manifest says which ones are deployed.
 
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 import { classify } from "./classifier";
 import { addMod, type Library, type ModInfo } from "./library";

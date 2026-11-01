@@ -1,7 +1,7 @@
 // Facts about the game install: its version, read from the executable's version resource.
 
 import { execFile, execFileSync } from "node:child_process";
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 import { promisify } from "node:util";
 

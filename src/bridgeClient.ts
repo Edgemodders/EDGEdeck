@@ -3,7 +3,7 @@
 // and lives in its own repository; the only contract with it is this protocol.
 
 import { spawn, type ChildProcess } from "node:child_process";
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 import * as readline from "node:readline";
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter, type MessageConnection } from "vscode-jsonrpc/node";

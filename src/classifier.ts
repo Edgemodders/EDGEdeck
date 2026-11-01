@@ -2,7 +2,7 @@
 // path under the game folder. Files it cannot place are listed, never rejected, and a folder that
 // looks like a set of options ("Option A", "Option B") is returned as a choice for the user.
 
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 import type { ModKind } from "./library";
 

@@ -1,7 +1,7 @@
 // Sizes: how much disk each mod, folder and file takes in the library, and the library's totals.
 // Deployed hardlinks cost nothing extra; the kept downloads do, so they are reported apart.
 
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 import { backupFolder, downloadsFolder, modFolder, type Library, type ModInfo } from "./library";
 

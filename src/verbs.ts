@@ -2,7 +2,7 @@
 // Each verb returns a JSON-able result and a one-line text for humans, so the two front ends
 // stay identical and an assistant sees exactly what a script would.
 
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as os from "node:os";
 import * as path from "node:path";
 import { classify, rednodeManifest } from "./classifier";

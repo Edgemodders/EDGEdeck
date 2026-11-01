@@ -2,7 +2,7 @@
 // manifest, and undoes exactly that. Never touches a file it did not put there; a file that was
 // already in the way is moved to the library's backup folder and comes back on undo.
 
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 import { isGameFolder } from "./game";
 import { backupFolder, sourcePath, type Library, type ModInfo } from "./library";

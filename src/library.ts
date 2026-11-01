@@ -2,7 +2,7 @@
 // and library.json at the root. Everything EDGEdeck knows is in these files, so a person or an
 // assistant can read the state without the UI.
 
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { Placement } from "./classifier";

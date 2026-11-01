@@ -4,11 +4,32 @@
 
 import * as assert from "node:assert/strict";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { classify } from "./classifier";
+import { removeTemp } from "./extract";
+import fsx, { electronFs } from "./fsx";
 import { nxmFromQuery } from "./nxm";
 
 export async function run(): Promise<void> {
+  // A .asar file in a mod (REDnode's host has resources\app.asar): Electron's node:fs reads it as a
+  // folder, so a copy failed ("ENOENT, not found in ...app.asar") and so did removing the temp folder
+  // (EPERM). EDGEdeck's fs, here in the real extension host, treats it as the file it is.
+  {
+    assert.ok(electronFs, "the extension host has original-fs");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "edgedeck-asar-"));
+    const asar = path.join(dir, "red4ext", "plugins", "REDnode", "host", "resources", "app.asar");
+    fsx.mkdirSync(path.dirname(asar), { recursive: true });
+    fsx.writeFileSync(asar, "not a real asar");
+    const c = classify(dir, "REDnode");
+    assert.ok(c.placements.some((p) => p.to === "red4ext/plugins/REDnode/host/resources/app.asar"), `classified: ${JSON.stringify(c.placements.map((p) => p.to))}`);
+    fsx.copyFileSync(asar, path.join(dir, "copy.asar"));
+    assert.equal(fsx.statSync(path.join(dir, "copy.asar")).size, "not a real asar".length);
+    assert.equal(removeTemp(dir), undefined, "the folder holding a .asar is removed");
+    assert.ok(!fsx.existsSync(dir));
+  }
+
   // An nxm link through VS Code's own Uri, as the forwarder sends it: every parameter comes back.
   const link = "nxm://cyberpunk2077/mods/35393/files/166705?key=a-b_c&expires=1760000000&user_id=42";
   const uri = vscode.Uri.parse(`vscode://edgemodders.edgedeck/nxm?url=${encodeURIComponent(link)}`);

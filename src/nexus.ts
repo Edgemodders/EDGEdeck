@@ -4,7 +4,7 @@
 // https://help.nexusmods.com/article/114-api-acceptable-use-policy
 
 import * as crypto from "node:crypto";
-import * as fs from "node:fs";
+import fs from "./fsx";
 
 export const NexusGame = "cyberpunk2077";
 export const NexusApi = "https://api.nexusmods.com/v1";

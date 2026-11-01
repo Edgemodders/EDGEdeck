@@ -3,7 +3,7 @@
 // project remembers it and is re-synced when the project is packed again.
 
 import { createHash } from "node:crypto";
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 import { classify, type Classification } from "./classifier";
 import { activateVersion, baseName, familyKey, familyOf, takeFamilyName } from "./families";

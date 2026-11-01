@@ -3,7 +3,7 @@
 // panel, and the archive conflict scan through REDbridge when it is available.
 
 import { spawn } from "node:child_process";
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
@@ -672,7 +672,7 @@ async function mcpSetupCommand(): Promise<void> {
 
 // ---- watching: pick up what an assistant or the command line changed ---------------------------
 
-let watchers: fs.FSWatcher[] = [];
+let watchers: import("node:fs").FSWatcher[] = [];
 let watchTimer: NodeJS.Timeout | undefined;
 let seenManifestTime: string | undefined;
 

@@ -2,7 +2,7 @@
 // file by file before the old folder goes. The usual reason is the game's drive, where deploy can use
 // hardlinks; the next deploy switches the game's files over (deployMethod in deploy.ts).
 
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 
 export interface MoveProgress {

@@ -23,6 +23,7 @@ How to keep it:
 
 **Fixed**
 
+- **Mods with a `.asar` file add, deploy and size correctly.** Inside VS Code, every `.asar` file was read as a folder, so adding REDnode (whose host has `resources\app.asar`) failed with "ENOENT, not found in ...app.asar", and the temporary folder could not be removed (EPERM). EDGEdeck now handles them as the files they are.
 - **Removing one version of a mod says which one.** The question names the version, and the project folder for a mod built from a project, and says the other versions stay. It used to name only the mod.
 
 ## 0.29.3 (2026-11-01)

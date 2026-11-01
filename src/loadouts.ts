@@ -4,7 +4,7 @@
 // touching the game. The library, sections and load order are shared by every loadout. A loadout is
 // one JSON file in the library's loadouts folder, so it can be exported, shared and imported.
 
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 import { families, familyKey, type Family } from "./families";
 import { saveLibrary, saveMod, type Library, type ModInfo } from "./library";

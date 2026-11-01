@@ -3,7 +3,7 @@
 // enabled mod is a REDmod package, in list order.
 
 import { execFile } from "node:child_process";
-import * as fs from "node:fs";
+import fs from "./fsx";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import { readManifest } from "./deploy";
