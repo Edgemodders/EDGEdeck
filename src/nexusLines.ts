@@ -104,9 +104,17 @@ export function splitLines(files: NexusFiles, entries: LineFile[]): number[] {
   return entries.map((_, i) => line.get(find(i))!);
 }
 
-/** A line's name: the page's name, then the file's name without its version, unless that already starts with the page's. */
+/** A Nexus file's name without its version or a list number in front: "2. UV HQ Arms 1.1" is "UV HQ Arms". */
+export function fileLabel(title: string): string {
+  return title
+    .replace(/^\s*\d+[.)]\s+/, "")
+    .replace(/[\s_-]*\bv?\d+(?:\.\d+)+[a-z0-9]*\b/gi, "")
+    .trim();
+}
+
+/** A line's name: the page's name, then the file's label, unless that already starts with the page's name. */
 export function lineName(page: string, title?: string): string {
-  const t = (title ?? "").replace(/[\s_-]*\bv?\d+(?:\.\d+)+[a-z0-9]*\b/gi, "").trim();
+  const t = fileLabel(title ?? "");
   if (!t || baseName(t) === baseName(page)) return page;
   return baseName(t).startsWith(baseName(page)) ? t : `${page}: ${t}`;
 }

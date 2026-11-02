@@ -7,6 +7,7 @@ export * from "./deploy";
 export * from "./extract";
 export * from "./families";
 export * from "./nexusLines";
+export * from "./pageGroups";
 export * from "./frameworks";
 export * from "./frameworkGet";
 export * from "./game";

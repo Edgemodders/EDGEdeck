@@ -100,7 +100,13 @@ A game patch is the usual reason a modded game stops starting. EDGEdeck records 
 
 **Versions.** A mod has one row however many versions are in the library. The newest, or the one that is on, stands for it; the others wait in the version dropdown and in **Switch version...**. Downloading a version already in the library does nothing twice.
 
-**Several files from one Nexus page.** Some pages offer more than one file: two main files to pick from, or an optional patch beside the main file. Each file you download is a mod of its own, named after the page and the file (`Cool Mod: Main File - Female`), with its own versions and updates. EDGEdeck knows a newer version of a file by the author marking it as an update on Nexus, or by its name without the version.
+**Several files from one Nexus page.** Some pages offer more than one file: two main files to pick from, or an optional patch beside the main file. Each file you download is a mod of its own, with its own versions, updates and on/off box. Once two or more files of a page are in the library, they sit under one row named after the page:
+
+- **The page's box** turns every file off and remembers which were on. Ticking it again turns those back on, or all of them if none were remembered. It shows a dash while only some are on.
+- **The page's row** has Move up, Move down, Section, Check for updates and Open on Nexus for all its files at once. Drag it to move them all. Its arrow folds the files away.
+- **Each file's row** works like any mod's. Its Move up and Move down, and dragging it, change its place among the page's other files; it does not leave the page's row. A file's section button moves the whole page.
+
+EDGEdeck knows a newer version of a file by the author marking it as an update on Nexus, or by its name without the version. Files an earlier EDGEdeck took for versions of one another are split apart at the next update check or download from that page.
 
 ## 6. Deploying
 

@@ -633,6 +633,102 @@ console.log("changes: ok");
   console.log("sections: ok");
 }
 
+// Page groups: two files of one Nexus page (here -KS- UV Texture Framework, mod 3783, as its page
+// had them on 2026-11-02) under one parent row. The group keeps together in the order, sits in one
+// section, moves as one; its files move only among themselves; the box remembers what was on.
+{
+  const before = [...lib.info.order];
+  const f = (file_id, name, version, category_name, t) => ({ file_id, name, version, category_name, is_primary: false, uploaded_timestamp: t, file_name: `${file_id}.zip`, size_kb: 1 });
+  const uv = { files: [
+    f(79361, "2. UV Framework 3.2.1 Classic install", "3.2.1", "OLD_VERSION", 1),
+    f(81119, "UV4 Prelim Release (Supports ALL female bodies)", "4.0", "OLD_VERSION", 2),
+    f(116256, "1. UV Framework 4.1", "4.1", "OLD_VERSION", 3),
+    f(116258, "2. (OPTIONAL) UV HQ Arms", "1.0", "ARCHIVED", 4),
+    f(116264, "2. (OPTIONAL) UV HQ Arms", "1.1", "MAIN", 5),
+    f(116788, "1. UV Framework 4.1", "4.1", "MAIN", 6),
+    f(27051, "Nanarc's Arm Tattoo Overlays", "1.0", "OPTIONAL", 0),
+  ], file_updates: [[79361, 116256], [116256, 116263], [116263, 116268], [116268, 116788], [116258, 116264]].map(([o, n]) => ({ old_file_id: o, new_file_id: n, new_file_name: "", uploaded_timestamp: 0 })) };
+  assert.equal(core.lineFor(uv, { fileId: 116264 }, [[{ fileId: 116788 }]]), undefined, "HQ Arms is a mod of its own");
+  assert.equal(core.lineFor(uv, { fileId: 116788 }, [[{ fileId: 81119 }]]), 0, "4.1 follows the retired 4.0 prelim");
+  assert.equal(core.newestInLine(uv, { fileId: 79361 }).file_id, 116788, "Classic install 3.2.1 became UV Framework 4.1");
+  assert.equal(core.newestInLine(uv, { fileId: 116258 }).file_id, 116264);
+  assert.equal(core.newestInLine(uv, { fileId: 27051 }).file_id, 27051);
+  assert.equal(core.fileLabel("2. (OPTIONAL) UV HQ Arms"), "(OPTIONAL) UV HQ Arms");
+  assert.equal(core.lineName("-KS- UV Texture Framework", "2. (OPTIONAL) UV HQ Arms"), "-KS- UV Texture Framework: (OPTIONAL) UV HQ Arms");
+
+  const page = "-KS- UV Texture Framework";
+  const nexus = { name: page, version: "4.1", latestVersion: "", latestFileId: 0, latestFileName: "", checked: "2026-11-02T00:00:00Z" };
+  const add = (name, version, fileId, fileTitle, family) => {
+    const m = core.addMod(lib, cls("bare", "Fam").placements, { name, version, source: { type: "nexus", modId: 3783, fileId, fileTitle } });
+    m.nexus = nexus;
+    if (family) m.family = family;
+    core.saveMod(lib, m);
+    return m;
+  };
+  const fw = add(page, "4.1", 116788, "1. UV Framework 4.1");
+  const between = core.addMod(lib, cls("bare", "Fam").placements, { name: "Between", version: "1.0", source: { type: "folder" } });
+  const arms = add(`${page}: (OPTIONAL) UV HQ Arms`, "1.1", 116264, "2. (OPTIONAL) UV HQ Arms", "nexus:3783:116258");
+  const groups = () => core.pageGroups(core.families(lib));
+  assert.equal(groups().length, 1);
+  const g = groups()[0];
+  assert.equal(g.key, "page:3783");
+  assert.equal(g.name, page);
+  assert.deepEqual(g.families.map((x) => core.childName(g, x)), ["UV Framework", "(OPTIONAL) UV HQ Arms"]);
+  assert.ok(core.gatherGroups(lib), "the order changes");
+  const at = (m) => lib.info.order.indexOf(m.id);
+  assert.deepEqual([at(arms) - at(fw), at(between) - at(arms)], [1, 1], "the page's files together, the other mod below them");
+  assert.equal(core.gatherGroups(lib), false, "once");
+  const mods = () => core.sectionsOf(lib).find((s) => s.name === "Mods");
+  assert.deepEqual(mods().groups.map((x) => x.key), ["page:3783"]);
+
+  // The box: off and remember, then back on with what was on.
+  const fam = (m) => core.families(lib).find((x) => x.key === core.familyKey(m));
+  let choice = core.groupToggle(lib, groups()[0]);
+  assert.deepEqual([choice.on, choice.families.length], [false, 2]);
+  core.setFamiliesOn(lib, choice.families, false);
+  assert.ok(!fw.enabled && !arms.enabled);
+  assert.equal(core.groupState(groups()[0]), "none");
+  choice = core.groupToggle(lib, groups()[0]);
+  assert.deepEqual([choice.on, choice.families.map((x) => x.key).sort()], [true, [core.familyKey(fw), core.familyKey(arms)].sort()], "both were on");
+  core.setFamiliesOn(lib, [fam(arms)], true);
+  assert.equal(core.groupState(groups()[0]), "some");
+  core.setFamiliesOn(lib, core.groupToggle(lib, groups()[0]).families, false);
+  choice = core.groupToggle(lib, groups()[0]);
+  assert.deepEqual(choice.families.map((x) => x.key), [core.familyKey(arms)], "only the one that was on");
+  core.setFamiliesOn(lib, choice.families, true);
+  assert.ok(arms.enabled && !fw.enabled);
+
+  // One section for the group; its files move among themselves; other mods move past the whole group.
+  core.addSection(lib, "Bodies");
+  core.putInSection(lib, arms, "Bodies");
+  assert.deepEqual([lib.info.sectionOf[core.familyKey(fw)], lib.info.sectionOf[core.familyKey(arms)]], ["Bodies", "Bodies"], "the whole group");
+  const bodies = () => core.sectionsOf(lib).find((s) => s.name === "Bodies");
+  assert.ok(core.moveInSection(lib, arms, -1), "a file moves up past the other");
+  assert.ok(at(arms) < at(fw));
+  assert.equal(core.moveInSection(lib, arms, -1), false, "not out of its group");
+  core.putInSection(lib, between, "Bodies");
+  assert.deepEqual(bodies().families.map((x) => x.active.id), [arms.id, fw.id, between.id]);
+  assert.ok(core.moveInSection(lib, between, -1), "the other mod moves up past the whole group");
+  assert.deepEqual(bodies().families.map((x) => x.active.id), [between.id, arms.id, fw.id]);
+  assert.ok(core.moveGroupInSection(lib, "page:3783", -1), "the group moves up as one");
+  assert.deepEqual(bodies().families.map((x) => x.active.id), [arms.id, fw.id, between.id]);
+  core.placeNextTo(lib, between, arms, true);
+  assert.deepEqual(bodies().families.map((x) => x.active.id), [arms.id, fw.id, between.id], "dropped on a file: below the whole group");
+  core.placeNextTo(lib, fw, between, true);
+  assert.equal(at(fw), at(arms) + 1, "a file does not leave its group");
+  core.placeNextTo(lib, fw, arms, false);
+  assert.ok(at(fw) < at(arms), "but trades places within it");
+  core.placeGroupNextTo(lib, "page:3783", between, true);
+  assert.deepEqual(bodies().families.map((x) => x.active.id), [between.id, fw.id, arms.id], "the group below the other mod");
+
+  core.deleteSection(lib, "Bodies");
+  delete lib.info.groupOn;
+  for (const m of [fw, arms, between]) core.removeMod(lib, m);
+  lib.info.order = before;
+  core.saveLibrary(lib);
+  console.log("page groups: ok");
+}
+
 // Loadouts: save the current set, change things, load it back.
 {
   const file = core.saveLoadout(lib, "smoke", "2.31");

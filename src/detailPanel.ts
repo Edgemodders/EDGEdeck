@@ -19,6 +19,8 @@ export interface DetailData {
   update?: string;
   /** This mod's versions in the library, newest first. */
   versions: { id: string; version: string; enabled: boolean }[];
+  /** The Nexus page group this mod is a file of: the page's name and every file of it in the library (pageGroups.ts). */
+  page?: { name: string; files: { id: string; name: string; enabled: boolean }[] };
   /** Bytes per file and in all. */
   size: { total: number; files: Map<string, number> };
 }
@@ -96,6 +98,12 @@ function render(d: DetailData, csp: string): string {
   const source = mod.source.type === "github" ? `GitHub release ${esc(mod.source.path ?? "")}${mod.source.modId ? ` (Nexus mod ${mod.source.modId})` : ""}` : mod.source.type === "nexus" ? `Nexus mod ${mod.source.modId}` : mod.source.type === "vortex" ? `imported from Vortex${mod.source.modId ? ` (Nexus mod ${mod.source.modId})` : ""}` : mod.source.path ? `${mod.source.type}: ${esc(mod.source.path)}` : mod.source.type;
   const update = d.update;
   const versionsLine = d.versions.length > 1 ? `<div class="dim">Versions in the library: ${d.versions.map((v) => (v.id === mod.id ? `<b>${esc(v.version)}</b> (this one)` : `${esc(v.version)}${v.enabled ? " (on)" : ""}`)).join(", ")}. Pick one from the version list on the EDGEdeck page.</div>` : "";
+  const pageLine = d.page
+    ? `<div class="dim">One of ${d.page.files.length} files from the Nexus page ${esc(d.page.name)}${mod.source.fileTitle ? ` (on Nexus: ${esc(mod.source.fileTitle)})` : ""}. The others: ${d.page.files
+        .filter((f) => f.id !== mod.id)
+        .map((f) => `${esc(f.name)}${f.enabled ? " (on)" : ""}`)
+        .join(", ")}. Each is a mod of its own; the page's box on the EDGEdeck page turns them all off or back on.</div>`
+    : "";
   const nexusLine = mod.source.modId
     ? `<div class="dim">Nexus mod ${mod.source.modId}${mod.nexus?.author ? ` by ${esc(mod.nexus.author)}` : ""}${mod.nexus?.checked ? `, checked ${esc(mod.nexus.checked.slice(0, 10))}` : ""}. ${update ? `<span class="warn">Version ${esc(update)} is on Nexus.</span>` : mod.nexus ? "Up to date." : "Not checked yet."}</div>${mod.nexus?.summary ? `<p class="dim">${esc(mod.nexus.summary)}</p>` : ""}`
     : "";
@@ -132,6 +140,7 @@ details { margin: 4px 0; } summary { cursor: pointer; } ul { margin: 4px 0 8px 1
 <div class="meta">${[...mod.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="chip ${k === "framework" ? "on" : ""}">${k}</span>`).join("")}<span class="chip">${mod.files.length} files</span><span class="chip">${fmt(d.size.total)}</span><span class="chip ${mod.enabled ? "on" : ""}">${mod.enabled ? "on" : "off"}</span></div>
 <div class="dim">${source}. Added ${esc(mod.added.slice(0, 10))}.</div>
 ${versionsLine}
+${pageLine}
 ${nexusLine}
 <div class="bar">
   <button data-action="toggle">${mod.enabled ? "Turn off" : "Turn on"}</button>

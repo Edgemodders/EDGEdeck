@@ -25,13 +25,29 @@ export interface PageRow {
   nexusId?: number;
   /** What the row's Deploy/Undeploy button does; none while the page shows another loadout. */
   oneMod?: "deploy" | "undeploy";
+  /** The page group this row is a file of (`page:<Nexus id>`); its name is then the file's. */
+  group?: string;
+}
+
+/** A Nexus page with two or more of its files in the library: the parent row over them. */
+export interface PageGroupRow {
+  key: string;
+  name: string;
+  nexusId: number;
+  /** Files on (in the loadout the page shows), of how many. */
+  on: number;
+  files: number;
+  /** Whether the box turns back on the files that were on, rather than every file. */
+  remembered: boolean;
 }
 
 export interface PageSection {
   name: string;
   /** A section of the user's own: it can be renamed, moved and deleted. */
   user: boolean;
+  /** A group's rows follow each other, where its first file sits. */
   rows: PageRow[];
+  groups: PageGroupRow[];
 }
 
 export interface PageData {
@@ -70,7 +86,10 @@ export interface PageMessage {
   action:
     | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate" | "deployOne"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
-    | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport";
+    | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport"
+    | "groupOn" | "groupMove" | "groupSection" | "groupNexus" | "groupCheck" | "placeGroup";
+  /** The page group a group action is about. */
+  group?: string;
   /** loadoutView: the loadout to show. */
   loadout?: string;
   id?: string;
@@ -78,7 +97,7 @@ export interface PageMessage {
   section?: string;
   /** sectionOn: on or off. fold: folded shut or open. */
   on?: boolean;
-  /** moveSection: up or down. */
+  /** moveSection, groupMove: up or down. */
   delta?: -1 | 1;
   /** sectionMoveMods, sectionRemoveMods: the mods shown in the section when the button was pressed. */
   ids?: string[];
@@ -172,6 +191,7 @@ export function renderPage(d: PageData, csp: string): string {
     .map(([k, label]) => `<button class="chip" data-facet="${k}">${label} <b>${counts.get(k) ?? 0}</b></button>`)
     .join("");
 
+  const groupName = new Map(d.sections.flatMap((s) => s.groups.map((g) => [g.key, g.name] as const)));
   const row = (r: PageRow, section: string, first: boolean, last: boolean) => {
     const statusClass = r.changed || r.conflicts ? "warn" : r.needsDeploy ? "pend" : r.deployed && r.enabled ? "ok" : "dim";
     const oneTitle =
@@ -185,9 +205,9 @@ export function renderPage(d: PageData, csp: string): string {
     const buttons = [
       { m: { action: "deployOne", id: r.id }, icon: r.oneMod ?? "deploy", title: r.oneMod ? oneTitle : "", cls: r.oneMod ? `one ${r.oneMod}${r.oneMod === "deploy" && r.enabled && r.needsDeploy ? " upd" : ""}` : "blank" },
       { m: { action: "details", id: r.id }, icon: "details", title: "Details" },
-      { m: { action: "moveUp", id: r.id }, icon: "up", title: "Move up: wins conflicts against the mod above", off: first },
+      { m: { action: "moveUp", id: r.id }, icon: "up", title: r.group ? "Move up: wins conflicts against the file above" : "Move up: wins conflicts against the mod above", off: first },
       { m: { action: "moveDown", id: r.id }, icon: "down", title: "Move down", off: last },
-      { m: { action: "pickSection", id: r.id }, icon: "section", title: "Put in a section" },
+      { m: { action: "pickSection", id: r.id }, icon: "section", title: r.group ? "Put this page's files in a section" : "Put in a section" },
       { m: { action: "open", id: r.id }, icon: "folder", title: "Open its library folder" },
       // A mod without an update or not from Nexus keeps a blank slot, so the icons line up down the column.
       { m: { action: "checkUpdate", id: r.id }, icon: "check", title: r.nexusId ? "Check Nexus for a newer file of this mod" : "", cls: r.nexusId ? "" : "blank" },
@@ -195,7 +215,7 @@ export function renderPage(d: PageData, csp: string): string {
       { m: { action: "nexus", id: r.id }, icon: "nexus", title: "Open on Nexus", cls: r.nexusId ? "" : "blank" },
       { m: { action: "remove", id: r.id }, icon: "remove", title: r.versions.length > 1 ? `Remove version ${r.version} from the library` : "Remove from the library", cls: "danger" },
     ] as { m: PageMessage; icon: string; title: string; off?: boolean; cls?: string }[];
-    const text = `${r.name} ${r.versions.map((v) => v.version).join(" ")} ${r.kinds.join(" ")} ${r.status}`.toLowerCase();
+    const text = `${r.group ? `${groupName.get(r.group) ?? ""} ` : ""}${r.name} ${r.versions.map((v) => v.version).join(" ")} ${r.kinds.join(" ")} ${r.status}`.toLowerCase();
     // The version cell: a dropdown when there is anything to choose, the version alone otherwise.
     const versionCell =
       r.versions.length > 1 || r.update
@@ -203,9 +223,9 @@ export function renderPage(d: PageData, csp: string): string {
             .map((v) => `<option value='${msg({ action: "activate", id: v.id })}' ${v.active ? "selected" : ""}>${esc(v.version || "(no version)")}</option>`)
             .join("")}${r.update ? `<option value='${msg({ action: "update", id: r.id })}' class="get">Get ${esc(r.update)} from Nexus</option>` : ""}</select>`
         : `<span class="mono">${esc(r.version)}</span>`;
-    return `<tr draggable="true" data-id="${esc(r.id)}" data-group="${esc(section)}" data-facets="${facetsOf(r).join(" ")}" data-text="${esc(text)}" data-size="${r.size}" class="${r.enabled ? "" : "offrow"}">
+    return `<tr draggable="true" data-id="${esc(r.id)}" data-group="${esc(section)}"${r.group ? ` data-pg="${esc(r.group)}"` : ""} data-facets="${facetsOf(r).join(" ")}" data-text="${esc(text)}" data-size="${r.size}" class="${r.enabled ? "" : "offrow"}">
 <td class="chk"><input type="checkbox" ${r.enabled ? "checked" : ""} data-msg='${msg({ action: "toggle", id: r.id })}' title="${r.enabled ? "Turn off" : "Turn on"}"></td>
-<td class="name"><a data-msg='${msg({ action: "details", id: r.id })}'>${esc(r.name)}</a></td>
+<td class="name${r.group ? " child" : ""}"><a data-msg='${msg({ action: "details", id: r.id })}'>${esc(r.name)}</a></td>
 <td class="vercell">${versionCell}</td>
 <td>${[...r.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>
 <td class="mono size" data-size="${r.size}" title="${r.size.toLocaleString()} bytes in the library">${fmt(r.size)}</td>
@@ -242,8 +262,55 @@ export function renderPage(d: PageData, csp: string): string {
       : "";
     return `<tr class="group ${d.collapsed.includes(s.name) ? "folded" : ""}" data-groupfor="${esc(s.name)}"><td class="chk">${box}</td><td colspan="6"><div class="gline"><button class="fold" data-fold="${esc(s.name)}" aria-expanded="${d.collapsed.includes(s.name) ? "false" : "true"}" title="Fold or unfold ${esc(s.name)}">${icon("fold")}<span class="glabel">${esc(s.name)}</span></button> <span class="dim">${s.rows.length}, ${n} on, ${fmt(s.rows.reduce((t, r) => t + r.size, 0))}</span>${note(s)}<span class="spacer"></span>${bulk}${tools ? `<span class="gsep"></span>${tools}` : ""}</div></td></tr>`;
   };
+  // A page group's own row: its box, its name, and buttons in the same slots as a mod row's.
+  const pageGroupRow = (g: PageGroupRow, rows: PageRow[], section: string, first: boolean, last: boolean) => {
+    const some = g.on > 0 && g.on < g.files;
+    const title = g.on
+      ? `Turn off every file of ${g.name}; ticking it again turns ${g.on === 1 ? "this one" : `these ${g.on}`} back on`
+      : g.remembered
+        ? `Turn on the files of ${g.name} that were on last time`
+        : `Turn on every file of ${g.name}`;
+    const blank = { m: { action: "details" }, icon: "details", title: "", cls: "blank" };
+    const buttons = [
+      blank,
+      blank,
+      { m: { action: "groupMove", group: g.key, delta: -1 }, icon: "up", title: "Move this page's files up together", off: first },
+      { m: { action: "groupMove", group: g.key, delta: 1 }, icon: "down", title: "Move this page's files down together", off: last },
+      { m: { action: "groupSection", group: g.key }, icon: "section", title: "Put this page's files in a section" },
+      blank,
+      { m: { action: "groupCheck", group: g.key }, icon: "check", title: "Check Nexus for newer versions of these files" },
+      blank,
+      { m: { action: "groupNexus", group: g.key }, icon: "nexus", title: "Open the page on Nexus" },
+      blank,
+    ] as { m: PageMessage; icon: string; title: string; off?: boolean; cls?: string }[];
+    const folded = d.collapsed.includes(g.key);
+    const size = fmt(rows.reduce((t, r) => t + r.size, 0));
+    return `<tr class="pghead ${folded ? "folded" : ""} ${g.on ? "" : "offrow"}" draggable="true" data-pg="${esc(g.key)}" data-group="${esc(section)}">
+<td class="chk"><input type="checkbox" class="pgall" data-pg="${esc(g.key)}" ${g.on ? "checked" : ""} data-some="${some ? 1 : 0}" title="${esc(title)}"></td>
+<td colspan="5"><div class="gline"><button class="fold pgfold" data-fold="${esc(g.key)}" aria-expanded="${folded ? "false" : "true"}" title="Fold or unfold the files of ${esc(g.name)}">${icon("fold")}<span class="pglabel">${esc(g.name)}</span></button> <span class="dim">${g.files} files from one Nexus page, ${g.on} on, ${size}</span></div></td>
+<td class="acts">${buttons.map((b) => `<button class="ico ${b.cls ?? ""}" data-msg='${msg(b.m)}' title="${esc(b.title)}" aria-label="${esc(b.title)}" ${b.off ? "disabled" : ""}>${icon(b.icon)}</button>`).join("")}</td>
+</tr>`;
+  };
+  // A section's rows by what moves as one: a mod, or a group's row with its files under it.
+  const sectionBody = (s: PageSection) => {
+    const units: PageRow[][] = [];
+    for (const r of s.rows) {
+      const prev = units[units.length - 1];
+      if (r.group && prev && prev[0].group === r.group) prev.push(r);
+      else units.push([r]);
+    }
+    return units
+      .map((u, ui) => {
+        const g = u[0].group ? s.groups.find((x) => x.key === u[0].group) : undefined;
+        const first = ui === 0;
+        const last = ui === units.length - 1;
+        if (!g) return row(u[0], s.name, first, last);
+        return pageGroupRow(g, u, s.name, first, last) + u.map((r, i) => row(r, s.name, i === 0, i === u.length - 1)).join("");
+      })
+      .join("");
+  };
   const body = d.sections
-    .map((s) => groupRow(s) + (s.rows.length ? s.rows.map((r, i) => row(r, s.name, i === 0, i === s.rows.length - 1)).join("") : `<tr class="hint" data-hintfor="${esc(s.name)}"><td></td><td colspan="6">Empty. Drag mods here, or use a mod's section button.</td></tr>`))
+    .map((s) => groupRow(s) + (s.rows.length ? sectionBody(s) : `<tr class="hint" data-hintfor="${esc(s.name)}"><td></td><td colspan="6">Empty. Drag mods here, or use a mod's section button.</td></tr>`))
     .join("");
 
   return `<!doctype html><html><head><meta charset="utf-8">
@@ -305,6 +372,9 @@ button.fold svg { width: 14px; height: 14px; fill: none; stroke: currentColor; s
 button.fold:hover, button.fold:hover .glabel { color: var(--yellow); }
 tr.folded button.fold svg { transform: rotate(-90deg); }
 tr.hint td { color: var(--dim); font-style: italic; font-size: 12px; }
+tr.pghead button.fold { color: var(--fg); } tr.pghead .pglabel { font-weight: 600; } tr.pghead.offrow .pglabel { color: var(--dim); } tr.pghead button.fold:hover .pglabel { color: var(--yellow); }
+td.name.child { padding-left: 30px; position: relative; }
+td.name.child::before { content: ""; position: absolute; left: 14px; top: 0; bottom: 50%; width: 9px; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 tr[draggable] { cursor: grab; } tr.dragging { opacity: .4; }
 tr.dropabove td { box-shadow: inset 0 2px 0 var(--yellow); } tr.dropbelow td { box-shadow: inset 0 -2px 0 var(--yellow); }
 tr.group.dropin td, tr.hint.dropin td { background: color-mix(in srgb, var(--yellow) 12%, transparent); }
@@ -388,7 +458,7 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
     if (!tbody) return;
     if (state.bySize) {
       const rs = [...tbody.querySelectorAll("tr[data-size]")].sort((a, b) => Number(b.dataset.size) - Number(a.dataset.size));
-      for (const g of tbody.querySelectorAll("tr.group")) g.remove();
+      for (const g of tbody.querySelectorAll("tr.group, tr.pghead")) g.remove();
       for (const r of rs) tbody.appendChild(r);
     } else {
       tbody.replaceChildren(...original);
@@ -398,6 +468,7 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
   const q = document.getElementById("q");
   const rows = [...document.querySelectorAll("tr[data-facets]")];
   const groups = [...document.querySelectorAll("tr.group")];
+  const pgs = [...document.querySelectorAll("tr.pghead")];
   // Folded sections show only their header; a search or a filter opens them while it lasts.
   const folded = new Set(${JSON.stringify(d.collapsed).replace(/</g, "\\u003c")});
   function apply() {
@@ -408,7 +479,12 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
       r.dataset.match = ok ? "1" : ""; if (ok) shown++;
     }
     const filtering = !!needle || state.facet !== "all";
-    for (const r of rows) r.hidden = !r.dataset.match || (!filtering && !state.bySize && folded.has(r.dataset.group));
+    for (const r of rows) r.hidden = !r.dataset.match || (!filtering && !state.bySize && (folded.has(r.dataset.group) || (!!r.dataset.pg && folded.has(r.dataset.pg))));
+    // A page group's row shows while any of its files does, and folds like a section.
+    for (const p of pgs) {
+      p.hidden = state.bySize || (filtering ? !rows.some((r) => r.dataset.match && r.dataset.pg === p.dataset.pg) : folded.has(p.dataset.group));
+      p.classList.toggle("folded", !filtering && folded.has(p.dataset.pg));
+    }
     for (const g of groups) {
       g.hidden = state.bySize || (filtering && !rows.some((r) => r.dataset.match && r.dataset.group === g.dataset.groupfor));
       g.classList.toggle("folded", !filtering && folded.has(g.dataset.groupfor));
@@ -460,31 +536,66 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
     c.indeterminate = c.dataset.some === "1";
     c.addEventListener("change", () => post({ action: "sectionOn", section: c.dataset.section, on: c.checked }));
   }
+  // A page group's box: a dash while some of its files are on. A click turns every file off and
+  // remembers which were on, or turns those back on.
+  for (const c of document.querySelectorAll("input.pgall")) {
+    c.indeterminate = c.dataset.some === "1";
+    c.addEventListener("change", () => post({ action: "groupOn", group: c.dataset.pg }));
+  }
 
   // Drag a row onto another to put it above or below that one (and in its section), or onto a section's header to move it there.
-  let dragId = null;
+  // A file of a page group moves only among its group's files; a group's row moves the whole group.
+  let dragId = null, dragPg = "", dragGroup = null;
+  const firstOf = (pg) => rows.find((x) => x.dataset.pg === pg)?.dataset.id;
   const unmark = () => { for (const e of document.querySelectorAll(".dropabove, .dropbelow, .dropin")) e.classList.remove("dropabove", "dropbelow", "dropin"); };
   for (const r of rows) {
     r.addEventListener("dragstart", (e) => {
       if (state.bySize) { e.preventDefault(); return; }
-      dragId = r.dataset.id; r.classList.add("dragging");
+      dragId = r.dataset.id; dragPg = r.dataset.pg || ""; dragGroup = null; r.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", r.dataset.id);
     });
     r.addEventListener("dragend", () => { r.classList.remove("dragging"); unmark(); dragId = null; });
     const below = (e) => { const b = r.getBoundingClientRect(); return e.clientY > b.top + b.height / 2; };
+    const takes = () => (dragGroup ? r.dataset.pg !== dragGroup : !!dragId && dragId !== r.dataset.id && (!dragPg || r.dataset.pg === dragPg));
     r.addEventListener("dragover", (e) => {
-      if (!dragId || dragId === r.dataset.id) return;
+      if (!takes()) return;
       e.preventDefault(); unmark(); r.classList.add(below(e) ? "dropbelow" : "dropabove");
     });
     r.addEventListener("drop", (e) => {
       e.preventDefault(); unmark();
-      if (dragId && dragId !== r.dataset.id) post({ action: "place", id: dragId, target: r.dataset.id, below: below(e) });
+      if (!takes()) return;
+      if (dragGroup) post({ action: "placeGroup", group: dragGroup, target: r.dataset.id, below: below(e) });
+      else post({ action: "place", id: dragId, target: r.dataset.id, below: below(e) });
+    });
+  }
+  for (const p of pgs) {
+    p.addEventListener("dragstart", (e) => {
+      if (state.bySize) { e.preventDefault(); return; }
+      dragGroup = p.dataset.pg; dragId = null; dragPg = ""; p.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", p.dataset.pg);
+    });
+    p.addEventListener("dragend", () => { p.classList.remove("dragging"); unmark(); dragGroup = null; });
+    // Dropped on a group's row: above or below the whole group. Its own files do not leave it.
+    const below = (e) => { const b = p.getBoundingClientRect(); return e.clientY > b.top + b.height / 2; };
+    const takes = () => (dragGroup ? dragGroup !== p.dataset.pg : !!dragId && !dragPg);
+    p.addEventListener("dragover", (e) => { if (!takes()) return; e.preventDefault(); unmark(); p.classList.add(below(e) ? "dropbelow" : "dropabove"); });
+    p.addEventListener("drop", (e) => {
+      e.preventDefault(); unmark();
+      const target = firstOf(p.dataset.pg);
+      if (!takes() || !target) return;
+      if (dragGroup) post({ action: "placeGroup", group: dragGroup, target, below: below(e) });
+      else post({ action: "place", id: dragId, target, below: below(e) });
     });
   }
   for (const g of document.querySelectorAll("tr.group, tr.hint")) {
     const section = g.dataset.groupfor ?? g.dataset.hintfor;
-    g.addEventListener("dragover", (e) => { if (!dragId) return; e.preventDefault(); unmark(); g.classList.add("dropin"); });
-    g.addEventListener("drop", (e) => { e.preventDefault(); unmark(); if (dragId) post({ action: "putIn", id: dragId, section }); });
+    g.addEventListener("dragover", (e) => { if (!dragId && !dragGroup) return; e.preventDefault(); unmark(); g.classList.add("dropin"); });
+    g.addEventListener("drop", (e) => {
+      e.preventDefault(); unmark();
+      // A group, or a file of one, goes to the section with all its files (sections.ts).
+      const id = dragGroup ? firstOf(dragGroup) : dragId;
+      if (id) post({ action: "putIn", id, section });
+    });
   }
 
   // Column widths: drag the edge of a heading; double-click it to go back to automatic widths.

@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- **The files of one Nexus page sit under one row.** With two or more files of a page in the library (a second main file, an optional patch), the list shows a row named after the page with a row per file under it, on the EDGEdeck page and in the Mods view. The page's box turns every file off and remembers which were on; ticking it again turns those back on. Its row moves, drags and changes section for all its files, and folds them away; each file keeps its own versions and box, and moves among the page's files. See https://edgemodders.github.io/EDGEdeck/guide.html
+
 **Fixed**
 
 - **Several files from one Nexus Mods page are separate mods.** A second main file (Male and Female, 1K and 4K) or an optional file from the same page was added as a new version of the first file, under its name, and turned it off; with the same version number it was not downloaded at all. Now each file is a mod of its own, named after the page and the file, with its own versions, and the update check offers each one the newer version of that same file only. Files an earlier EDGEdeck put together are split apart at the next update check or download from that page, and EDGEdeck says which.

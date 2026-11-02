@@ -51,6 +51,8 @@ export interface LibraryInfo {
   sections?: string[];
   /** Family key to section name, for families put somewhere other than where their kinds put them. */
   sectionOf?: Record<string, string>;
+  /** Nexus page group key to the family keys that were on when its box last turned them off (pageGroups.ts). */
+  groupOn?: Record<string, string[]>;
   /** The loadout the mods' on/off state belongs to (loadouts.ts). */
   activeLoadout?: string;
 }

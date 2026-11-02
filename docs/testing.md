@@ -8,7 +8,7 @@ Every test run on EDGEdeck so far: how to run it again, what to expect, and what
 
 Releases up to 0.26.6 were published as REDdeck; this page uses the new name throughout.
 
-Last updated 2026-11-01. Dates before 2026-10-17 come from the session records; anything not confirmed there is marked unverified.
+Last updated 2026-11-02. Dates before 2026-10-17 come from the session records; anything not confirmed there is marked unverified.
 
 ## At a glance
 
@@ -20,7 +20,7 @@ Last updated 2026-11-01. Dates before 2026-10-17 come from the session records; 
 | [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-31 (v0.29.2) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-11-01 | 42 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | none open |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 3 open (16 to 18) |
 
 ## Automated
 
@@ -49,7 +49,7 @@ npm run smoke
 | Library and deploy | Extract a zip with 7za and add it; a conflict won by order; hardlinks (7 linked, none skipped); the deploy report (mods counted, paths, the load order files section); a single `.archive` goes to `archive/pc/mod` and in and out of `modlist.txt`; a second deploy does nothing; a reorder replaces the file |
 | Outside changes | A changed file is skipped until answered, Keep imports it and relinks, a missing file comes back; a rebuilt mod relinks silently |
 | Projects | Find the `.cpmodproj`, its packed files, re-sync; `installProject` adds as version dev, then refreshes in place and keeps its slot; beside a mod of the same name: separate (and `lostFiles` names it the loser), Keep both (`dev 2`, one family, on in its place), Use this project (the old mod follows the new folder, family key kept) |
-| Families and order | Versions newest first, update, switch version, a new version takes the old one's place, two on in a family found; place above; sections (add, order, move, rename, delete, the section box) |
+| Families and order | Versions newest first, update, switch version, a new version takes the old one's place, two on in a family found; place above; sections (add, order, move, rename, delete, the section box); Nexus file lines (update chain, name, a retired file's successor, the newest of a line, the split of merged files, a real page's files: mod 3783) and page groups (child names, kept together in the order, the box that remembers, one section, moves and drags inside and past a group) |
 | Loadouts | Version 1 save and load; Default from the current state, sync writes once, new, edit without touching mods, Make active both ways, the active one cannot be deleted, rename, export, import, delete |
 | CLI and MCP | `edgedeck list --json`, off and on, conflicts, loadouts, deploy, changes, mod; the MCP server over stdio through the SDK's client (list, turn off reaches the files, pending, a bad id is an error, the tool count) |
 | Off and Undo | Files and created folders leave; Undo puts a backed-up foreign file back and keeps the user's own files |
@@ -151,4 +151,42 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 
 ## Waiting for a hand test
 
-None open: every hand test through 0.29.4 has passed (2026-11-01). New ones go in a table here, with the columns # (kept until the list is done), Test, Since and Steps; a passed one moves to the table above.
+Every hand test through 0.29.4 has passed (2026-11-01). New ones go in this table, with the columns # (kept until the list is done), Test, Since and Steps; a passed one moves to the table above.
+
+| # | Test | Since | Steps |
+|---|---|---|---|
+| 16 | **Files an older EDGEdeck merged are split** | `main` after 0.29.4 (for 0.30.0); signed in to Nexus | Two files of one page, merged by 0.29.4, become two mods. Numbered steps in [Tests 16 to 18, step by step](#tests-16-to-18-step-by-step) |
+| 17 | **Each file of a page is a mod of its own** | the same | A second main file and an optional file download as mods of their own, each with its own update. Same steps |
+| 18 | **The page's row** | the same | The box that remembers, folding, search, moving and dragging, the Mods view and the detail panel. Same steps |
+
+### Tests 16 to 18, step by step
+
+The page is -KS- UV Texture Framework (https://www.nexusmods.com/cyberpunk2077/mods/3783?tab=files): two main files, **1. UV Framework 4.1** and **2. (OPTIONAL) UV HQ Arms**, and optional files such as **Nanarc's Arm Tattoo Overlays**. Nothing here needs a deploy; don't deploy until the clean-up.
+
+**16. The split** (do this first, while EDGEdeck 0.29.4 from the Marketplace is installed):
+
+1. On the page's Files tab, press **Mod manager download** on **1. UV Framework 4.1**, then on **2. (OPTIONAL) UV HQ Arms**. 0.29.4 shows the bug: HQ Arms arrives as an older version of the framework, switched off, and the framework's version list shows 4.1 and 1.1.
+2. Install the test build: in the Extensions view, **...** > **Install from VSIX...** > `dist\edgedeck-win32-x64-0.29.4.vsix` in the EDGEdeck repo (made by `npm run package`), then reload the window. It still says 0.29.4; that is expected.
+3. Press **Check updates** on the EDGEdeck page.
+4. **Expect:** a message that **-KS- UV Texture Framework: (OPTIONAL) UV HQ Arms** is now a mod of its own. The list has a row **-KS- UV Texture Framework** with two files under it: **UV Framework** 4.1 (on) and **(OPTIONAL) UV HQ Arms** 1.1 (off). Neither has a version list, and neither is offered an update.
+
+**17. New downloads** (the test build installed):
+
+1. Remove **(OPTIONAL) UV HQ Arms** (its remove icon), then press **Mod manager download** on it again on Nexus.
+2. **Expect:** no "new version of" message. It arrives on, as a file under the page's row. The UV Framework file stays on.
+3. In the Optional files section, press **Mod manager download** on **Nanarc's Arm Tattoo Overlays**. **Expect:** a third file under the page's row, 1.0, on.
+4. Press **Mod manager download** on **1. UV Framework 4.1** again. **Expect:** "already in the library"; nothing is downloaded and the other files stay on.
+5. Press the check icon on the page's row. **Expect:** all three up to date.
+
+**18. The page's row** (the three files from test 17, all on):
+
+1. Untick **(OPTIONAL) UV HQ Arms**. **Expect:** the page's box shows a dash, and its row says `3 files from one Nexus page, 2 on`.
+2. Click the page's box. **Expect:** all three off.
+3. Click it again. **Expect:** UV Framework and the tattoo overlays come back on; HQ Arms stays off.
+4. Click the arrow before the page's name. **Expect:** its files fold away. Close the EDGEdeck page and open it again: still folded. Unfold it.
+5. Type `hq arms` in the search box. **Expect:** the page's row and HQ Arms only. Clear the search.
+6. On a file, press Move up and Move down. **Expect:** it trades places with the page's other files, and its Move up is greyed out at the top of the group. Drag a file onto a mod outside the group. **Expect:** no drop line; nothing moves.
+7. Drag the page's row below another mod. **Expect:** all three files move together. Use the page's section button to put it in a section of yours. **Expect:** all three files go there.
+8. In the Mods view (the sidebar): the same page row with its three files under it. Its box does what step 2 and 3 did.
+9. Click **(OPTIONAL) UV HQ Arms**. **Expect:** the detail panel says it is one of 3 files from the Nexus page -KS- UV Texture Framework, and names the other two.
+10. **Clean up:** remove the three files, and the section if you made one. Reinstall EDGEdeck from the Marketplace if you want to leave the test build.

@@ -1,11 +1,13 @@
 // The Mods view: one list, grouped into Frameworks, the user's sections and Mods, with a checkbox and a status per mod.
-// A mod expands into the folders and files it deploys; a file opens from the library copy.
+// A mod expands into the folders and files it deploys; a file opens from the library copy. A Nexus
+// page with two or more of its files in the library is one row over them (pageGroups.ts).
 
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { families } from "./families";
 import { frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { modFolder, type Library, type ModInfo } from "./library";
+import { childName, type PageGroup } from "./pageGroups";
 import { sectionsOf } from "./sections";
 import { formatBytes, modSize } from "./sizes";
 
@@ -20,9 +22,12 @@ export interface SetupStep {
 const SetupIcons: Record<SetupStep["id"], string> = { game: "folder-opened", drive: "server", frameworks: "layers", bridge: "cloud-download", nexus: "account", links: "link", vortex: "archive" };
 
 export type ModNode =
-  | { type: "group"; label: string; mods: ModInfo[]; steps?: SetupStep[]; user?: boolean }
+  | { type: "group"; label: string; mods: ModInfo[]; steps?: SetupStep[]; user?: boolean; pages?: PageGroup[] }
   | { type: "setup"; step: SetupStep }
-  | { type: "mod"; mod: ModInfo }
+  /** A Nexus page with two or more of its files in the library, over a row per file. */
+  | { type: "page"; group: PageGroup }
+  /** `label`: a file's name under its page group. */
+  | { type: "mod"; mod: ModInfo; label?: string }
   | { type: "folder"; mod: ModInfo; label: string; files: string[] }
   | { type: "file"; mod: ModInfo; file: string };
 
@@ -58,10 +63,25 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
       const groups: ModNode[] = [];
       const steps = this.setup();
       if (steps.length) groups.push({ type: "group", label: "Set up", mods: [], steps });
-      for (const sec of sectionsOf(lib)) groups.push({ type: "group", label: sec.name, mods: sec.families.map((f) => f.active), user: sec.user });
+      for (const sec of sectionsOf(lib)) groups.push({ type: "group", label: sec.name, mods: sec.families.map((f) => f.active), user: sec.user, pages: sec.groups });
       return groups;
     }
-    if (node.type === "group") return node.steps ? node.steps.map((step) => ({ type: "setup", step })) : node.mods.map((mod) => ({ type: "mod", mod }));
+    if (node.type === "group") {
+      if (node.steps) return node.steps.map((step) => ({ type: "setup", step }));
+      // A page group's files sit under one row, where its first file is.
+      const out: ModNode[] = [];
+      const seen = new Set<string>();
+      for (const mod of node.mods) {
+        const page = node.pages?.find((g) => g.families.some((f) => f.active.id === mod.id));
+        if (!page) out.push({ type: "mod", mod });
+        else if (!seen.has(page.key)) {
+          seen.add(page.key);
+          out.push({ type: "page", group: page });
+        }
+      }
+      return out;
+    }
+    if (node.type === "page") return node.group.families.map((f) => ({ type: "mod", mod: f.active, label: childName(node.group, f) }));
     if (node.type === "mod") {
       const groups = new Map<string, string[]>();
       for (const f of node.mod.files) groups.set(topFolder(f), [...(groups.get(topFolder(f)) ?? []), f]);
@@ -105,6 +125,20 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
       }
       return item;
     }
+    if (node.type === "page") {
+      const g = node.group;
+      const on = g.families.filter((f) => f.on).length;
+      const item = new vscode.TreeItem(g.name, vscode.TreeItemCollapsibleState.Expanded);
+      item.id = g.key;
+      item.description = `${g.families.length} files from one Nexus page, ${on} on`;
+      item.tooltip = new vscode.MarkdownString(
+        [`**${g.name}**`, `${g.families.length} files from Nexus mod ${g.nexusId}, each a mod of its own with its own versions.`, "The box turns every file off and remembers which were on; ticking it again turns those back on."].join("  \n"),
+      );
+      item.iconPath = new vscode.ThemeIcon("files", new vscode.ThemeColor(on ? "edgedeck.accent" : "disabledForeground"));
+      item.contextValue = "page";
+      item.checkboxState = on ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
+      return item;
+    }
     if (node.type === "folder") {
       const item = new vscode.TreeItem(node.label || "(game folder)", vscode.TreeItemCollapsibleState.Collapsed);
       item.id = `${node.mod.id}/${node.label}`;
@@ -141,7 +175,7 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
     }
     const { mod } = node;
     const status = this.status(mod);
-    const item = new vscode.TreeItem(mod.name, mod.files.length ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+    const item = new vscode.TreeItem(node.label ?? mod.name, mod.files.length ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
     item.id = mod.id;
     const others = families(this.library()!).find((f) => f.active.id === mod.id)?.mods.length ?? 1;
     const lib = this.library();

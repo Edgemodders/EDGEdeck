@@ -17,10 +17,11 @@ import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
 import { lineFile, lineName, lineOfFile, newestInLine, otherLineFiles, splitPage } from "./nexusLines";
+import { childName, gatherGroups, groupOfFamily, groupToggle, pageGroups, setFamiliesOn, type PageGroup } from "./pageGroups";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrameworks, type FrameworkRelease, type FrameworkSource, type FrameworkState } from "./frameworkGet";
 import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
-import { addSection, deleteSection, moveInSection, moveSection, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
+import { addSection, deleteSection, moveGroupInSection, moveInSection, moveSection, placeGroupNextTo, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
 import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
 import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, steamLibraries } from "./game";
@@ -73,7 +74,8 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
   sevenZa = findSevenZip(extensionRoot);
 
   view = new ModsView(() => library, statusFor, frameworkCheck, () => state.setup);
-  tree = vscode.window.createTreeView("edgedeck.mods", { treeDataProvider: view, showCollapseAll: false });
+  // Checkboxes by hand: a page group's box is not the sum of its files' boxes (pageGroups.ts).
+  tree = vscode.window.createTreeView("edgedeck.mods", { treeDataProvider: view, showCollapseAll: false, manageCheckboxStateManually: true });
   detail = new DetailPanel((action, id) => run(() => detailAction(action, id)));
   conflictsPanel = new ConflictsPanel((m) => run(() => conflictsAction(m)));
   modsPage = new ModsPage((m) => run(() => pageAction(m)));
@@ -86,6 +88,11 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     { dispose: () => bridge?.stop() },
     tree.onDidChangeCheckboxState((e) => {
       for (const [node, checked] of e.items) {
+        if (node.type === "page" && library) {
+          const group = pageGroups(families(library)).find((g) => g.key === node.group.key);
+          if (group) toggleGroup(group);
+          continue;
+        }
         if (node.type !== "mod" || !library) continue;
         node.mod.enabled = checked === vscode.TreeItemCheckboxState.Checked;
         saveMod(library, node.mod);
@@ -316,7 +323,7 @@ export function deactivate(): void {
 }
 
 function modOf(node: ModNode | undefined): ModInfo | undefined {
-  return node && node.type !== "group" && node.type !== "setup" ? node.mod : undefined;
+  return node && (node.type === "mod" || node.type === "folder" || node.type === "file") ? node.mod : undefined;
 }
 
 // ---- setup: what is missing, as rows in the tree, buttons on the page and welcome content ---
@@ -752,6 +759,8 @@ async function maybeCheckBridge(): Promise<void> {
 function refresh(): void {
   const { gamePath } = settings();
   if (library) {
+    // The list shows a page group's files together; the order that decides conflicts must agree.
+    if (gatherGroups(library)) log.appendLine("Order: each Nexus page's files kept together");
     try {
       for (const m of syncProjects(library)) log.appendLine(`${m.name}: packed output changed, library copy refreshed (${m.files.length} files)`);
     } catch (err) {
@@ -917,6 +926,10 @@ function detailData(mod: ModInfo) {
     bridge: bridgeExe,
     update: library ? familyUpdate(library, mod) : undefined,
     versions: library ? familyOf(library, mod).mods.map((m) => ({ id: m.id, version: m.version, enabled: m.enabled })) : [],
+    page: (() => {
+      const g = library ? groupOfFamily(pageGroups(families(library)), familyKey(mod)) : undefined;
+      return g ? { name: g.name, files: g.families.map((f) => ({ id: f.active.id, name: childName(g, f), enabled: f.on })) } : undefined;
+    })(),
     size: library ? modSize(library, mod) : { total: 0, files: new Map<string, number>(), mtimes: new Map<string, number>() },
   };
 }
@@ -970,7 +983,19 @@ async function pageData() {
   if (library && (!pageLoadout || !findLoadout(library.root, pageLoadout))) pageLoadout = active;
   const editing = library && pageLoadout !== active ? findLoadout(library.root, pageLoadout) : undefined;
   const viewed = library && editing ? loadoutState(library, readLoadout(editing.file)) : undefined;
-  const sections = library ? sectionsOf(library).map((sec) => ({ name: sec.name, user: sec.user, rows: sec.families.map((f) => pageRow(f, manifestMods, viewed?.get(f.key))) })) : [];
+  const isOn = (f: Family) => (viewed ? !!viewed.get(f.key)?.enabled : f.on);
+  const sections = library
+    ? sectionsOf(library).map((sec) => ({
+        name: sec.name,
+        user: sec.user,
+        rows: sec.families.map((f) => {
+          const r = pageRow(f, manifestMods, viewed?.get(f.key));
+          const g = groupOfFamily(sec.groups, f.key);
+          return g ? { ...r, group: g.key, name: childName(g, f) } : r;
+        }),
+        groups: sec.groups.map((g) => ({ key: g.key, name: g.name, nexusId: g.nexusId, on: g.families.filter(isOn).length, files: g.families.length, remembered: g.families.some((f) => library!.info.groupOn?.[g.key]?.includes(f.key)) })),
+      }))
+    : [];
   return {
     rows: sections.flatMap((sec) => sec.rows),
     sections,
@@ -1143,6 +1168,13 @@ async function pageAction(m: PageMessage): Promise<void> {
         refresh();
       }
       return;
+    case "groupOn":
+    case "groupMove":
+    case "groupSection":
+    case "groupNexus":
+    case "groupCheck":
+    case "placeGroup":
+      return groupAction(m);
   }
   if (!mod || !library) return;
   const edited = editedLoadout();
@@ -1209,6 +1241,57 @@ async function pageAction(m: PageMessage): Promise<void> {
       break;
     }
   }
+}
+
+/** The page's buttons on a page group's row. */
+async function groupAction(m: PageMessage): Promise<void> {
+  if (!library || !m.group) return;
+  const group = pageGroups(families(library)).find((g) => g.key === m.group);
+  if (!group) return;
+  const first = group.families[0].active;
+  switch (m.action) {
+    case "groupOn":
+      return toggleGroup(group, editedLoadout());
+    case "groupMove":
+      if (m.delta && moveGroupInSection(library, group.key, m.delta)) refresh();
+      return;
+    case "groupSection":
+      return pickSectionCommand(first);
+    case "groupNexus":
+      return nexusOpenCommand(first);
+    case "groupCheck":
+      return checkUpdatesCommand(false, group.families.map((f) => f.active));
+    case "placeGroup": {
+      const target = m.target ? library.mods.find((x) => x.id === m.target) : undefined;
+      if (target) {
+        placeGroupNextTo(library, group.key, target, !!m.below);
+        log.appendLine(`${group.name}: placed ${m.below ? "below" : "above"} ${target.name}`);
+        refresh();
+      }
+      return;
+    }
+  }
+}
+
+/**
+ * A page group's box: with any of its files on, every file off (the ones on are remembered);
+ * with none on, the remembered ones back on, or all. In `loadout` (another loadout than the
+ * active one, shown on the page) only that loadout's file changes.
+ */
+function toggleGroup(group: PageGroup, loadout?: string): void {
+  if (!library) return;
+  if (loadout) {
+    const viewed = loadoutState(library, readLoadout(findLoadout(library.root, loadout)!.file));
+    const choice = groupToggle(library, group, (f) => !!viewed.get(f.key)?.enabled);
+    for (const f of choice.families) setInLoadout(library, loadout, f.active, { enabled: choice.on });
+    log.appendLine(`${loadout}: ${group.name} ${choice.on ? `on (${choice.families.map((f) => childName(group, f)).join(", ")})` : "off, every file"}`);
+    void updatePage();
+    return;
+  }
+  const choice = groupToggle(library, group);
+  setFamiliesOn(library, choice.families, choice.on);
+  log.appendLine(`${group.name}: ${choice.on ? `on (${choice.families.map((f) => childName(group, f)).join(", ")})` : "off, every file"}`);
+  refresh();
 }
 
 // ---- sections ------------------------------------------------------------------------------------
