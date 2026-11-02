@@ -203,6 +203,17 @@ async function release() {
   }
 
   if (!p.already) {
+    // update_mod_version is the API's only way to set the page's version; say so when it did not
+    // take (the owner set 0.30.0 by hand on 2026-11-02, so whether it works here is unverified).
+    const after = await modByPage(p.config.page);
+    if (after.version === version) console.log(`The page's version is ${version}`);
+    else {
+      const msg = `The page's version is still ${after.version}, not ${version}: set it by hand on Nexus (Edit mod page, Version). The API has no other way to set it.`;
+      console.log(process.env.GITHUB_ACTIONS ? `::warning title=Nexus page version::${msg}` : msg);
+    }
+  }
+
+  if (!p.already) {
     // Changelogs only add: posted once, with the version it belongs to, so a rerun never doubles it.
     const notes = notesFile ? readFileSync(notesFile, 'utf8').trim() : '';
     if (notes) {
