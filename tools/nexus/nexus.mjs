@@ -134,8 +134,14 @@ async function plan(version) {
   const mod = await modByPage(config.page);
   const { file, versions } = await mainFile(mod.id, config.file);
   const already = versions.find((v) => v.version === version);
-  const previous = versions.find((v) => v.is_primary) ?? null;
-  const description = descriptionPlan(mod, config, version);
+  // The version this one replaces, and Nexus archives when archivePrevious is set: the newest still
+  // under Main files. Not "the primary one": with Mod manager download off a new version is never
+  // primary, so the flag stays on an old, archived version (0.28.0 on EDGEdeck's page, 2026-11-02)
+  // and the version actually showing would stay in Main files beside the new one.
+  const shown = versions.filter((v) => v.category === 'main' && v.version !== version).sort((a, b) => String(b.uploaded_at).localeCompare(String(a.uploaded_at)));
+  const previous = shown[0] ?? versions.find((v) => v.is_primary) ?? null;
+  // Older ones still under Main files: the API cannot archive a version by itself, so say so.
+  const stale = shown.slice(1);
   console.log(`${mod.name} on Nexus (page ${config.page}): version ${mod.version}, ${file ? `main file ${file.id}` : 'no files yet'}`);
   console.log(
     already
@@ -144,6 +150,9 @@ async function plan(version) {
         ? `File: create the main file with ${version}; mod manager download ${config.upload.modManager ? 'on' : 'off'}; the page's version becomes ${version}`
         : `File: upload ${version} as the main file's new version${previous ? `, replacing ${previous.version}${config.upload.archivePrevious ? ' (archived)' : ''}` : ''}; mod manager download ${config.upload.modManager ? 'on' : 'off'}; the page's version becomes ${version}`,
   );
+  if (stale.length) console.log(`Also under Main files: ${stale.map((v) => v.version).join(', ')}. Nexus's API cannot archive these; archive them on the page's Files tab (Manage files)`);
+  // Last, so the file's plan shows even when this stops the release.
+  const description = descriptionPlan(mod, config, version);
   console.log(`Description: ${description.push ? 'push' : 'no push'} (${description.why})`);
   return { config, mod, file, already, previous, description };
 }
