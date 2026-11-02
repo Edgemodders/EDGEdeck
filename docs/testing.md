@@ -157,7 +157,7 @@ Every hand test through 0.29.4 has passed (2026-11-01). New ones go in this tabl
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 19 | **Remove a whole page** | `main` after 0.29.4 (for 0.30.0) | A page row with three files, one of them with two versions and one off: the page row's last icon (a bin) says **Remove from Library: all 3 files of this page, on or off**. Click it: the question lists the three files, says every version of each goes and how many are on. **Remove 3** takes them all, versions included, and the page row goes; Cancel leaves everything. Each file's own remove icon reads **Remove from Library** (or **Remove version x from Library**) |
+| 19 | **Remove a whole page** | `main` after 0.29.4 (for 0.30.0) | A page row with three files, one of them with two versions and one off: the page row's last icon (a bin) says **Remove from Library: all 3 files of this page, on or off**. Click it: the question lists the three files, says every version of each goes and how many are on. **Remove 3** takes them all, versions included: the page row and its files leave the list at once, and a notification **Removing 3 files of ...** shows until the conflict check is done (on 11-02 the rows stayed about 10 seconds with no sign of work; fixed the same day). Removing one mod, or a section's mods, does the same. Cancel leaves everything. Each file's own remove icon reads **Remove from Library** (or **Remove version x from Library**) |
 
 ### Tests 16 to 18, step by step
 
