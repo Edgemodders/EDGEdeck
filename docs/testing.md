@@ -19,8 +19,8 @@ Last updated 2026-11-02. Dates before 2026-10-17 come from the session records; 
 | [UI test](#ui-test-in-a-real-vs-code) | Automated, by hand only (not in CI) | 2026-10-25 (`main` before 0.29.0) | Pass |
 | [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-31 (v0.29.2) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
-| [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-11-02 | 43 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | 2 open (17, 18) |
+| [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-11-02 | 44 runs, see the table |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 1 open (19) |
 
 ## Automated
 
@@ -149,6 +149,7 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 11-01 | 0.29.4 | Not recorded | Waiting test 15: **Deploy or undeploy one mod from its row** (0.29.4) | **Passed.** |
 | 11-01 | EDGEkit 1.140.2 test build with the Nexus links task | PC | EDGEkit's installer checkbox, on a first install after uninstalling EDGEkit | **Passed.** The box started unticked with Vortex holding the links; ticked, the links went to EDGEkit's EDGEdeck; every step as written |
 | 11-02 | `main` after 0.29.4 (for 0.30.0) | Not recorded | Waiting test 16: **files an older EDGEdeck merged are split**, page 3783 | **Passed**, with Gorilla Arms - remove knuckles as the merged file: a window still on 0.29.2 had taken that link and added it as version 1.0 of UV Framework. After updating that window's EDGEdeck, Check updates split it into its own row under the page. Led to the step "the test build in every window, not F5" |
+| 11-02 | `main` after 0.29.4 (for 0.30.0) | Not recorded | Waiting tests 17 and 18: **each file of a page is a mod of its own**, **the page's row** | **Passed.** Led to a Remove from Library button on the page's row (test 19), and every remove tooltip reads "from Library" |
 
 ## Waiting for a hand test
 
@@ -156,8 +157,7 @@ Every hand test through 0.29.4 has passed (2026-11-01). New ones go in this tabl
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 17 | **Each file of a page is a mod of its own** | the same | A second main file and an optional file download as mods of their own, each with its own update. Same steps |
-| 18 | **The page's row** | the same | The box that remembers, folding, search, moving and dragging, the Mods view and the detail panel. Same steps |
+| 19 | **Remove a whole page** | `main` after 0.29.4 (for 0.30.0) | A page row with three files, one of them with two versions and one off: the page row's last icon (a bin) says **Remove from Library: all 3 files of this page, on or off**. Click it: the question lists the three files, says every version of each goes and how many are on. **Remove 3** takes them all, versions included, and the page row goes; Cancel leaves everything. Each file's own remove icon reads **Remove from Library** (or **Remove version x from Library**) |
 
 ### Tests 16 to 18, step by step
 

@@ -87,7 +87,7 @@ export interface PageMessage {
     | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate" | "deployOne"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport"
-    | "groupOn" | "groupMove" | "groupSection" | "groupNexus" | "groupCheck" | "placeGroup";
+    | "groupOn" | "groupMove" | "groupSection" | "groupNexus" | "groupCheck" | "groupRemove" | "placeGroup";
   /** The page group a group action is about. */
   group?: string;
   /** loadoutView: the loadout to show. */
@@ -213,7 +213,7 @@ export function renderPage(d: PageData, csp: string): string {
       { m: { action: "checkUpdate", id: r.id }, icon: "check", title: r.nexusId ? "Check Nexus for a newer file of this mod" : "", cls: r.nexusId ? "" : "blank" },
       { m: { action: "update", id: r.id }, icon: "update", title: r.update ? `Update to ${r.update}` : "", cls: r.update ? "upd" : "blank" },
       { m: { action: "nexus", id: r.id }, icon: "nexus", title: "Open on Nexus", cls: r.nexusId ? "" : "blank" },
-      { m: { action: "remove", id: r.id }, icon: "remove", title: r.versions.length > 1 ? `Remove version ${r.version} from the library` : "Remove from the library", cls: "danger" },
+      { m: { action: "remove", id: r.id }, icon: "remove", title: r.versions.length > 1 ? `Remove version ${r.version} from Library` : "Remove from Library", cls: "danger" },
     ] as { m: PageMessage; icon: string; title: string; off?: boolean; cls?: string }[];
     const text = `${r.group ? `${groupName.get(r.group) ?? ""} ` : ""}${r.name} ${r.versions.map((v) => v.version).join(" ")} ${r.kinds.join(" ")} ${r.status}`.toLowerCase();
     // The version cell: a dropdown when there is anything to choose, the version alone otherwise.
@@ -243,7 +243,7 @@ export function renderPage(d: PageData, csp: string): string {
     // For the mods shown in the section (the search and the filter apply): move them all, or remove them all.
     const bulk = [
       { action: "sectionMoveMods", icon: "section", title: `Put the mods shown in ${esc(s.name)} in another section` },
-      { action: "sectionRemoveMods", icon: "remove", title: `Remove the mods shown in ${esc(s.name)} from the library`, cls: "danger" },
+      { action: "sectionRemoveMods", icon: "remove", title: `Remove the mods shown in ${esc(s.name)} from Library`, cls: "danger" },
     ]
       .map((b) => `<button class="ico ${b.cls ?? ""}" data-bulk="${b.action}" data-section="${esc(s.name)}" title="${b.title}" aria-label="${b.title}" ${s.rows.length ? "" : "disabled"}>${icon(b.icon)}</button>`)
       .join("");
@@ -281,7 +281,7 @@ export function renderPage(d: PageData, csp: string): string {
       { m: { action: "groupCheck", group: g.key }, icon: "check", title: "Check Nexus for newer versions of these files" },
       blank,
       { m: { action: "groupNexus", group: g.key }, icon: "nexus", title: "Open the page on Nexus" },
-      blank,
+      { m: { action: "groupRemove", group: g.key }, icon: "remove", title: `Remove from Library: all ${g.files} files of this page, on or off`, cls: "danger" },
     ] as { m: PageMessage; icon: string; title: string; off?: boolean; cls?: string }[];
     const folded = d.collapsed.includes(g.key);
     const size = fmt(rows.reduce((t, r) => t + r.size, 0));

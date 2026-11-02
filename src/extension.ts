@@ -26,7 +26,7 @@ import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
 import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
 import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, steamLibraries } from "./game";
 import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove";
-import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
+import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveLibrary, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
 import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
@@ -1173,6 +1173,7 @@ async function pageAction(m: PageMessage): Promise<void> {
     case "groupSection":
     case "groupNexus":
     case "groupCheck":
+    case "groupRemove":
     case "placeGroup":
       return groupAction(m);
   }
@@ -1261,6 +1262,8 @@ async function groupAction(m: PageMessage): Promise<void> {
       return nexusOpenCommand(first);
     case "groupCheck":
       return checkUpdatesCommand(false, group.families.map((f) => f.active));
+    case "groupRemove":
+      return removeGroupCommand(group);
     case "placeGroup": {
       const target = m.target ? library.mods.find((x) => x.id === m.target) : undefined;
       if (target) {
@@ -1271,6 +1274,29 @@ async function groupAction(m: PageMessage): Promise<void> {
       return;
     }
   }
+}
+
+/** Removes every file of a page group from the library, every version of each, on or off, after one question. */
+async function removeGroupCommand(group: PageGroup): Promise<void> {
+  if (!library) return;
+  const mods = group.families.flatMap((f) => f.mods);
+  const on = group.families.filter((f) => f.on).length;
+  const n = group.families.length;
+  const detail = [
+    group.families.map((f) => childName(group, f)).join("\n"),
+    mods.length > n ? `\n\nEvery version of each is removed: ${mods.length} library entries.` : "",
+    on ? `\n\n${on} of them ${on === 1 ? "is" : "are"} on; ${on === 1 ? "its" : "their"} files leave the game on the next deploy.` : "",
+  ].join("");
+  const button = `Remove ${n}`;
+  const a = await vscode.window.showWarningMessage(`Remove all ${n} files of ${group.name} from Library?`, { modal: true, detail }, button);
+  if (a !== button) return;
+  for (const m of mods) removeMod(library, m);
+  if (library.info.groupOn?.[group.key]) {
+    delete library.info.groupOn[group.key];
+    saveLibrary(library);
+  }
+  log.appendLine(`Removed ${group.name}: ${n} files (${mods.length} library entries): ${group.families.map((f) => childName(group, f)).join(", ")}`);
+  reload();
 }
 
 /**
