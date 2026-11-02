@@ -12,6 +12,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.30.0 (2026-11-02)
+
 **New**
 
 - **The files of one Nexus page sit under one row.** With two or more files of a page in the library (a second main file, an optional patch), the list shows a row named after the page with a row per file under it, on the EDGEdeck page and in the Mods view. The page's box turns every file off and remembers which were on; ticking it again turns those back on. Its row moves, drags, changes section and removes from the library for all its files, and folds them away; each file keeps its own versions and box, and moves among the page's files. See https://edgemodders.github.io/EDGEdeck/guide.html
