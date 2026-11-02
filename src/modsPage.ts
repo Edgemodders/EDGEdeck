@@ -151,6 +151,11 @@ export class ModsPage {
   update(data: PageData): void {
     if (this.panel) this.panel.webview.html = renderPage(data, this.panel.webview.cspSource);
   }
+
+  /** Drops rows from the open page at once, before the work behind them; the next render settles the rest. */
+  async gone(ids: string[]): Promise<void> {
+    if (this.panel) await this.panel.webview.postMessage({ type: "gone", ids });
+  }
 }
 
 function esc(s: string): string {
@@ -631,6 +636,17 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
     widths();
   }
   for (const s of document.querySelectorAll("select.ver")) s.addEventListener("change", () => { if (s.value) vscode.postMessage(JSON.parse(s.value)); });
+  // Rows the extension is removing go at once; a page group's row goes with its last file.
+  window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (!m || m.type !== "gone") return;
+    const ids = new Set(m.ids);
+    const going = (el) => ids.has(el.dataset.id) || (el.classList.contains("pghead") && rows.every((r) => r.dataset.pg !== el.dataset.pg || ids.has(r.dataset.id)));
+    for (const el of [...original, ...rows, ...pgs]) if (going(el)) el.remove();
+    for (let i = original.length - 1; i >= 0; i--) if (going(original[i])) original.splice(i, 1);
+    for (let i = rows.length - 1; i >= 0; i--) if (ids.has(rows[i].dataset.id)) rows.splice(i, 1);
+    apply();
+  });
   const lo = document.getElementById("loadout");
   if (lo) lo.addEventListener("change", () => post({ action: "loadoutView", loadout: lo.value }));
   apply();

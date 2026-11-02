@@ -1290,13 +1290,35 @@ async function removeGroupCommand(group: PageGroup): Promise<void> {
   const button = `Remove ${n}`;
   const a = await vscode.window.showWarningMessage(`Remove all ${n} files of ${group.name} from Library?`, { modal: true, detail }, button);
   if (a !== button) return;
-  for (const m of mods) removeMod(library, m);
   if (library.info.groupOn?.[group.key]) {
     delete library.info.groupOn[group.key];
     saveLibrary(library);
   }
-  log.appendLine(`Removed ${group.name}: ${n} files (${mods.length} library entries): ${group.families.map((f) => childName(group, f)).join(", ")}`);
-  reload();
+  log.appendLine(`Removing ${group.name}: ${n} files (${mods.length} library entries): ${group.families.map((f) => childName(group, f)).join(", ")}`);
+  await removeEntries(`${n} files of ${group.name}`, mods);
+}
+
+/**
+ * Removes library entries with feedback at once: the page drops their rows before anything else
+ * (`gone`), the folders go, and the list updates in place (no full reload: the library in memory
+ * is already right, and a reload re-reads Vortex and the game version, seconds on a real PC). A
+ * notification stays up while the other mods' archives are checked for conflicts again.
+ * `rows`: the page rows that leave; one version of a mod with others left keeps its row.
+ */
+async function removeEntries(what: string, mods: ModInfo[], rows: string[] = mods.map((m) => m.id)): Promise<void> {
+  if (!library || !mods.length) return;
+  if (rows.length) await modsPage.gone(rows);
+  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Removing ${what}` }, async (progress) => {
+    for (const m of mods) removeMod(library!, m);
+    refresh();
+    // refresh() queues the archive scan; run it here instead, so the notification lasts as long as it does.
+    clearTimeout(scanTimer);
+    if (bridgeExe && library!.mods.some((m) => m.enabled)) {
+      progress.report({ message: "removed; checking the other mods' archives for conflicts" });
+      await scanArchives(false);
+    }
+  });
+  log.appendLine(`Removed ${what}`);
 }
 
 /**
@@ -1395,9 +1417,8 @@ async function sectionRemoveModsCommand(section: string | undefined, ids: string
   ].join("");
   const a = await vscode.window.showWarningMessage(`Remove ${shownIn(section, rows.length)} from the library?`, { modal: true, detail }, `Remove ${rows.length}`);
   if (a !== `Remove ${rows.length}`) return;
-  for (const m of mods) removeMod(library, m);
-  log.appendLine(`Removed ${rows.length} mod${rows.length === 1 ? "" : "s"} (${mods.length} library entries) from ${section}: ${rows.map((r) => r.name).join(", ")}`);
-  reload();
+  log.appendLine(`Removing ${rows.length} mod${rows.length === 1 ? "" : "s"} (${mods.length} library entries) from ${section}: ${rows.map((r) => r.name).join(", ")}`);
+  await removeEntries(`${rows.length} mod${rows.length === 1 ? "" : "s"} from ${section}`, mods);
 }
 
 /** Quick pick of the sections, to put a mod in one; "New section..." makes one first. */
@@ -2506,9 +2527,8 @@ async function removeCommand(mod: ModInfo | undefined): Promise<void> {
   const keep = others > 0 ? ` The other version${others === 1 ? "" : "s"} stay${others === 1 ? "s" : ""}.` : "";
   const a = await vscode.window.showWarningMessage(`Remove ${what} from the library?${keep} Its files leave the game on the next deploy.`, { modal: true }, "Remove");
   if (a !== "Remove") return;
-  removeMod(library, mod);
-  log.appendLine(`Removed ${mod.name}`);
-  reload();
+  // The row stays while other versions of the mod are left; the next render shows the one that takes over.
+  await removeEntries(what, [mod], others > 0 ? [] : [mod.id]);
 }
 
 /** Moves a mod past its neighbour in its section, the row above or below it on the page and in the tree. */
