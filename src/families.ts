@@ -2,7 +2,8 @@
 // so a user can go back; the UI shows one row per mod with a version to pick. A family's key is
 // the one set by hand (`family`), else the Nexus mod id when there is one, else a REDnode package's
 // id, else the project path, else the name without version tokens. Only one version of a family is
-// on at a time.
+// on at a time. A Nexus page with several files that are mods of their own (two main files) has a
+// family per file, with `family` set on all but the first (nexusLines.ts).
 
 import { singleRednodeApp } from "./classifier";
 import { placeAbove, saveMod, type Library, type ModInfo } from "./library";
@@ -174,7 +175,11 @@ export function familiesWithTwoOn(lib: Library): Family[] {
   return families(lib).filter((f) => f.mods.filter((m) => m.enabled).length > 1);
 }
 
-/** An entry for the same Nexus file, or the same version of the same mod, already in the library. */
-export function findSameVersion(lib: Library, modId: number, fileId: number, version?: string): ModInfo | undefined {
-  return lib.mods.find((m) => m.source.modId === modId && (m.source.fileId === fileId || (!!version && m.version === version)));
+/**
+ * An entry for the same Nexus file, or the same version of the same mod, already in the library.
+ * `line` is the family the file belongs in (nexusLines.ts): another file of the page with the same
+ * version is a different mod.
+ */
+export function findSameVersion(lib: Library, modId: number, fileId: number, version?: string, line = `nexus:${modId}`): ModInfo | undefined {
+  return lib.mods.find((m) => m.source.modId === modId && (m.source.fileId === fileId || (!!version && m.version === version && familyKey(m) === line)));
 }

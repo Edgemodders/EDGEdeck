@@ -16,6 +16,8 @@ export interface ModSource {
   path?: string;
   modId?: number;
   fileId?: number;
+  /** For a Nexus file: its name on the mod page ("Main File - Female"), which tells the files of one page apart. */
+  fileTitle?: string;
 }
 
 /** `mod.json`, one per mod folder. */

@@ -100,6 +100,8 @@ A game patch is the usual reason a modded game stops starting. EDGEdeck records 
 
 **Versions.** A mod has one row however many versions are in the library. The newest, or the one that is on, stands for it; the others wait in the version dropdown and in **Switch version...**. Downloading a version already in the library does nothing twice.
 
+**Several files from one Nexus page.** Some pages offer more than one file: two main files to pick from, or an optional patch beside the main file. Each file you download is a mod of its own, named after the page and the file (`Cool Mod: Main File - Female`), with its own versions and updates. EDGEdeck knows a newer version of a file by the author marking it as an update on Nexus, or by its name without the version.
+
 ## 6. Deploying
 
 Deploy puts the **active loadout** in the game (see [Loadouts](#10-loadouts)). Close the game first: Windows will not let EDGEdeck replace files the running game holds open, so a deploy with the game running waits until you say **The game is closed now**.

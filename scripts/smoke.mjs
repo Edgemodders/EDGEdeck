@@ -461,6 +461,71 @@ console.log("changes: ok");
   }
   console.log("families: ok");
 
+  // File lines: a Nexus page with two main files and an optional one is three mods, each with its
+  // own versions. Versions are linked by Nexus's update chain, else by the name without the version,
+  // else a main file continues the one line the page no longer offers.
+  {
+    const f = (file_id, name, version, category_name, t) => ({ file_id, name, version, category_name, is_primary: false, uploaded_timestamp: t, file_name: `${file_id}.zip`, size_kb: 1 });
+    const page = { files: [
+      f(10, "Main File - Male", "1.0", "OLD_VERSION", 1),
+      f(11, "Main File - Male", "1.1", "MAIN", 3),
+      f(20, "Main File - Female", "1.1", "MAIN", 4),
+      f(30, "Patch for Other Mod", "1.0", "OPTIONAL", 5),
+    ], file_updates: [{ old_file_id: 10, new_file_id: 11, new_file_name: "11.zip", uploaded_timestamp: 3 }] };
+    assert.ok(core.sameLine(page, { fileId: 10 }, { fileId: 11 }), "the update chain");
+    assert.ok(!core.sameLine(page, { fileId: 11 }, { fileId: 20 }), "two main files");
+    assert.ok(core.sameLine(page, { fileId: 999, title: "Main File - Male 1.0" }, { fileId: 11 }), "the name without the version");
+    assert.equal(core.lineFor(page, { fileId: 11 }, [[{ fileId: 10 }]]), 0);
+    assert.equal(core.lineFor(page, { fileId: 20 }, [[{ fileId: 11 }]]), undefined, "the other main file is a mod of its own");
+    assert.equal(core.lineFor(page, { fileId: 30 }, [[{ fileId: 11 }]]), undefined, "so is the optional file");
+    const renamed = { files: [f(1, "Old name", "1.0", "OLD_VERSION", 1), f(2, "New name", "2.0", "MAIN", 2)], file_updates: [] };
+    assert.equal(core.lineFor(renamed, { fileId: 2 }, [[{ fileId: 1 }]]), 0, "a main file continues the retired line");
+    assert.equal(core.lineFor(renamed, { fileId: 2 }, [[{ fileId: 1 }], [{ fileId: 7 }]]), undefined, "unless two lines are retired");
+    assert.equal(core.newestInLine(page, { fileId: 10 }).file_id, 11);
+    assert.equal(core.newestInLine(page, { fileId: 20 }).file_id, 20, "not the other main file");
+    assert.equal(core.newestInLine(page, { fileId: 30 }).file_id, 30, "an optional file is not updated to a main one");
+    assert.equal(core.newestInLine(page, { fileId: 777 }, [{ fileId: 20 }]).file_id, 11, "an unknown file: the one main file no other line has");
+    assert.equal(core.newestInLine(page, { fileId: 777 }), undefined, "two candidates: no guess");
+    assert.deepEqual(core.splitLines(page, [{ fileId: 10 }, { fileId: 11 }]), [0, 0]);
+    assert.deepEqual(core.splitLines(page, [{ fileId: 11 }, { fileId: 20 }, { fileId: 10 }, { fileId: 30 }]), [0, 1, 0, 2]);
+    assert.deepEqual(core.splitLines(renamed, [{ fileId: 1 }, { fileId: 2 }]), [0, 0], "a retired line's successor stays");
+    assert.equal(core.lineName("Cool Mod", "Main File - Female 1.1"), "Cool Mod: Main File - Female");
+    assert.equal(core.lineName("Cool Mod", "Cool Mod - Female v2.0"), "Cool Mod - Female");
+    assert.equal(core.lineName("Cool Mod", "Cool Mod 1.1"), "Cool Mod");
+
+    const male = core.addMod(lib, cls("bare", "Fam").placements, { name: "Cool Mod", version: "1.1", source: { type: "nexus", modId: 500, fileId: 11 } });
+    assert.deepEqual(core.lineOfFile(lib, 500, 20, page), { key: "nexus:500:20", entries: [], newLine: true });
+    const next = core.lineOfFile(lib, 500, 10, page);
+    assert.equal(next.key, "nexus:500");
+    assert.deepEqual(next.entries.map((m) => m.id), [male.id]);
+    assert.equal(core.findSameVersion(lib, 500, 20, "1.1", "nexus:500:20"), undefined, "same version, other file: not in the library");
+    assert.equal(core.findSameVersion(lib, 500, 99, "1.1").id, male.id);
+    const female = core.addMod(lib, cls("bare", "Fam").placements, { name: "Cool Mod: Main File - Female", version: "1.1", source: { type: "nexus", modId: 500, fileId: 20 } });
+    female.family = "nexus:500:20";
+    core.saveMod(lib, female);
+    assert.deepEqual(core.settleNewVersion(lib, female), {}, "a file of its own settles nothing");
+    assert.ok(male.enabled && female.enabled, "both stay on");
+    assert.equal(core.families(lib).filter((x) => x.nexusId === 500).length, 2, "two rows");
+    assert.deepEqual(core.otherLineFiles(lib, male), [{ fileId: 20, title: undefined }]);
+    core.removeMod(lib, female);
+
+    // What an older EDGEdeck did: the female file became a version of the male one, under its name.
+    const merged = core.addMod(lib, cls("bare", "Fam").placements, { name: "Cool Mod", version: "1.1", source: { type: "nexus", modId: 500, fileId: 20 } });
+    assert.equal(core.familyOf(lib, merged).mods.length, 2, "merged, as before");
+    lib.info.sectionOf = { ...(lib.info.sectionOf ?? {}), "nexus:500": "Visual" };
+    assert.deepEqual(core.splitPage(lib, 500, page, "Cool Mod"), ["Cool Mod: Main File - Female"]);
+    assert.equal(merged.family, "nexus:500:20");
+    assert.equal(merged.name, "Cool Mod: Main File - Female");
+    assert.equal(male.name, "Cool Mod", "the first file keeps its name");
+    assert.equal(male.source.fileTitle, "Main File - Male", "the file's name filled in");
+    assert.equal(lib.info.sectionOf["nexus:500:20"], "Visual", "in the same section");
+    assert.deepEqual(core.splitPage(lib, 500, page, "Cool Mod"), [], "once");
+    delete lib.info.sectionOf["nexus:500"];
+    delete lib.info.sectionOf["nexus:500:20"];
+    for (const m of [male, merged]) core.removeMod(lib, m);
+    console.log("nexus file lines: ok");
+  }
+
   // Rename: every version gets the name, the family stays one (its key pinned, so a name-keyed
   // family, its section and loadouts hold), a new version takes the name, and empty puts it back.
   {

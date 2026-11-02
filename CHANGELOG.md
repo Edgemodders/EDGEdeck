@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- **Several files from one Nexus Mods page are separate mods.** A second main file (Male and Female, 1K and 4K) or an optional file from the same page was added as a new version of the first file, under its name, and turned it off; with the same version number it was not downloaded at all. Now each file is a mod of its own, named after the page and the file, with its own versions, and the update check offers each one the newer version of that same file only. Files an earlier EDGEdeck put together are split apart at the next update check or download from that page, and EDGEdeck says which.
+
 ## 0.29.4 (2026-11-01)
 
 **New**

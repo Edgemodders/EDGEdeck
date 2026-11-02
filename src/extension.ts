@@ -16,6 +16,7 @@ import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, lat
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
+import { lineFile, lineName, lineOfFile, newestInLine, otherLineFiles, splitPage } from "./nexusLines";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrameworks, type FrameworkRelease, type FrameworkSource, type FrameworkState } from "./frameworkGet";
 import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
@@ -27,7 +28,7 @@ import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove"
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
-import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer } from "./nexus";
+import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
 import { currentNxmHandler, describeHandler, forwarderCommand, forwarderExe, nxmFromQuery, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority, type LinkTarget } from "./nxm";
@@ -2647,12 +2648,30 @@ async function checkUpdatesCommand(quiet: boolean, only?: ModInfo[]): Promise<vo
   }
   let updates = 0;
   let failed = 0;
+  // One request per page, however many versions and files of it the library has. The first time a
+  // page is seen, files an older EDGEdeck put together as versions of one mod are split apart.
+  const pages = new Map<number, Promise<NexusFiles>>();
+  const split: string[] = [];
+  const pageFiles = (mod: ModInfo): Promise<NexusFiles> => {
+    const id = mod.source.modId!;
+    let p = pages.get(id);
+    if (!p) {
+      p = client.files(id).then((files) => {
+        const names = splitPage(library!, id, files, mod.nexus?.name ?? mod.name);
+        if (names.length) log.appendLine(`Nexus mod ${id} has files that are mods of their own; now separate: ${names.join(", ")}`);
+        split.push(...names);
+        return files;
+      });
+      pages.set(id, p);
+    }
+    return p;
+  };
   await vscode.window.withProgress({ location: quiet ? vscode.ProgressLocation.Window : vscode.ProgressLocation.Notification, title: "Checking Nexus for updates" }, async (progress) => {
     for (const [i, mod] of mods.entries()) {
       progress.report({ message: `${i + 1} of ${mods.length}: ${mod.name}` });
       try {
-        const files = await client.files(mod.source.modId!);
-        const newest = newestFile(files);
+        const files = await pageFiles(mod);
+        const newest = newestOnPage(library!, mod, files);
         const info = mod.nexus?.name ? undefined : await client.mod(mod.source.modId!);
         mod.nexus = {
           name: info?.name ?? mod.nexus?.name ?? mod.name,
@@ -2674,6 +2693,9 @@ async function checkUpdatesCommand(quiet: boolean, only?: ModInfo[]): Promise<vo
   // Checking a few mods does not put off the daily check of all of them.
   if (!only) await globalState.update("edgedeck.lastUpdateCheck", Date.now());
   refresh();
+  if (split.length) {
+    void vscode.window.showInformationMessage(`${split.length === 1 ? `${split[0]} is` : `${split.join(", ")} are`} now ${split.length === 1 ? "a mod" : "mods"} of ${split.length === 1 ? "its" : "their"} own. An earlier EDGEdeck took ${split.length === 1 ? "it" : "them"} for a version of another file from the same Nexus page. Check which ones you want on.`);
+  }
   // Counted per mod as the table shows it, not per library entry: an older version kept off beside
   // the newest is not an update waiting.
   const checked = new Set(mods.map((m) => familyKey(m)));
@@ -2728,8 +2750,10 @@ async function addFromLink(link: string): Promise<void> {
 }
 
 /**
- * Downloads one Nexus file into the library and adds it. When an older entry for the same Nexus
- * mod exists, the new one takes its place in the order and the old one is turned off.
+ * Downloads one Nexus file into the library and adds it. When the library has an older version of
+ * the same file (its line, nexusLines.ts), the new one takes its place in the order and the old
+ * one is turned off. Another file of the same page (a second main file, an optional one) is a mod
+ * of its own.
  */
 async function fetchFromNexus(modId: number, fileId: number, key?: string, expires?: number, quiet = false): Promise<void> {
   if (!library) return;
@@ -2737,7 +2761,13 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   if (!client) return;
   const [info, files] = await Promise.all([client.mod(modId), client.files(modId)]);
   const file = files.files.find((f) => f.file_id === fileId);
-  const same = findSameVersion(library, modId, fileId, file?.version);
+  const split = splitPage(library, modId, files, info.name);
+  if (split.length) {
+    log.appendLine(`Nexus mod ${modId} has files that are mods of their own; now separate: ${split.join(", ")}`);
+    refresh();
+  }
+  const line = lineOfFile(library, modId, fileId, files);
+  const same = findSameVersion(library, modId, fileId, file?.version, line.key);
   if (same) {
     const r = activateVersion(library, same);
     log.appendLine(`${same.name} ${same.version} is already in the library (${same.id}); made it the active version`);
@@ -2768,8 +2798,10 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
     });
   }
   log.appendLine(`Downloaded ${fileName} (${info.name} ${file?.version ?? ""}) from Nexus mod ${nxm.modId}, md5 ${md5Of(dest)}`);
-  const existing = library.mods.find((m) => m.source.modId === nxm.modId);
-  await addFrom(dest, { name: existing?.name ?? info.name, version: file?.version ?? info.version, source: { type: "nexus", modId: nxm.modId, fileId: nxm.fileId, path: dest }, quiet });
+  const existing = line.entries[0];
+  const name = existing?.name ?? (line.newLine ? lineName(info.name, file?.name) : info.name);
+  if (line.newLine) log.appendLine(`${file?.name ?? fileId} is another file of ${info.name} on Nexus, so it is a mod of its own: ${name}`);
+  await addFrom(dest, { name, version: file?.version ?? info.version, source: { type: "nexus", modId: nxm.modId, fileId: nxm.fileId, path: dest, fileTitle: file?.name }, quiet, family: line.key });
   const added = library.mods[library.mods.length - 1];
   if (added && added.source.modId === nxm.modId && added.source.fileId === nxm.fileId) {
     added.nexus = { name: info.name, version: info.version, latestVersion: file?.version ?? info.version, latestFileId: nxm.fileId, latestFileName: fileName, checked: new Date().toISOString(), author: info.author, summary: info.summary };
@@ -2781,6 +2813,15 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
     refresh();
     if (!quiet) offerDeploy(`${added.name} ${added.version} added in place of ${r.previous.version}${r.on ? "" : " (the mod is off)"}.`);
   }
+}
+
+/**
+ * The newest file Nexus has of a mod: of its own file on the page (nexusLines.ts). Knowing nothing
+ * of its file, on a page with no other file in the library, the page's newest main file.
+ */
+function newestOnPage(lib: Library, mod: ModInfo, files: NexusFiles) {
+  const others = otherLineFiles(lib, mod);
+  return mod.source.fileId !== undefined || mod.source.fileTitle || others.length ? newestInLine(files, lineFile(mod), others) : newestFile(files);
 }
 
 class PremiumError extends Error {
@@ -2799,7 +2840,7 @@ async function updateModCommand(mod: ModInfo | undefined): Promise<void> {
   let fileId = fam.update?.fileId;
   let latest = fam.update?.version;
   if (!fileId || !latest) {
-    const newest = newestFile(await client.files(mod.source.modId));
+    const newest = newestOnPage(library, fam.mods[0], await client.files(mod.source.modId));
     fileId = newest?.file_id;
     latest = newest?.version;
   }
