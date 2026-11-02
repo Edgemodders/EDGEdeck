@@ -166,7 +166,7 @@ The page is -KS- UV Texture Framework (https://www.nexusmods.com/cyberpunk2077/m
 **16. The split** (do this first, while EDGEdeck 0.29.4 from the Marketplace is installed):
 
 1. On the page's Files tab, press **Mod manager download** on **1. UV Framework 4.1**, then on **2. (OPTIONAL) UV HQ Arms**. 0.29.4 shows the bug: HQ Arms arrives as an older version of the framework, switched off, and the framework's version list shows 4.1 and 1.1.
-2. Install the test build: in the Extensions view, **...** > **Install from VSIX...** > `dist\edgedeck-win32-x64-0.29.4.vsix` in the EDGEdeck repo (made by `npm run package`), then reload the window. It still says 0.29.4; that is expected.
+2. Install the test build: in the Extensions view, **...** > **Install from VSIX...** > `dist\edgedeck-win32-x64-0.29.4.vsix` in the EDGEdeck repo (made by `npm run package`). It still says 0.29.4; that is expected. Then reload **every** VS Code window, or close all but one. Not F5: a Mod manager download goes to whichever window VS Code picks, and a window still running the old EDGEdeck takes the link with the old code (on 11-02 a window open since 11-01, on 0.29.2, added Gorilla Arms as a version of the framework while the F5 window showed the new rows). The `EDGEdeck <version> starting` line at the top of each window's EDGEdeck log says which code it runs.
 3. Press **Check updates** on the EDGEdeck page.
 4. **Expect:** a message that **-KS- UV Texture Framework: (OPTIONAL) UV HQ Arms** is now a mod of its own. The list has a row **-KS- UV Texture Framework** with two files under it: **UV Framework** 4.1 (on) and **(OPTIONAL) UV HQ Arms** 1.1 (off). Neither has a version list, and neither is offered an update.
 
