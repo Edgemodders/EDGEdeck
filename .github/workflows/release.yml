@@ -4,8 +4,10 @@
 #                                               Nexus zip as the run's artifact; nothing is published
 #   Run workflow, "Make a release" ticked       also publishes v<package.json version> and tags this
 #                                               commit with it; stops first if that tag exists (raise
-#                                               the version), if it is not run on main, or if
-#                                               CHANGELOG.md has no section for it
+#                                               the version), if it is not run on main, if
+#                                               CHANGELOG.md has no section for it, or if README.md's
+#                                               status line and status badge do not name it
+#                                               (tools/release/readme-check.mjs)
 #   npm run release                             the same as ticking the box, from a terminal
 #   ... and "Update Nexus Mods" ticked          also, after the GitHub release, uploads the Nexus zip
 #                                               to the page as the main file's new version (the old
@@ -97,6 +99,12 @@ jobs:
         run: |
           node scripts/release-notes.mjs "${VERSION}" --out "${RUNNER_TEMP}/notes.md"
           node scripts/release-notes.mjs "${VERSION}" --nexus --out "${RUNNER_TEMP}/nexus-notes.txt"
+
+      # Before anything is built or published: a README whose status line or status badge does not
+      # name the version stops a release here.
+      - name: The README says this release
+        if: env.RELEASE == 'true'
+        run: node tools/release/readme-check.mjs --version "${VERSION}"
 
       - name: Nexus Mods can take this release
         if: env.RELEASE == 'true' && inputs.nexus
