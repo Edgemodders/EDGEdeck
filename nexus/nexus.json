@@ -3,7 +3,7 @@
   "upload": {
     "name": "EDGEdeck",
     "category": "main",
-    "primary": false,
+    "primary": true,
     "modManager": false,
     "archivePrevious": true,
     "description": "EDGEdeck {version}, the VS Code extension. Extract, then in VS Code: Extensions view, ..., Install from VSIX. Or install it from the Marketplace or Open VSX, where it updates itself."
