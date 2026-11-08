@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- **Import from Vortex keeps the Nexus link of mods a newer Vortex downloaded.** Newer Vortex names its folders `Name 12345 1.2.0 2026-11-07T18-59Z hash` instead of `Name-12345-1-2-0-1762541940`, and versions with a letter (`1-0-1a`, `r10`, `beta`) did not match either. Those mods came in without their Nexus id: no Open on Nexus Mods, no update check, and a name with the date and hash in it. Now both kinds of folder give the name, the Nexus id and the version. Mods imported before keep what they have; remove and import them again to link them.
+
 ## 0.30.1 (2026-11-08)
 
 **New**

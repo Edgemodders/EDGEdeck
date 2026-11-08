@@ -1282,6 +1282,19 @@ console.log("undo: ok");
   // A mod known by another name than its download (Cyber Engine Tweaks ships as "CET ... - Scripting fixes").
   assert.equal(core.vortexDisplayName({ name: "CET 1.37.1 - Scripting fixes", modId: 107 }), "Cyber Engine Tweaks");
   assert.equal(core.vortexDisplayName({ name: "Flavorful", modId: 13575 }), "Flavorful", "unknown ids keep their own name");
+  // Both ways Vortex names its folders, with versions that hold letters (real names from a staging folder).
+  const parsed = (f) => core.parseVortexFolder(f);
+  assert.deepEqual(parsed("Codeware-7780-1-20-5-1777845006"), { name: "Codeware", modId: 7780, version: "1.20.5" });
+  assert.deepEqual(parsed("Preem Scanner - No Line Effect Removal-9215-1-0-1a-1695485728"), { name: "Preem Scanner - No Line Effect Removal", modId: 9215, version: "1.0.1a" }, "a letter in an older folder's version");
+  assert.deepEqual(parsed("Eviction Notice-23187-1-0-3-for-2-3-1755569719"), { name: "Eviction Notice", modId: 23187, version: "1.0.3.for.2.3" }, "the id is the first number after the name, not the last");
+  assert.deepEqual(parsed("Flushing Etiquette 27902 3.3.2 2026-11-07T18-59Z D2ZS2n36j"), { name: "Flushing Etiquette", modId: 27902, version: "3.3.2" }, "a newer Vortex's folder");
+  assert.deepEqual(parsed("DroneEngineer 1.1.0 37244 5 2026-11-07T14-27Z 2w0lw1dVD"), { name: "DroneEngineer 1.1.0", modId: 37244, version: "5" }, "a version in the name stays in the name");
+  assert.deepEqual(parsed("vibinFM 99718 1.6-beta 2026-10-02T11-04Z abcDEF123"), { name: "vibinFM", modId: 99718, version: "1.6-beta" });
+  assert.equal(parsed("VBody_MiV2_0"), undefined, "a folder named by hand");
+  fs.mkdirSync(path.join(staging, "Flushing Etiquette 27902 3.3.2 2026-11-07T18-59Z D2ZS2n36j", "archive", "pc", "mod"), { recursive: true });
+  fs.writeFileSync(path.join(staging, "Flushing Etiquette 27902 3.3.2 2026-11-07T18-59Z D2ZS2n36j", "archive", "pc", "mod", "flushing.archive"), "x");
+  const newer = core.listVortexMods(fakeGame, staging).find((m) => m.modId === 27902);
+  assert.ok(newer && newer.name === "Flushing Etiquette" && newer.version === "3.3.2", "a newer Vortex's mod keeps its Nexus id at import");
   console.log("vortex staging: ok");
 }
 
