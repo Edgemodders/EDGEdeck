@@ -5,6 +5,7 @@
 // version tells the lines apart. A page with one line keeps the family key `nexus:<mod id>`, so
 // libraries from before lines need no change; a second line gets `nexus:<mod id>:<first file id>`.
 
+import * as path from "node:path";
 import { baseName, familyKey } from "./families";
 import { saveLibrary, saveMod, type Library, type ModInfo } from "./library";
 import type { NexusFile, NexusFiles } from "./nexus";
@@ -147,6 +148,39 @@ export function otherLineFiles(lib: Library, mod: ModInfo): LineFile[] {
 }
 
 /**
+ * The newest file of a page that offers one mod only: every file it still offers is one line.
+ * Undefined when it offers several (a second main file, an optional one), since a mod whose file
+ * is unknown could be any of them.
+ */
+export function onlyLine(files: NexusFiles, newest: NexusFile | undefined): NexusFile | undefined {
+  if (!newest) return undefined;
+  return files.files.every((f) => !live(f) || sameLine(files, { fileId: f.file_id }, { fileId: newest.file_id })) ? newest : undefined;
+}
+
+/**
+ * The Nexus file a Vortex staging folder holds, from the folder's name. Older Vortex names the
+ * folder after the downloaded file (`Name-<id>-<version>-<unix upload time>`, the file's `file_name`
+ * without its extension); newer Vortex writes the upload time to the minute
+ * (`Name <id> <version> 2026-11-07T18-59Z <hash>`). Undefined when no file, or more than one, fits.
+ */
+export function vortexFile(files: NexusFiles, folder: string): NexusFile | undefined {
+  const byName = files.files.filter((f) => f.file_name.replace(/\.(zip|7z|rar)$/i, "").toLowerCase() === folder.toLowerCase());
+  if (byName.length === 1) return byName[0];
+  const unix = /-(\d{10})$/.exec(folder);
+  if (unix) {
+    const at = files.files.filter((f) => f.uploaded_timestamp === Number(unix[1]));
+    return at.length === 1 ? at[0] : undefined;
+  }
+  const iso = /^.+ \d+ (\S+) (\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})Z \S+$/.exec(folder);
+  if (!iso) return undefined;
+  const minute = Date.parse(`${iso[2]}T${iso[3]}:${iso[4]}:00Z`) / 1000;
+  const at = files.files.filter((f) => f.uploaded_timestamp >= minute && f.uploaded_timestamp < minute + 60);
+  if (at.length === 1) return at[0];
+  const same = at.filter((f) => f.version === iso[1]);
+  return same.length === 1 ? same[0] : undefined;
+}
+
+/**
  * Puts right what an older EDGEdeck did with a page's files: every file of the page was one family,
  * so a second main file (or an optional one) became a "version" of the first and turned it off.
  * Each line found becomes a family of its own, named after the page and the file, in the same
@@ -155,6 +189,16 @@ export function otherLineFiles(lib: Library, mod: ModInfo): LineFile[] {
  */
 export function splitPage(lib: Library, modId: number, files: NexusFiles, pageName: string): string[] {
   const split: string[] = [];
+  // A mod imported from Vortex knows its page, not its file: find the file from the folder's name,
+  // so each of the page's files below is a line of its own.
+  for (const m of lib.mods) {
+    if (m.source.modId !== modId || m.source.type !== "vortex" || m.source.fileId !== undefined || !m.source.path) continue;
+    const f = vortexFile(files, path.basename(m.source.path));
+    if (!f) continue;
+    m.source.fileId = f.file_id;
+    m.source.fileTitle = f.name;
+    saveMod(lib, m);
+  }
   for (const m of lib.mods) {
     const name = m.source.modId === modId && !m.source.fileTitle ? fileOf(files, m.source.fileId)?.name : undefined;
     if (name) {

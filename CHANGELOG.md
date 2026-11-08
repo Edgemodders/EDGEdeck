@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- **Optional files imported from Vortex no longer get another file as their update.** A mod imported from Vortex knew its Nexus page but not its file, so every file of one page (the main file and its optional ones) was one mod, the update check offered the page's newest main file to all of them, and Update all turned the others off. Now the update check finds each mod's file from its Vortex folder's name and makes each file a mod of its own, as for files downloaded from Nexus. A mod whose file is still unknown gets no update on a page that offers more than one mod. See https://github.com/Edgemodders/EDGEdeck/issues/4
+
 ## 0.30.1 (2026-11-08)
 
 **New**
