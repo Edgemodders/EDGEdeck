@@ -13,14 +13,16 @@
 #                                               to the page as the main file's new version (the old
 #                                               one archived, Mod Manager Download off: an extension,
 #                                               not a game mod), adds its changelog and pushes
-#                                               nexus/description.bbcode (tools/nexus/nexus.mjs,
-#                                               copied from REDnode; NEXUS_KEY). It checks the page
+#                                               nexus/description.bbcode (the Nexus tool, from
+#                                               EDGErepo at the tag v1; NEXUS_KEY). It checks the page
 #                                               first and stops before building if nexus/nexus.json
 #                                               names no page, or if the description changed on Nexus
-#                                               since the last pull (node tools/nexus/nexus.mjs pull,
-#                                               merge, commit, run again). If the upload fails after
-#                                               the GitHub release, run tools/nexus/nexus.mjs release
-#                                               on the dev PC with the release's zip: it skips what is
+#                                               since the last pull
+#                                               (node ../EDGErepo/tools/nexus/nexus.mjs pull, merge,
+#                                               commit, run again). If the upload fails after the
+#                                               GitHub release, run
+#                                               node ../EDGErepo/tools/nexus/nexus.mjs release on the
+#                                               dev PC with the release's zip: it skips what is
 #                                               already done.
 #
 # A release publishes to the VS Code Marketplace (VSCE_PAT) and Open VSX (OVSX_PAT, skipped while that
@@ -106,16 +108,22 @@ jobs:
         if: env.RELEASE == 'true'
         run: node tools/release/readme-check.mjs --version "${VERSION}"
 
+      # The Nexus tool, shared by the Edgemodders repos at this tag (REDnode's docs/edgerepo.md). Outside
+      # the workspace, so nothing packs it.
+      - name: The Nexus tool
+        if: env.RELEASE == 'true' && inputs.nexus
+        run: git -c advice.detachedHead=false clone --quiet --depth 1 --branch v1 https://github.com/Edgemodders/EDGErepo "$RUNNER_TEMP/EDGErepo"
+
       - name: Nexus Mods can take this release
         if: env.RELEASE == 'true' && inputs.nexus
         env:
           NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
         run: |
           if [ -z "$(node -p "require('./nexus/nexus.json').page ?? ''")" ]; then
-            echo "::error::nexus/nexus.json names no page yet. Put the page's number in it as \"page\", then run node tools/nexus/nexus.mjs pull (nexus/README.md)."
+            echo "::error::nexus/nexus.json names no page yet. Put the page's number in it as \"page\", then run node ../EDGErepo/tools/nexus/nexus.mjs pull (nexus/README.md)."
             exit 1
           fi
-          node tools/nexus/nexus.mjs check --version "${VERSION}"
+          node "$RUNNER_TEMP/EDGErepo/tools/nexus/nexus.mjs" check --version "${VERSION}"
 
       - run: npm ci
       - run: npm run typecheck
@@ -189,4 +197,4 @@ jobs:
         if: env.RELEASE == 'true' && inputs.nexus
         env:
           NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
-        run: node tools/nexus/nexus.mjs release --version "${VERSION}" --zip "dist/EDGEdeck-${VERSION}-nexus.zip" --notes "${RUNNER_TEMP}/nexus-notes.txt"
+        run: node "$RUNNER_TEMP/EDGErepo/tools/nexus/nexus.mjs" release --version "${VERSION}" --zip "dist/EDGEdeck-${VERSION}-nexus.zip" --notes "${RUNNER_TEMP}/nexus-notes.txt"
