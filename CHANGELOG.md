@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- **Update all works for free Nexus accounts.** For a member without Premium, Update all and a row's update opened each file's page at its manual download, which saves the file to the browser's downloads folder. They now open the Mod manager download page, the one Nexus's own "Mod manager download" button opens, so the file comes back to EDGEdeck through the nxm link.
+
 ## 0.30.1 (2026-11-08)
 
 **New**
