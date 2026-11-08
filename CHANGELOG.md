@@ -12,6 +12,14 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- A Nexus download's notification shows its speed and the time left, as in "12 of 70 MB · 1.4 MB/s · 42 s left". Getting REDbridge shows them too.
+
+**Changed**
+
+- Nexus downloads run one at a time; the others say "waiting: 2 downloads ahead" until their turn. Nexus caps a free account's speed for the whole account (3 MB/s, 1.5 MB/s with an ad blocker), so files downloading at once only shared it. The setting `edgedeck.nexusDownloadsAtOnce` changes the number; 0 means no limit, for Premium.
+
 ## 0.30.1 (2026-11-08)
 
 **New**

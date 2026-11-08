@@ -29,6 +29,7 @@ import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove"
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveLibrary, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
+import { DownloadQueue, progressText, SpeedMeter } from "./downloads";
 import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
@@ -45,6 +46,8 @@ let status: vscode.StatusBarItem;
 let log: vscode.OutputChannel;
 let sevenZa: string | undefined;
 let extensionRoot = "";
+/** Nexus downloads, `edgedeck.nexusDownloadsAtOnce` at a time (downloads.ts says why one by default). */
+const downloadQueue = new DownloadQueue(() => vscode.workspace.getConfiguration("edgedeck").get<number>("nexusDownloadsAtOnce", 1));
 let storageDir = "";
 /** The game folder found through Steam, GOG or Epic, looked up once per reload. */
 let detectedGame: string | undefined;
@@ -1540,9 +1543,15 @@ async function getBridgeCommand(): Promise<void> {
       await installDotnetRuntime((l) => log.appendLine(l));
     }
     let last = 0;
+    let shown = 0;
+    const meter = new SpeedMeter();
     const exe = await installBridge(release, storageDir, sevenZa, (r, t) => {
+      meter.add(r);
+      const now = Date.now();
+      if (now - shown < 500 && r < t) return;
+      shown = now;
       const pct = t ? Math.floor((r / t) * 100) : 0;
-      progress.report({ increment: pct - last, message: `downloading ${Math.round(r / 1048576)} of ${mb} MB` });
+      progress.report({ increment: pct - last, message: `downloading ${progressText(r, t, meter.bytesPerSecond)}` });
       last = pct;
     }, (l) => log.appendLine(l));
     bridgeExe = exe;
@@ -2929,11 +2938,6 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
     if (!quiet) void vscode.window.showInformationMessage(`${info.name} ${same.version} is already in the library${r.previous.id === same.id ? "." : " and is now the active version."}`);
     return;
   }
-  const links = await client.downloadLinks(modId, fileId, key, expires).catch((err: Error) => {
-    if (/403|forbidden|premium/i.test(err.message)) throw new PremiumError();
-    throw err;
-  });
-  if (!links.length) throw new Error("Nexus returned no download link.");
   const nxm = { modId, fileId };
   const fileName = file?.file_name ?? `${info.name}-${nxm.modId}-${nxm.fileId}.zip`;
   const dest = path.join(library.root, "downloads", fileName);
@@ -2941,15 +2945,32 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   const have = fs.existsSync(dest) && !!file && Math.abs(fs.statSync(dest).size - file.size_kb * 1024) < 2048;
   if (have) log.appendLine(`${fileName} is already in downloads, not downloading again`);
   else {
-    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Downloading ${info.name}` }, async (progress) => {
-      let last = 0;
-      await download(links[0].URI, dest, (received, total) => {
-        if (!total) return;
-        const pct = Math.floor((received / total) * 100);
-        progress.report({ increment: pct - last, message: `${Math.round(received / 1048576)} of ${Math.round(total / 1048576)} MB` });
-        last = pct;
-      });
-    });
+    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Downloading ${info.name}` }, (progress) =>
+      downloadQueue.run(
+        async () => {
+          // The link is asked for when the file's turn comes, so it cannot go stale in the queue.
+          progress.report({ message: "starting" });
+          const links = await client.downloadLinks(modId, fileId, key, expires).catch((err: Error) => {
+            if (/403|forbidden|premium/i.test(err.message)) throw new PremiumError();
+            throw err;
+          });
+          if (!links.length) throw new Error("Nexus returned no download link.");
+          const meter = new SpeedMeter();
+          let last = 0;
+          let shown = 0;
+          await download(links[0].URI, dest, (received, total) => {
+            meter.add(received);
+            const now = Date.now();
+            if (now - shown < 500 && received < total) return;
+            shown = now;
+            const pct = total ? Math.floor((received / total) * 100) : 0;
+            progress.report({ increment: pct - last, message: progressText(received, total, meter.bytesPerSecond) });
+            last = pct;
+          });
+        },
+        (ahead) => progress.report({ message: `waiting: ${ahead} ${ahead === 1 ? "download" : "downloads"} ahead` }),
+      ),
+    );
   }
   log.appendLine(`Downloaded ${fileName} (${info.name} ${file?.version ?? ""}) from Nexus mod ${nxm.modId}, md5 ${md5Of(dest)}`);
   const existing = line.entries[0];

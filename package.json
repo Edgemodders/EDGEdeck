@@ -688,6 +688,12 @@
           "default": true,
           "description": "Ask Nexus Mods once a day whether the mods with a Nexus id have a newer file. Needs you signed in (EDGEdeck: Nexus: sign in)."
         },
+        "edgedeck.nexusDownloadsAtOnce": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "description": "How many Nexus downloads run at once; the others wait their turn in their notification. Nexus caps a free account's speed for the whole account (3 MB/s, 1.5 MB/s with an ad blocker), so files downloading at once share it: one at a time gets each file into the library sooner. Premium has no cap; set 0 for no limit."
+        },
         "edgedeck.nexusClientId": {
           "type": "string",
           "default": "",
