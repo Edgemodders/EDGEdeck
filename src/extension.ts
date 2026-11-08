@@ -73,7 +73,8 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
   status.show();
   sevenZa = findSevenZip(extensionRoot);
 
-  view = new ModsView(() => library, statusFor, frameworkCheck, () => state.setup);
+  view = new ModsView(() => library, statusFor, frameworkCheck, () => state.setup, hideOff);
+  void vscode.commands.executeCommand("setContext", HideOffKey, hideOff());
   // Checkboxes by hand: a page group's box is not the sum of its files' boxes (pageGroups.ts).
   tree = vscode.window.createTreeView("edgedeck.mods", { treeDataProvider: view, showCollapseAll: false, manageCheckboxStateManually: true });
   detail = new DetailPanel((action, id) => run(() => detailAction(action, id)));
@@ -110,6 +111,8 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.deploy", () => run(deployCommand)),
     vscode.commands.registerCommand("edgedeck.undo", () => run(undoCommand)),
     vscode.commands.registerCommand("edgedeck.runGame", () => run(runGameCommand)),
+    vscode.commands.registerCommand("edgedeck.hideOff", () => setHideOff(true)),
+    vscode.commands.registerCommand("edgedeck.showAll", () => setHideOff(false)),
     vscode.commands.registerCommand("edgedeck.moveLibrary", () => run(moveLibraryCommand)),
     vscode.commands.registerCommand("edgedeck.getFrameworks", () => run(getFrameworksCommand)),
     vscode.commands.registerCommand("edgedeck.updateAll", () => run(updateAllCommand)),
@@ -782,6 +785,7 @@ function refresh(): void {
   void vscode.commands.executeCommand("setContext", "edgedeck.deployed", !!readManifest(gamePath));
   updateProjectContext();
   updateStatus();
+  updateTreeMessage();
   view.refresh();
   updateDetail();
   updateConflicts();
@@ -1346,6 +1350,27 @@ function toggleGroup(group: PageGroup, loadout?: string): void {
 
 /** Sections folded shut on the mods page, by name. */
 const FoldedKey = "edgedeck.foldedSections";
+
+/** The Mods view's eye: true while it leaves out the mods that are off. */
+const HideOffKey = "edgedeck.hideOff";
+
+function hideOff(): boolean {
+  return globalState.get<boolean>(HideOffKey, false);
+}
+
+/** The eye in the view's title bar: Hide mods that are off, or Show all mods. */
+async function setHideOff(on: boolean): Promise<void> {
+  await globalState.update(HideOffKey, on);
+  void vscode.commands.executeCommand("setContext", HideOffKey, on);
+  updateTreeMessage();
+  view.refresh();
+}
+
+/** Above the list while off mods are hidden, so a short list does not look like lost mods. */
+function updateTreeMessage(): void {
+  const off = library && hideOff() ? families(library).filter((f) => !f.active.enabled).length : 0;
+  tree.message = !off ? undefined : off === families(library!).length ? `All ${off} mods are off and hidden. The eye in the title bar shows them.` : `${off} mod${off === 1 ? " is" : "s are"} off and hidden. The eye in the title bar shows ${off === 1 ? "it" : "them"}.`;
+}
 
 /** Asks for a new section's name; returns it once made. */
 async function newSectionCommand(): Promise<string | undefined> {

@@ -1,6 +1,7 @@
 // The Mods view: one list, grouped into Frameworks, the user's sections and Mods, with a checkbox and a status per mod.
 // A mod expands into the folders and files it deploys; a file opens from the library copy. A Nexus
-// page with two or more of its files in the library is one row over them (pageGroups.ts).
+// page with two or more of its files in the library is one row over them (pageGroups.ts). The eye in
+// the title bar hides the mods that are off; the headers' counts still count them.
 
 import * as path from "node:path";
 import * as vscode from "vscode";
@@ -47,6 +48,8 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
     private readonly status: (mod: ModInfo) => string,
     private readonly frameworks: () => FrameworkCheck | undefined = () => undefined,
     private readonly setup: () => SetupStep[] = () => [],
+    /** The title bar's eye: true leaves out the mods that are off, and sections with none on. */
+    private readonly hideOff: () => boolean = () => false,
   ) {}
 
   refresh(): void {
@@ -63,7 +66,7 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
       const groups: ModNode[] = [];
       const steps = this.setup();
       if (steps.length) groups.push({ type: "group", label: "Set up", mods: [], steps });
-      for (const sec of sectionsOf(lib)) groups.push({ type: "group", label: sec.name, mods: sec.families.map((f) => f.active), user: sec.user, pages: sec.groups });
+      for (const sec of sectionsOf(lib)) if (!this.hideOff() || sec.families.some((f) => f.active.enabled)) groups.push({ type: "group", label: sec.name, mods: sec.families.map((f) => f.active), user: sec.user, pages: sec.groups });
       return groups;
     }
     if (node.type === "group") {
@@ -73,6 +76,7 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
       const seen = new Set<string>();
       for (const mod of node.mods) {
         const page = node.pages?.find((g) => g.families.some((f) => f.active.id === mod.id));
+        if (this.hideOff() && !(page ? page.families.some((f) => f.active.enabled) : mod.enabled)) continue;
         if (!page) out.push({ type: "mod", mod });
         else if (!seen.has(page.key)) {
           seen.add(page.key);
@@ -81,7 +85,7 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
       }
       return out;
     }
-    if (node.type === "page") return node.group.families.map((f) => ({ type: "mod", mod: f.active, label: childName(node.group, f) }));
+    if (node.type === "page") return node.group.families.filter((f) => !this.hideOff() || f.active.enabled).map((f) => ({ type: "mod", mod: f.active, label: childName(node.group, f) }));
     if (node.type === "mod") {
       const groups = new Map<string, string[]>();
       for (const f of node.mod.files) groups.set(topFolder(f), [...(groups.get(topFolder(f)) ?? []), f]);

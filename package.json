@@ -215,6 +215,18 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "edgedeck.hideOff",
+        "title": "Hide mods that are off",
+        "category": "EDGEdeck",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "edgedeck.showAll",
+        "title": "Show all mods",
+        "category": "EDGEdeck",
+        "icon": "$(eye)"
+      },
+      {
         "command": "edgedeck.showLog",
         "title": "Show log",
         "category": "EDGEdeck"
@@ -359,6 +371,16 @@
           "command": "edgedeck.refresh",
           "when": "view == edgedeck.mods",
           "group": "navigation@5"
+        },
+        {
+          "command": "edgedeck.hideOff",
+          "when": "view == edgedeck.mods && !edgedeck.hideOff",
+          "group": "navigation@6"
+        },
+        {
+          "command": "edgedeck.showAll",
+          "when": "view == edgedeck.mods && edgedeck.hideOff",
+          "group": "navigation@6"
         },
         {
           "command": "edgedeck.checkUpdates",
@@ -549,6 +571,14 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "edgedeck.hideOff",
+          "when": "!edgedeck.hideOff"
+        },
+        {
+          "command": "edgedeck.showAll",
+          "when": "edgedeck.hideOff"
+        },
         {
           "command": "edgedeck.remove",
           "when": "false"
