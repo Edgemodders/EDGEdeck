@@ -18,6 +18,8 @@ export interface PageRow {
   deployed: boolean;
   /** Bytes in the library for the active version. */
   size: number;
+  /** When the mod last changed on Nexus, in seconds (`updatedAt`); 0 when nothing says. */
+  updated: number;
   needsDeploy: boolean;
   changed: boolean;
   conflicts: number;
@@ -228,12 +230,13 @@ export function renderPage(d: PageData, csp: string): string {
             .map((v) => `<option value='${msg({ action: "activate", id: v.id })}' ${v.active ? "selected" : ""}>${esc(v.version || "(no version)")}</option>`)
             .join("")}${r.update ? `<option value='${msg({ action: "update", id: r.id })}' class="get">Get ${esc(r.update)} from Nexus</option>` : ""}</select>`
         : `<span class="mono">${esc(r.version)}</span>`;
-    return `<tr draggable="true" data-id="${esc(r.id)}" data-group="${esc(section)}"${r.group ? ` data-pg="${esc(r.group)}"` : ""} data-facets="${facetsOf(r).join(" ")}" data-text="${esc(text)}" data-size="${r.size}" class="${r.enabled ? "" : "offrow"}">
+    return `<tr draggable="true" data-id="${esc(r.id)}" data-group="${esc(section)}"${r.group ? ` data-pg="${esc(r.group)}"` : ""} data-facets="${facetsOf(r).join(" ")}" data-text="${esc(text)}" data-size="${r.size}" data-updated="${r.updated}" class="${r.enabled ? "" : "offrow"}">
 <td class="chk"><input type="checkbox" ${r.enabled ? "checked" : ""} data-msg='${msg({ action: "toggle", id: r.id })}' title="${r.enabled ? "Turn off" : "Turn on"}"></td>
 <td class="name${r.group ? " child" : ""}"><a data-msg='${msg({ action: "details", id: r.id })}'>${esc(r.name)}</a></td>
 <td class="vercell">${versionCell}</td>
 <td>${[...r.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>
 <td class="mono size" data-size="${r.size}" title="${r.size.toLocaleString()} bytes in the library">${fmt(r.size)}</td>
+<td class="mono upd8"${r.updated ? ` title="When this mod's file, or the newest file of its line, was uploaded to Nexus"` : ""}>${r.updated ? new Date(r.updated * 1000).toISOString().slice(0, 10) : ""}</td>
 <td class="${statusClass}">${r.needsDeploy || r.changed ? `<a class="st" data-msg='${msg({ action: "changes", id: r.id })}' title="What the next deploy does for this mod">${esc(r.status)}</a>` : esc(r.status)}${r.update ? `<a class="upd" data-msg='${msg({ action: "update", id: r.id })}' title="Download ${esc(r.update)} from Nexus and put it in this mod's place">update ${esc(r.update)} available</a>` : ""}</td>
 <td class="acts">${buttons.map((b) => `<button class="ico ${b.cls ?? ""}" data-msg='${msg(b.m)}' title="${esc(b.title)}" aria-label="${esc(b.title)}" ${b.off ? "disabled" : ""}>${icon(b.icon)}</button>`).join("")}</td>
 </tr>`;
@@ -265,7 +268,7 @@ export function renderPage(d: PageData, csp: string): string {
     const box = s.rows.length
       ? `<input type="checkbox" class="all" data-section="${esc(s.name)}" ${all ? "checked" : ""} data-some="${some ? 1 : 0}" title="${all ? "Turn off" : "Turn on"} every mod in ${esc(s.name)}">`
       : "";
-    return `<tr class="group ${d.collapsed.includes(s.name) ? "folded" : ""}" data-groupfor="${esc(s.name)}"><td class="chk">${box}</td><td colspan="6"><div class="gline"><button class="fold" data-fold="${esc(s.name)}" aria-expanded="${d.collapsed.includes(s.name) ? "false" : "true"}" title="Fold or unfold ${esc(s.name)}">${icon("fold")}<span class="glabel">${esc(s.name)}</span></button> <span class="dim">${s.rows.length}, ${n} on, ${fmt(s.rows.reduce((t, r) => t + r.size, 0))}</span>${note(s)}<span class="spacer"></span>${bulk}${tools ? `<span class="gsep"></span>${tools}` : ""}</div></td></tr>`;
+    return `<tr class="group ${d.collapsed.includes(s.name) ? "folded" : ""}" data-groupfor="${esc(s.name)}"><td class="chk">${box}</td><td colspan="7"><div class="gline"><button class="fold" data-fold="${esc(s.name)}" aria-expanded="${d.collapsed.includes(s.name) ? "false" : "true"}" title="Fold or unfold ${esc(s.name)}">${icon("fold")}<span class="glabel">${esc(s.name)}</span></button> <span class="dim">${s.rows.length}, ${n} on, ${fmt(s.rows.reduce((t, r) => t + r.size, 0))}</span>${note(s)}<span class="spacer"></span>${bulk}${tools ? `<span class="gsep"></span>${tools}` : ""}</div></td></tr>`;
   };
   // A page group's own row: its box, its name, and buttons in the same slots as a mod row's.
   const pageGroupRow = (g: PageGroupRow, rows: PageRow[], section: string, first: boolean, last: boolean) => {
@@ -292,7 +295,7 @@ export function renderPage(d: PageData, csp: string): string {
     const size = fmt(rows.reduce((t, r) => t + r.size, 0));
     return `<tr class="pghead ${folded ? "folded" : ""} ${g.on ? "" : "offrow"}" draggable="true" data-pg="${esc(g.key)}" data-group="${esc(section)}">
 <td class="chk"><input type="checkbox" class="pgall" data-pg="${esc(g.key)}" ${g.on ? "checked" : ""} data-some="${some ? 1 : 0}" title="${esc(title)}"></td>
-<td colspan="5"><div class="gline"><button class="fold pgfold" data-fold="${esc(g.key)}" aria-expanded="${folded ? "false" : "true"}" title="Fold or unfold the files of ${esc(g.name)}">${icon("fold")}<span class="pglabel">${esc(g.name)}</span></button> <span class="dim">${g.files} files from one Nexus page, ${g.on} on, ${size}</span></div></td>
+<td colspan="6"><div class="gline"><button class="fold pgfold" data-fold="${esc(g.key)}" aria-expanded="${folded ? "false" : "true"}" title="Fold or unfold the files of ${esc(g.name)}">${icon("fold")}<span class="pglabel">${esc(g.name)}</span></button> <span class="dim">${g.files} files from one Nexus page, ${g.on} on, ${size}</span></div></td>
 <td class="acts">${buttons.map((b) => `<button class="ico ${b.cls ?? ""}" data-msg='${msg(b.m)}' title="${esc(b.title)}" aria-label="${esc(b.title)}" ${b.off ? "disabled" : ""}>${icon(b.icon)}</button>`).join("")}</td>
 </tr>`;
   };
@@ -315,7 +318,7 @@ export function renderPage(d: PageData, csp: string): string {
       .join("");
   };
   const body = d.sections
-    .map((s) => groupRow(s) + (s.rows.length ? sectionBody(s) : `<tr class="hint" data-hintfor="${esc(s.name)}"><td></td><td colspan="6">Empty. Drag mods here, or use a mod's section button.</td></tr>`))
+    .map((s) => groupRow(s) + (s.rows.length ? sectionBody(s) : `<tr class="hint" data-hintfor="${esc(s.name)}"><td></td><td colspan="7">Empty. Drag mods here, or use a mod's section button.</td></tr>`))
     .join("");
 
   return `<!doctype html><html><head><meta charset="utf-8">
@@ -347,7 +350,7 @@ tr.offrow td.name a, tr.offrow td.mono { color: var(--dim); }
 .mono { font-family: var(--vscode-editor-font-family); font-size: 12px; } .dim { color: var(--dim); } .ok { color: var(--green); } .warn { color: var(--yellow); } .pend { color: var(--cyan); }
 a.st { color: inherit; cursor: pointer; } a.st:hover { text-decoration: underline; }
 a.changes { color: var(--yellow); cursor: pointer; font-size: 12px; } a.changes:hover { text-decoration: underline; }
-td.size { text-align: right; white-space: nowrap; } th.size { text-align: right; }
+td.size { text-align: right; white-space: nowrap; } td.upd8 { white-space: nowrap; } th.size { text-align: right; }
 .sep { color: var(--line); margin: 0 4px; }
 .upd { display: block; color: var(--yellow); font-size: 12px; cursor: pointer; } .upd:hover { text-decoration: underline; }
 select.ver { font-family: var(--vscode-editor-font-family); font-size: 12px; color: var(--fg); background: var(--vscode-dropdown-background, var(--bg)); border: 1px solid var(--vscode-dropdown-border, var(--line)); padding: 2px 6px; cursor: pointer; }
@@ -443,10 +446,11 @@ ${d.viewing !== d.activeLoadout ? `<div class="editing">Editing the loadout <b>$
   ${chips}
   <span class="sep">|</span>
   <button class="chip" id="bysize" title="Biggest mods first, across every section">Largest first</button>
+  <button class="chip" id="bydate" title="Most recently updated mods first, across every section">Newest update first</button>
   <span class="spacer"></span>
   <button data-msg='${msg({ action: "newSection" })}' title="A section of your own to group mods in">+ Section</button>
 </div>
-${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</th><th>Ver</th><th>Kind</th><th class="size">Size</th><th title="${d.viewing !== d.activeLoadout ? `What the game has, from the active loadout ${esc(d.activeLoadout)}` : ""}">Status${d.viewing !== d.activeLoadout ? ` <span class="stfor">in ${esc(d.activeLoadout)}</span>` : ""}</th><th class="acts">Actions</th></tr></thead><tbody id="rows">${body}</tbody></table><div class="empty" id="none" hidden>No mod matches.</div>` : `<div class="empty">No mods yet. Press + Add mod, or import from Vortex from the Mods view menu.</div>`}
+${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</th><th>Ver</th><th>Kind</th><th class="size">Size</th><th class="upd8">Updated</th><th title="${d.viewing !== d.activeLoadout ? `What the game has, from the active loadout ${esc(d.activeLoadout)}` : ""}">Status${d.viewing !== d.activeLoadout ? ` <span class="stfor">in ${esc(d.activeLoadout)}</span>` : ""}</th><th class="acts">Actions</th></tr></thead><tbody id="rows">${body}</tbody></table><div class="empty" id="none" hidden>No mod matches.</div>` : `<div class="empty">No mods yet. Press + Add mod, or import from Vortex from the Mods view menu.</div>`}
 <div class="foot">
   <span>Library: <a data-msg='${msg({ action: "library" })}'>${esc(d.library)}</a> (${d.method === "link" ? "same drive as the game: hardlinks" : `other drive: copies. <a data-msg='${msg({ action: "moveLibrary" })}'>Move library...</a>`})</span>
   <span>Last deploy: ${d.lastDeploy ? esc(d.lastDeploy) : "never"}</span>
@@ -455,20 +459,24 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
 </div>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
-  const state = Object.assign({ q: "", facet: "all", bySize: false, widths: null }, vscode.getState() || {});
+  const state = Object.assign({ q: "", facet: "all", bySize: false, byDate: false, widths: null }, vscode.getState() || {});
+  // Largest first or Newest update first: one flat list across the sections, no dragging.
+  const sorted = () => state.bySize || state.byDate;
   const post = (m) => vscode.postMessage(m);
   const tbody = document.getElementById("rows");
   const original = tbody ? [...tbody.children] : [];
   function order() {
     if (!tbody) return;
-    if (state.bySize) {
-      const rs = [...tbody.querySelectorAll("tr[data-size]")].sort((a, b) => Number(b.dataset.size) - Number(a.dataset.size));
+    if (sorted()) {
+      const key = state.byDate ? "updated" : "size";
+      const rs = [...tbody.querySelectorAll("tr[data-size]")].sort((a, b) => Number(b.dataset[key]) - Number(a.dataset[key]));
       for (const g of tbody.querySelectorAll("tr.group, tr.pghead")) g.remove();
       for (const r of rs) tbody.appendChild(r);
     } else {
       tbody.replaceChildren(...original);
     }
     document.getElementById("bysize").classList.toggle("active", state.bySize);
+    document.getElementById("bydate").classList.toggle("active", state.byDate);
   }
   const q = document.getElementById("q");
   const rows = [...document.querySelectorAll("tr[data-facets]")];
@@ -484,17 +492,17 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
       r.dataset.match = ok ? "1" : ""; if (ok) shown++;
     }
     const filtering = !!needle || state.facet !== "all";
-    for (const r of rows) r.hidden = !r.dataset.match || (!filtering && !state.bySize && (folded.has(r.dataset.group) || (!!r.dataset.pg && folded.has(r.dataset.pg))));
+    for (const r of rows) r.hidden = !r.dataset.match || (!filtering && !sorted() && (folded.has(r.dataset.group) || (!!r.dataset.pg && folded.has(r.dataset.pg))));
     // A page group's row shows while any of its files does, and folds like a section.
     for (const p of pgs) {
-      p.hidden = state.bySize || (filtering ? !rows.some((r) => r.dataset.match && r.dataset.pg === p.dataset.pg) : folded.has(p.dataset.group));
+      p.hidden = sorted() || (filtering ? !rows.some((r) => r.dataset.match && r.dataset.pg === p.dataset.pg) : folded.has(p.dataset.group));
       p.classList.toggle("folded", !filtering && folded.has(p.dataset.pg));
     }
     for (const g of groups) {
-      g.hidden = state.bySize || (filtering && !rows.some((r) => r.dataset.match && r.dataset.group === g.dataset.groupfor));
+      g.hidden = sorted() || (filtering && !rows.some((r) => r.dataset.match && r.dataset.group === g.dataset.groupfor));
       g.classList.toggle("folded", !filtering && folded.has(g.dataset.groupfor));
     }
-    for (const h of document.querySelectorAll("tr.hint")) h.hidden = state.bySize || filtering || folded.has(h.dataset.hintfor);
+    for (const h of document.querySelectorAll("tr.hint")) h.hidden = sorted() || filtering || folded.has(h.dataset.hintfor);
     for (const c of document.querySelectorAll(".chip")) c.classList.toggle("active", c.dataset.facet === state.facet);
     const none = document.getElementById("none"); if (none) none.hidden = shown > 0;
     const upd = document.getElementById("updall");
@@ -519,7 +527,8 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
   });
   if (q) { q.value = state.q; q.addEventListener("input", () => { state.q = q.value; apply(); }); }
   for (const c of document.querySelectorAll(".chip[data-facet]")) c.addEventListener("click", () => { state.facet = c.dataset.facet; apply(); });
-  document.getElementById("bysize").addEventListener("click", () => { state.bySize = !state.bySize; order(); apply(); });
+  document.getElementById("bysize").addEventListener("click", () => { state.bySize = !state.bySize; if (state.bySize) state.byDate = false; order(); apply(); });
+  document.getElementById("bydate").addEventListener("click", () => { state.byDate = !state.byDate; if (state.byDate) state.bySize = false; order(); apply(); });
   order();
   // A section's bulk buttons act on the rows of that section the search and filter leave showing.
   for (const b of document.querySelectorAll("button[data-bulk]")) b.addEventListener("click", () => {
@@ -555,7 +564,7 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
   const unmark = () => { for (const e of document.querySelectorAll(".dropabove, .dropbelow, .dropin")) e.classList.remove("dropabove", "dropbelow", "dropin"); };
   for (const r of rows) {
     r.addEventListener("dragstart", (e) => {
-      if (state.bySize) { e.preventDefault(); return; }
+      if (sorted()) { e.preventDefault(); return; }
       dragId = r.dataset.id; dragPg = r.dataset.pg || ""; dragGroup = null; r.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", r.dataset.id);
     });
@@ -575,7 +584,7 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
   }
   for (const p of pgs) {
     p.addEventListener("dragstart", (e) => {
-      if (state.bySize) { e.preventDefault(); return; }
+      if (sorted()) { e.preventDefault(); return; }
       dragGroup = p.dataset.pg; dragId = null; dragPg = ""; p.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", p.dataset.pg);
     });

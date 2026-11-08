@@ -954,6 +954,24 @@ function editedLoadout(): string | undefined {
   return library && pageLoadout && pageLoadout !== activeLoadout(library, state.version) ? pageLoadout : undefined;
 }
 
+/**
+ * When a mod last changed on Nexus, in seconds: the later of its installed file's upload and the
+ * newest file of its line, both saved by the update check. Before any check, the upload time in a
+ * Vortex folder's name (older Vortex: unix time at the end; newer: `2026-11-07T18-59Z`), else when it
+ * was added to the library. 0 when nothing says.
+ */
+function updatedAt(mod: ModInfo): number {
+  const t = Math.max(mod.nexus?.fileUploaded ?? 0, mod.nexus?.latestUploaded ?? 0);
+  if (t) return t;
+  const folder = mod.source.type === "vortex" ? path.basename(mod.source.path ?? "") : "";
+  const unix = /-(\d{10})$/.exec(folder);
+  if (unix) return Number(unix[1]);
+  const iso = /(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})Z/.exec(folder);
+  if (iso) return Date.parse(`${iso[1]}T${iso[2]}:${iso[3]}:00Z`) / 1000;
+  const added = mod.added ? Date.parse(mod.added) / 1000 : 0;
+  return Number.isFinite(added) ? Math.round(added) : 0;
+}
+
 function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo; enabled: boolean }): PageRow {
   const p = state.plan;
   const mod = viewed?.mod ?? fam.active;
@@ -968,6 +986,7 @@ function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo
     framework: mod.kinds.includes("framework"),
     deployed: manifestMods.has(mod.id),
     size: library ? modSize(library, mod).total : 0,
+    updated: updatedAt(mod),
     needsDeploy: !!p && (p.add.some((d) => d.mod?.id === mod.id) || p.stale.some((e) => e.mod === mod.id)),
     changed: state.changes.some((c) => c.entry.mod === mod.id && c.kind === "changed"),
     conflicts: p ? p.conflicts.filter((c) => c.winner === mod.id || c.losers.includes(mod.id)).length : 0,
@@ -2833,6 +2852,8 @@ async function checkUpdatesCommand(quiet: boolean, only?: ModInfo[]): Promise<vo
           latestVersion: newest?.version ?? "",
           latestFileId: newest?.file_id ?? 0,
           latestFileName: newest?.file_name ?? "",
+          latestUploaded: newest?.uploaded_timestamp ?? 0,
+          fileUploaded: files.files.find((f) => f.file_id === mod.source.fileId)?.uploaded_timestamp ?? mod.nexus?.fileUploaded ?? 0,
           checked: new Date().toISOString(),
           author: info?.author ?? mod.nexus?.author,
           summary: info?.summary ?? mod.nexus?.summary,

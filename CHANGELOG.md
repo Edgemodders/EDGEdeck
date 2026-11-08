@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- **Newest update first.** The EDGEdeck page has an Updated column, the date the mod's file (or the newest file of its line) was uploaded to Nexus, and a Newest update first button next to Largest first that lists every mod by that date, newest on top, across the sections; like Largest first, it holds dragging until you turn it off. The dates come from Nexus at the update check; before the first check, a mod imported from Vortex shows the date in its Vortex folder's name, and any other mod the day it was added.
+
 ## 0.30.1 (2026-11-08)
 
 **New**
