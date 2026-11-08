@@ -12,6 +12,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.30.1 (2026-11-08)
+
 **New**
 
 - The Mods view's title bar has an eye button, Hide mods that are off: the sidebar list then shows only the mods that are on, with a line above it saying how many are hidden. Click it again to show all mods. EDGEdeck remembers the choice.

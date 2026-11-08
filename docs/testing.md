@@ -151,10 +151,11 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 11-02 | `main` after 0.29.4 (for 0.30.0) | Not recorded | Waiting test 16: **files an older EDGEdeck merged are split**, page 3783 | **Passed**, with Gorilla Arms - remove knuckles as the merged file: a window still on 0.29.2 had taken that link and added it as version 1.0 of UV Framework. After updating that window's EDGEdeck, Check updates split it into its own row under the page. Led to the step "the test build in every window, not F5" |
 | 11-02 | `main` after 0.29.4 (for 0.30.0) | Not recorded | Waiting tests 17 and 18: **each file of a page is a mod of its own**, **the page's row** | **Passed.** Led to a Remove from Library button on the page's row (test 19), and every remove tooltip reads "from Library" |
 | 11-02 | `main` after 0.29.4 (for 0.30.0) | Not recorded | Waiting test 19: **remove a whole page** | **Passed** on the second run. The first run removed the files but left the rows about 10 seconds with no sign of work (a full reload after every remove); fixed the same day: the rows leave on confirm and a notification shows during the conflict check |
+| 11-08 | `main` after 0.30.0 (for 0.30.1) | PC | **Hide mods that are off**, the Mods view's title bar eye | **Passed.** |
 
 ## Waiting for a hand test
 
-Every hand test through 0.29.4 has passed (2026-11-01), and tests 16 to 19 for 0.30.0 (2026-11-02). New ones go in this table, with the columns # (kept until the list is done), Test, Since and Steps; a passed one moves to the table above.
+Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.0 (2026-11-02), and the eye for 0.30.1 (2026-11-08). New ones go in this table, with the columns # (kept until the list is done), Test, Since and Steps; a passed one moves to the table above.
 
 | # | Test | Since | Steps |
 |---|---|---|---|
