@@ -26,8 +26,8 @@ if (watch) {
   const contexts = await Promise.all([esbuild.context(extension), esbuild.context(core), esbuild.context(uiTest), esbuild.context(mcp)]);
   await Promise.all(contexts.map((c) => c.watch()));
 } else {
-  const [ext, , , server] = await Promise.all([esbuild.build({ ...extension, metafile: true }), esbuild.build(core), esbuild.build(uiTest), esbuild.build({ ...mcp, metafile: true })]);
-  writeNotices([ext.metafile, server.metafile]);
+  const [ext, lib, , server] = await Promise.all([esbuild.build({ ...extension, metafile: true }), esbuild.build({ ...core, metafile: true }), esbuild.build(uiTest), esbuild.build({ ...mcp, metafile: true })]);
+  writeNotices([ext.metafile, lib.metafile, server.metafile]);
 }
 
 /**

@@ -12,14 +12,14 @@
             <plugin name="Small">
               <description>The small one.</description>
               <files>
-                <file source="size\small.archive" destination="archive\pc\mod\size.archive"/>
+                <file source="size\small.dat" destination="archive\pc\mod\size.archive"/>
               </files>
               <typeDescriptor><type name="Optional"/></typeDescriptor>
             </plugin>
             <plugin name="Large">
               <description>The large one.</description>
               <files>
-                <file source="size\large.archive" destination="archive\pc\mod\size.archive"/>
+                <file source="size\large.dat" destination="archive\pc\mod\size.archive"/>
               </files>
               <typeDescriptor><type name="Recommended"/></typeDescriptor>
             </plugin>

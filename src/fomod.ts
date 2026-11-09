@@ -1,6 +1,6 @@
 // FOMOD: read a mod's fomod/ModuleConfig.xml into plain data. The resolver, the saved
 // choices and the installer window build on these types.
-import { XMLParser } from "fast-xml-parser";
+import { XMLParser, XMLValidator } from "fast-xml-parser";
 import fs from "./fsx";
 
 export type GroupType = "SelectExactlyOne" | "SelectAtMostOne" | "SelectAtLeastOne" | "SelectAny" | "SelectAll";
@@ -67,7 +67,10 @@ const REPEATING = new Set([
   "installstep", "group", "plugin", "file", "folder", "flag", "flagdependency",
   "filedependency", "dependencies", "pattern",
 ]);
+// preserveOrder keeps the document order of mixed <file> and <folder> entries; toNode turns its
+// output into plain objects (repeating elements as arrays) with the children's order in $order.
 const parser = new XMLParser({
+  preserveOrder: true,
   ignoreAttributes: false,
   attributeNamePrefix: "@",
   textNodeName: "#text",
@@ -76,10 +79,30 @@ const parser = new XMLParser({
   trimValues: true,
   transformTagName: (n) => n.toLowerCase(),
   transformAttributeName: (n) => n.toLowerCase(),
-  isArray: (name) => REPEATING.has(name),
 });
 
 type Node = Record<string, any>;
+
+function toNode(items: any[], attrs?: Record<string, string>): Node {
+  const out: Node = { ...attrs };
+  const order: { tag: string; node: Node }[] = [];
+  for (const item of items) {
+    for (const tag of Object.keys(item)) {
+      if (tag === ":@") continue;
+      if (tag === "#text") {
+        const s = String(item[tag]);
+        if (s) out["#text"] = (out["#text"] ?? "") + s;
+        continue;
+      }
+      const child = toNode(item[tag], item[":@"]);
+      order.push({ tag, node: child });
+      if (REPEATING.has(tag)) (out[tag] ??= []).push(child);
+      else out[tag] ??= child;
+    }
+  }
+  out.$order = order;
+  return out;
+}
 // An empty element parses to "", a missing one to undefined.
 const node = (x: unknown): Node => (x && typeof x === "object" ? (x as Node) : {});
 const list = (x: unknown): Node[] => (Array.isArray(x) ? x.map(node) : []);
@@ -105,8 +128,8 @@ function fileOf(n: Node, folder: boolean): FomodFile {
 }
 
 function filesOf(x: unknown): FomodFile[] {
-  const n = node(x);
-  return [...list(n.file).map((f) => fileOf(f, false)), ...list(n.folder).map((f) => fileOf(f, true))];
+  const order: { tag: string; node: Node }[] = node(x).$order ?? [];
+  return order.filter((c) => c.tag === "file" || c.tag === "folder").map((c) => fileOf(c.node, c.tag === "folder"));
 }
 
 function conditionOf(x: unknown): Condition {
@@ -164,7 +187,10 @@ function stepOf(n: Node): FomodStep {
 }
 
 export function parseModuleConfig(text: string): FomodConfig {
-  const root = node(parser.parse(text).config);
+  const valid = XMLValidator.validate(text);
+  if (valid !== true) throw new Error(`not a FOMOD ModuleConfig.xml: ${valid.err.msg} (line ${valid.err.line})`);
+  const root = toNode(parser.parse(text)).config;
+  if (!root) throw new Error("not a FOMOD ModuleConfig.xml: no <config> element");
   const install = node(root.installsteps);
   return {
     moduleName: str(root.modulename),
