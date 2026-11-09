@@ -1875,7 +1875,6 @@ async function addFomodFrom(source: string, isFile: boolean, folder: string, pre
   const saved = step.action === "install";
   let choices = p.applied.choices;
   let from = p.record?.from ?? "edgedeck";
-  let name: string | undefined;
   if (step.action === "hold") {
     // A quiet add (Update all) never waits on a window: the update waits for review instead.
     if (step.holder) holdForReview(p, step.holder);
@@ -1883,7 +1882,7 @@ async function addFomodFrom(source: string, isFile: boolean, folder: string, pre
     return undefined;
   }
   if (step.action === "window") {
-    const title = `${p.target?.name ?? p.active?.name ?? preset?.name ?? (p.cfg.moduleName || p.name)}${p.version ? ` ${p.version}` : ""}`;
+    const title = `${p.target?.name ?? p.active?.name ?? preset?.name ?? p.name}${p.version ? ` ${p.version}` : ""}`;
     const picked = await openFomodInstaller({ title, subtitle: installerSubtitle(p), cfg: p.cfg, root: p.root, choices, warnings: p.applied.warnings, ctx: { activeFiles: activeFiles(lib) } });
     if (!picked) {
       if (step.holder) {
@@ -1894,15 +1893,10 @@ async function addFomodFrom(source: string, isFile: boolean, folder: string, pre
     }
     choices = picked;
     from = "edgedeck";
-    if (!preset && !p.target && !p.active) {
-      const typed = await vscode.window.showInputBox({ prompt: "Name for this mod", value: p.cfg.moduleName || p.name, validateInput: (v) => (v.trim() ? undefined : "A name is needed") });
-      if (!typed) return undefined;
-      name = typed.trim();
-    }
     // The window may have waited behind others: the family as it is now decides what this replaces.
     p = reprepareFomodAdd(lib, p);
   }
-  const r = finishFomodAdd(lib, p, choices, { from, name });
+  const r = finishFomodAdd(lib, p, choices, { from });
   const mod = r.mod;
   log.appendLine(`${p.target ? "Reinstalled" : "Added"} ${mod.name} ${mod.version} from its installer (${mod.files.length} files, ${mod.kinds.join(", ")}) from ${source}${saved ? ", with the saved options" : ""}`);
   if (p.target) {

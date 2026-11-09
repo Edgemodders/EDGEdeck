@@ -21,6 +21,7 @@ How to keep it:
 **Fixed**
 
 - A FOMOD mod no longer installs every option at once, and its option folders are no longer offered as whole-mod choices.
+- Adding a file with Nexus's newer name (`Name 12345 1.2.0 2026-11-08T15-32Z hash`) gives the mod its name and version without the id, date and hash, and finds the mod of that Nexus page in the library, so a FOMOD file goes over it instead of becoming a second mod.
 
 ## 0.30.1 (2026-11-08)
 

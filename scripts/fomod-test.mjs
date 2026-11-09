@@ -599,6 +599,29 @@ try {
     core.finishFomodAdd(qlib, fresh, picks);
     assert.equal(qlib.mods.length, 1);
 
+    // 11. Nexus's newer file names: "Name <id> <version> <upload time> <hash>"
+    const spaced = "Test Pack FOMOD 13535 1.9.1 2026-11-08T15-32Z OCk3C5Ak1";
+    assert.equal(core.cleanName(spaced), "Test Pack FOMOD");
+    assert.equal(core.versionFrom(spaced), "1.9.1");
+    assert.equal(core.cleanName("Codeware-7780-1-20-3-1777845006"), "Codeware");
+    assert.equal(core.versionFrom("Codeware-7780-1-20-3-1777845006"), "1.20.3");
+    // the file's Nexus id finds its mod even when the mod's name is another; no new mod, no name to ask
+    const nlib = core.loadLibrary(path.join(tmp, "nlib"), game);
+    const { mod: had } = core.finishFomodAdd(nlib, core.prepareFomodAdd(nlib, same(basicRoot)), picks);
+    had.name = "Some Other Name"; had.version = "1.9.1"; had.source = { ...had.source, modId: 13535, fileId: 175526 };
+    core.saveMod(nlib, had);
+    const np = core.prepareFomodAdd(nlib, { source: path.join(tmp, spaced + ".7z"), folder: basicRoot, isFile: true });
+    assert.equal(np.target?.id, had.id);
+    assert.equal(np.active?.id, had.id);
+    assert.equal(np.version, "1.9.1");
+    assert.equal(np.name, "Test Pack FOMOD");
+    // a newer version of that page: no target, but the family is found, so it becomes its new version
+    const nv = core.prepareFomodAdd(nlib, { source: path.join(tmp, "Test Pack FOMOD 13535 1.9.2 2026-12-01T10-00Z Abc123xyz.7z"), folder: basicRoot, isFile: true });
+    assert.equal(nv.target, undefined);
+    assert.equal(nv.active?.id, had.id);
+    assert.equal(nv.version, "1.9.2");
+    assert.equal(nv.source.modId, 13535);
+
     // 10. A parser error reads as "not a FOMOD"
     assert.throws(() => core.parseModuleConfig('<!DOCTYPE config [<!DOCTYPE inner [<!ENTITY a "x">]>]><config/>'), /not a FOMOD ModuleConfig.xml/);
   }
