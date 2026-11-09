@@ -2,7 +2,7 @@
 // prepareFomodAdd works out the family, the version, the mod to reinstall over and the saved
 // choices; finishFomodAdd installs with the choices the caller settled on (saved, given or picked).
 import * as path from "node:path";
-import { baseName, cleanName, families, familyForDownload, familyKey, familyOf, settleNewVersion, versionFrom } from "./families";
+import { baseName, cleanName, families, familyForDownload, familyKey, familyOf, nexusFileName, settleNewVersion, versionFrom } from "./families";
 import { activeFiles, applySaved, findFomodRoot, inferChoices, installFomod, moduleConfigPath, readModuleConfig, type Applied, type FomodConfig, type FomodRecord, type StepChoice } from "./fomod";
 import { downloadsFolder, keepDownload, saveMod, type Library, type ModInfo, type ModSource } from "./library";
 
@@ -58,20 +58,21 @@ export function prepareFomodAdd(lib: Library, opts: FomodAddInput): PreparedFomo
   const modName = path.basename(source, isFile ? path.extname(source) : "");
   const label = opts.name ?? (isFile ? cleanName(modName) : modName);
   const fams = families(lib);
+  // A Nexus file name carries the page's id: it finds the mod even when the names differ.
+  const pageId = preset?.source?.modId ?? (isFile ? nexusFileName(modName)?.modId : undefined);
   // The family: the preset's line (a new line has none yet), else the mod this download is kept for, else the Nexus page, else by name.
   const fam = preset?.family
     ? fams.find((f) => f.key === preset.family)
     : download
       ? familyOf(lib, download)
-      : preset?.source?.modId
-        ? fams.find((f) => f.key === `nexus:${preset.source!.modId}`)
-        : fams.find((f) => f.mods.some((m) => familyKey(m) === `name:${baseName(label)}` || baseName(m.name) === baseName(label)));
+      : (pageId && fams.find((f) => f.key === `nexus:${pageId}`)) ||
+        (preset?.source?.modId ? undefined : fams.find((f) => f.mods.some((m) => familyKey(m) === `name:${baseName(label)}` || baseName(m.name) === baseName(label))));
   const active = fam?.active;
   // The version: the caller's, then the one of the mod this download is kept for, then the file name's, then the active one's (a reinstall).
   const version = preset?.version || download?.version || versionFrom(modName) || active?.version || "";
   const target = download ?? (fam ? fam.mods.find((m) => m.version === version && m.enabled) ?? fam.mods.find((m) => m.version === version) : undefined);
   // Nexus data: all of it from this download's own mod; just the page from the family's active mod.
-  const inherit = download?.source ?? (active?.source.modId ? ({ type: active.source.type, modId: active.source.modId } as ModSource) : undefined);
+  const inherit = download?.source ?? (active?.source.modId ? ({ type: active.source.type, modId: active.source.modId } as ModSource) : pageId ? ({ type: "file", modId: pageId } as ModSource) : undefined);
   const src: ModSource = preset?.source
     ? { ...preset.source, ...(keptPath ? { path: keptPath } : {}) }
     : isFile
