@@ -529,6 +529,69 @@ try {
     }
   }
 
+  // Importing the FOMOD choices Vortex kept
+  {
+    let ClassicLevel;
+    try {
+      ({ ClassicLevel } = require("classic-level"));
+    } catch (e) {
+      console.log(`note: classic-level did not load (${String(e.message).slice(0, 80)}), Vortex choices test skipped`);
+    }
+    if (ClassicLevel) {
+      const stateDir = path.join(tmp, "vstate");
+      const pre = "persistent###mods###cyberpunk2077###";
+      const opts = (step, group, names) => JSON.stringify([{ name: step, groups: [{ name: group, choices: names.map((name, idx) => ({ name, idx })) }] }]);
+      const db = new ClassicLevel(stateDir);
+      await db.open();
+      const put = (id, attr, v) => db.put(`${pre}${id}###attributes###${attr}`, v);
+      await put("Zed Cape-11-1-0-111", "installerChoices###options", opts("Colour", "Colour", ["Red"]));
+      await put("Zed Cape-11-1-0-111", "installerChoices###type", JSON.stringify("fomod"));
+      // value that is JSON inside a JSON string; found by mod id and version
+      await put("Quux Boots-22-2-0-222", "installerChoices###options", JSON.stringify(opts("Size", "Size", ["Big", "Wide"])));
+      await put("Quux Boots-22-2-0-222", "installerChoices###type", JSON.stringify("fomod"));
+      await put("Quux Boots-22-2-0-222", "modId", JSON.stringify(22));
+      await put("Quux Boots-22-2-0-222", "version", JSON.stringify("2.0"));
+      await put("Mine-33-1-0-333", "installerChoices###options", opts("A", "A", ["x"]));
+      await put("Mine-33-1-0-333", "installerChoices###type", JSON.stringify("fomod"));
+      await put("Gone-44-1-0-444", "installerChoices###options", opts("A", "A", ["x"]));
+      await put("Gone-44-1-0-444", "installerChoices###type", JSON.stringify("fomod"));
+      await put("Plain-55-1-0-555", "installerChoices###type", JSON.stringify("unknown"));
+      await put("Other-66-1-0-666", "installerChoices###options", opts("A", "A", ["x"]));
+      await put("Other-66-1-0-666", "installerChoices###type", JSON.stringify("other"));
+      await db.close();
+
+      const list = core.readVortexChoices(stateDir);
+      assert.deepEqual(list.map((v) => v.vortexId).sort(), ["Gone-44-1-0-444", "Mine-33-1-0-333", "Quux Boots-22-2-0-222", "Zed Cape-11-1-0-111"]);
+      const quux = list.find((v) => v.vortexId.startsWith("Quux"));
+      assert.deepEqual(quux, { vortexId: "Quux Boots-22-2-0-222", modId: 22, version: "2.0", choices: [{ step: "Size", group: "Size", plugins: ["Big", "Wide"] }] });
+
+      const vlib = core.loadLibrary(path.join(tmp, "vlib"), game);
+      const mkMod = (id, source, extra = {}) => {
+        const mod = { id, name: id, version: "1.0", kinds: ["archive"], enabled: true, added: "2026-11-09", source, files: [], ...extra };
+        fs.mkdirSync(core.modFolder(vlib, mod), { recursive: true });
+        vlib.mods.push(mod);
+        core.saveMod(vlib, mod);
+        return mod;
+      };
+      // A Windows path with backslashes, a path with slashes, and a mod found by id and version
+      mkMod("zed-cape", { type: "vortex", path: "C:\\Staging\\cyberpunk2077\\Zed Cape-11-1-0-111" });
+      mkMod("quux-boots", { type: "vortex", path: "D:/else/where/renamed", modId: 22 }, { version: "2.0" });
+      mkMod("mine", { type: "vortex", path: "C:\\Staging\\Mine-33-1-0-333" }, { fomod: { choices: [{ step: "A", group: "A", plugins: ["mine"] }], configHash: "h", from: "edgedeck" } });
+      mkMod("old-guess", { type: "vortex", path: "C:\\Staging\\Plain-55-1-0-555" }, { fomod: { choices: [], configHash: "", from: "inferred" } });
+      mkMod("not-vortex", { type: "folder", path: "C:\\Staging\\Gone-44-1-0-444" });
+      const r = core.importVortexChoices(vlib, list);
+      assert.deepEqual(r.matched.map((m) => m.id).sort(), ["quux-boots", "zed-cape"]);
+      assert.deepEqual(r.skipped, ["mine"]);
+      assert.deepEqual(r.unmatched.sort(), ["Gone-44-1-0-444"]);
+      const back = core.loadLibrary(vlib.root, game);
+      assert.deepEqual(back.mods.find((m) => m.id === "zed-cape").fomod, { choices: [{ step: "Colour", group: "Colour", plugins: ["Red"] }], configHash: "", from: "vortex" });
+      assert.equal(back.mods.find((m) => m.id === "mine").fomod.from, "edgedeck");
+      assert.equal(back.mods.find((m) => m.id === "old-guess").fomod.from, "inferred");
+      assert.equal("structure" in back.mods.find((m) => m.id === "quux-boots").fomod, false);
+      assert.throws(() => core.readVortexChoices(path.join(tmp, "nope")), /Vortex/);
+    }
+  }
+
   console.log("fomod tests passed");
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });

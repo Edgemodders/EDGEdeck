@@ -38,7 +38,7 @@ import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, t
 import { currentNxmHandler, describeHandler, forwarderCommand, forwarderExe, nxmFromQuery, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority, type LinkTarget } from "./nxm";
 import { deployedRedmodPackages, deployRedmod, enabledRedmodPackages } from "./redmod";
 import { addToProject, classifyProject, findProjectFile, installProject, projectName, sameNameMod, syncProjects, type BesideHow, type InstallProjectResult } from "./project";
-import { importFromVortex, listVortexMods, vortexDisplayName, vortexStagingCandidates } from "./vortex";
+import { importFromVortex, importVortexChoices, listVortexMods, readVortexChoices, vortexDisplayName, vortexStagingCandidates, vortexStateDir, type VortexChoices } from "./vortex";
 
 let library: Library | undefined;
 let view: ModsView;
@@ -119,6 +119,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.moveLibrary", () => run(moveLibraryCommand)),
     vscode.commands.registerCommand("edgedeck.getFrameworks", () => run(getFrameworksCommand)),
     vscode.commands.registerCommand("edgedeck.updateAll", () => run(updateAllCommand)),
+    vscode.commands.registerCommand("edgedeck.importFomodChoices", () => run(importFomodChoicesCommand)),
     vscode.commands.registerCommand("edgedeck.reviewFomod", (arg?: string | ModNode) => run(() => reviewFomodCommand(arg))),
     vscode.commands.registerCommand("edgedeck.remove", (node: ModNode) => run(() => removeCommand(modOf(node)))),
     vscode.commands.registerCommand("edgedeck.deployMod", (node: ModNode) => run(() => deployModCommand(modOf(node)))),
@@ -3223,6 +3224,33 @@ function offerReview(mod: ModInfo): void {
 }
 
 /** Opens the installer again for an update kept waiting for review (fomod.pending on the family's active mod). */
+/** One-time: gives mods brought over from Vortex the installer choices Vortex kept. Reads Vortex, writes only the library. */
+async function importFomodChoicesCommand(): Promise<void> {
+  if (!library) return;
+  const dir = vortexStateDir();
+  if (!fs.existsSync(dir)) {
+    void vscode.window.showInformationMessage(`Vortex’s data was not found (${dir}), so there are no installer choices to import.`);
+    return;
+  }
+  let list: VortexChoices[];
+  try {
+    list = readVortexChoices(dir);
+  } catch (e) {
+    log.appendLine(`Import FOMOD choices: ${(e as Error).message}`);
+    void vscode.window.showErrorMessage((e as Error).message);
+    return;
+  }
+  const r = importVortexChoices(library, list);
+  for (const m of r.matched) log.appendLine(`FOMOD choices from Vortex: ${m.id} (${m.vortexId})`);
+  for (const id of r.skipped) log.appendLine(`FOMOD choices kept: ${id} already has EDGEdeck choices`);
+  for (const v of r.unmatched) log.appendLine(`FOMOD choices unused: ${v} has no mod here`);
+  refresh();
+  void vscode.window.showInformationMessage(
+    `${r.matched.length} mod${r.matched.length === 1 ? "" : "s"} got their installer choices from Vortex; ${r.unmatched.length} had none here; ${r.skipped.length} kept their EDGEdeck choices.`,
+    { modal: true },
+  );
+}
+
 async function reviewFomodCommand(arg?: string | ModNode): Promise<void> {
   if (!library) return;
   let picked = typeof arg === "string" ? library.mods.find((m) => m.id === arg) : modOf(arg ?? tree.selection[0]);

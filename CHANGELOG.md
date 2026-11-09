@@ -12,6 +12,15 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- FOMOD installers: choose options when you add a FOMOD mod; updates keep your choices and only ask when the installer changed.
+- Import FOMOD choices from Vortex for mods you brought over.
+
+**Fixed**
+
+- A FOMOD mod no longer installs every option at once, and its option folders are no longer offered as whole-mod choices.
+
 ## 0.30.1 (2026-11-08)
 
 **New**

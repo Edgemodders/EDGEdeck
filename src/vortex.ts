@@ -5,7 +5,9 @@
 import fs from "./fsx";
 import * as path from "node:path";
 import { classify } from "./classifier";
-import { addMod, type Library, type ModInfo } from "./library";
+import { addMod, saveMod, type Library, type ModInfo } from "./library";
+import { readLevelDb } from "./leveldbRead";
+import type { StepChoice } from "./fomod";
 
 export interface VortexMod {
   folder: string;
@@ -191,4 +193,86 @@ export function importFromVortex(lib: Library, mods: VortexMod[]): ImportResult 
     result.added.push(mod);
   }
   return result;
+}
+
+/** What Vortex remembers of one FOMOD mod's installer choices. */
+export interface VortexChoices { vortexId: string; modId?: number; version?: string; choices: StepChoice[] }
+
+/** Vortex's state database, in the user's AppData. */
+export function vortexStateDir(): string {
+  return path.join(process.env.APPDATA ?? path.join(process.env.USERPROFILE ?? "", "AppData", "Roaming"), "Vortex", "state.v2");
+}
+
+/** A stored value is JSON, and may be JSON text inside a JSON string. */
+function parseStored(v: string | undefined): unknown {
+  if (v === undefined) return undefined;
+  let x: unknown;
+  try { x = JSON.parse(v); } catch { return v; }
+  if (typeof x === "string" && "[{".includes(x.trimStart().charAt(0)) && x.trim() !== "") {
+    try { x = JSON.parse(x); } catch { /* keep the string */ }
+  }
+  return x;
+}
+
+/** The FOMOD choices Vortex kept per mod; reads a copy of its database, writes nothing. */
+export function readVortexChoices(stateDir: string): VortexChoices[] {
+  const pre = "persistent###mods###cyberpunk2077###";
+  let rows: Map<string, string>;
+  try {
+    rows = readLevelDb(stateDir, pre);
+  } catch (e) {
+    throw new Error(`Could not read Vortex's data in ${stateDir}: ${(e as Error).message}`);
+  }
+  const optSuffix = "###attributes###installerChoices###options";
+  const out: VortexChoices[] = [];
+  for (const [key, raw] of rows) {
+    if (!key.endsWith(optSuffix)) continue;
+    const vortexId = key.slice(pre.length, key.length - optSuffix.length);
+    if (!vortexId || vortexId.includes("###")) continue;
+    const type = parseStored(rows.get(`${pre}${vortexId}###attributes###installerChoices###type`));
+    if (type !== undefined && type !== "fomod") continue;
+    const opts = parseStored(raw);
+    if (!Array.isArray(opts)) continue;
+    const choices: StepChoice[] = [];
+    for (const step of opts as { name?: unknown; groups?: unknown }[]) {
+      if (!step || typeof step.name !== "string" || !Array.isArray(step.groups)) continue;
+      for (const g of step.groups as { name?: unknown; choices?: unknown }[]) {
+        if (!g || typeof g.name !== "string" || !Array.isArray(g.choices)) continue;
+        const plugins = (g.choices as { name?: unknown }[]).map((c) => c?.name).filter((n): n is string => typeof n === "string");
+        choices.push({ step: step.name, group: g.name, plugins });
+      }
+    }
+    const id = Number(parseStored(rows.get(`${pre}${vortexId}###attributes###modId`)));
+    const ver = parseStored(rows.get(`${pre}${vortexId}###attributes###version`));
+    out.push({ vortexId, modId: Number.isFinite(id) && id > 0 ? id : undefined, version: typeof ver === "string" ? ver : undefined, choices });
+  }
+  return out;
+}
+
+/** The last folder name of a path, whichever slash it uses. */
+function lastSegment(p: string): string {
+  return p.split("\\").join("/").split("/").filter(Boolean).pop() ?? "";
+}
+
+/** Gives the library's Vortex mods the choices Vortex kept; a record made by EDGEdeck is never replaced. */
+export function importVortexChoices(lib: Library, list: VortexChoices[]): { matched: { id: string; vortexId: string }[]; unmatched: string[]; skipped: string[] } {
+  const matched: { id: string; vortexId: string }[] = [];
+  const skipped: string[] = [];
+  const used = new Set<string>();
+  const byFolder = new Map(list.map((v) => [v.vortexId, v]));
+  for (const mod of lib.mods) {
+    if (mod.source.type !== "vortex") continue;
+    let v = mod.source.path ? byFolder.get(lastSegment(mod.source.path)) : undefined;
+    if (!v && mod.source.modId) v = list.find((x) => x.modId === mod.source.modId && x.version !== undefined && x.version === mod.version);
+    if (!v) continue;
+    used.add(v.vortexId);
+    if (mod.fomod?.from === "edgedeck") {
+      skipped.push(mod.id);
+      continue;
+    }
+    mod.fomod = { choices: v.choices, configHash: "", from: "vortex" };
+    saveMod(lib, mod);
+    matched.push({ id: mod.id, vortexId: v.vortexId });
+  }
+  return { matched, unmatched: list.filter((v) => !used.has(v.vortexId)).map((v) => v.vortexId), skipped };
 }
