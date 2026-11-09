@@ -373,17 +373,50 @@ try {
     assert.equal(rz.data.added.id, stub.id);
     assert.equal(dlib.mods[0].fomod.from, "edgedeck");
     // a different version: a new entry that keeps the Nexus ids and the kept download
-    stub.version = "0.9";
-    core.saveMod(dlib, stub);
-    const rn = await core.verbs.add(ds, zipFile, undefined, undefined, picks);
-    assert.equal(dlib.mods.length, 2);
-    const added = dlib.mods.find((m) => m.id === rn.data.added.id);
-    assert.equal(added.source.modId, 77);
-    assert.equal(added.source.fileId, 5);
-    assert.equal(added.source.fileTitle, "Main");
-    assert.equal(added.source.type, "nexus");
-    assert.equal(path.resolve(added.source.path).toLowerCase(), path.resolve(kept).toLowerCase());
-    assert.equal(stub.enabled, false);
+    const rn = await core.verbs.add(ds, zipFile);
+    assert.equal(rn.data.added.id, stub.id);
+
+    // Versions: the kept download's own version, the file name's, the family's
+    const mkzip = (name) => {
+      const f = path.join(zipDir, name);
+      execFileSync(sevenZa, ["a", "-tzip", f, path.join(basicRoot, "*")], { stdio: "ignore" });
+      return f;
+    };
+    const vl = core.loadLibrary(path.join(tmp, "vlib2"), game);
+    const vs = { lib: vl, libraryRoot: vl.root, game, sevenZa };
+    const other1 = core.addMod(vl, cl.placements, { name: "Zed One", source: { type: "folder", path: basicRoot } });
+    const keptV = path.join(core.downloadsFolder(vl.root), "Basic Pack-123-1-9-1-1699999999.zip");
+    const act = core.addMod(vl, cl.placements, { name: "Basic Pack", version: "1.9.1", source: { type: "nexus", path: keptV, modId: 123, fileId: 9, fileTitle: "Main" } });
+    const other2 = core.addMod(vl, cl.placements, { name: "Zed Two", source: { type: "folder", path: basicRoot } });
+    const orderBefore = vl.mods.map((m) => m.id);
+    const sameFile = mkzip("Basic Pack-123-1-9-1-1699999999.zip");
+    await core.verbs.add(vs, sameFile, undefined, undefined, picks);
+    const famMods = () => vl.mods.filter((m) => m.source.modId === 123);
+    assert.equal(famMods().length, 1);
+    assert.equal(famMods()[0].id, act.id);
+    assert.equal(famMods()[0].version, "1.9.1");
+    assert.equal(famMods()[0].enabled, true);
+    assert.deepEqual(vl.mods.map((m) => m.id), orderBefore);
+    assert.equal(famMods()[0].source.fileId, 9);
+    assert.equal(famMods()[0].source.fileTitle, "Main");
+    assert.equal(path.resolve(famMods()[0].source.path).toLowerCase(), path.resolve(keptV).toLowerCase());
+    assert.equal(famMods()[0].fomod.from, "edgedeck");
+    // another version of the page: its own entry with that version, the old one off
+    const v2 = mkzip("Basic Pack-123-2-0-1699999999.zip");
+    const r2v = await core.verbs.add(vs, v2);
+    assert.equal(r2v.data.added.version, "2.0");
+    assert.equal(vl.mods.find((m) => m.id === act.id).enabled, false);
+    // no version information with an existing family: replaces the active mod
+    const vl3 = core.loadLibrary(path.join(tmp, "vlib3"), game);
+    const vs3 = { lib: vl3, libraryRoot: vl3.root, game, sevenZa };
+    const fam3 = core.addMod(vl3, cl.placements, { name: "Basic Pack", version: "3.0", source: { type: "file", path: path.join(tmp, "gone.zip") } });
+    await core.verbs.add(vs3, mkzip("Basic Pack.zip"), undefined, undefined, picks);
+    assert.equal(vl3.mods.length, 1);
+    assert.equal(vl3.mods[0].id, fam3.id);
+    assert.equal(vl3.mods[0].version, "3.0");
+    assert.equal(path.basename(vl3.mods[0].source.path), "Basic Pack.zip");
+    await core.verbs.add(vs3, mkzip("Basic Pack.zip"));
+    assert.equal(vl3.mods.length, 1);
   }
 
   console.log("fomod tests passed");

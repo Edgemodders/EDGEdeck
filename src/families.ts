@@ -40,6 +40,24 @@ export function rednodePackageId(mod: Pick<ModInfo, "files">): string | undefine
   return manifest ? /^red4ext\/plugins\/REDnode\/apps\/([^/]+)\//i.exec(manifest)![1].toLowerCase() : undefined;
 }
 
+/**
+ * "Codeware-7780-1-20-3-1777845006" and "CET 1.37.1 - Scripting fixes-107-1-37-1-1759193708" are Nexus
+ * names; "REDnode-0.40.1" and "Codeware v1.20.3" end in their version, which goes in the version field.
+ */
+export function cleanName(base: string): string {
+  const m = /^(.*?)-(\d+)-([\d-]+)-(\d{10})$/.exec(base);
+  const name = (m ? m[1] : base).replace(/[_]+/g, " ").trim();
+  return name.replace(/[\s-]+v?\d+(?:\.\d+)+$/i, "").trim() || name;
+}
+
+/** The version a download's file name carries: "Name-123-1-0-1699999999" (Nexus) or a trailing "1.2.3" / "v1.2.3". "" when there is none. */
+export function versionFrom(base: string): string {
+  const m = /^(.*?)-(\d+)-([\d-]+)-(\d{10})/.exec(base);
+  if (m) return m[3].replace(/-/g, ".");
+  const v = /\b(v?\d+(?:\.\d+)+)\b/i.exec(base);
+  return v ? v[1].replace(/^v/i, "") : "";
+}
+
 export function familyKey(mod: ModInfo): string {
   if (mod.family) return mod.family;
   if (mod.source.modId) return `nexus:${mod.source.modId}`;
