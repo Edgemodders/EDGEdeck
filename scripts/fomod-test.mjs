@@ -42,6 +42,50 @@ try {
   assert.throws(() => core.parseModuleConfig("<config><moduleName>M</config>"), /not a FOMOD ModuleConfig.xml/);
   assert.throws(() => core.parseModuleConfig("<other/>"), /not a FOMOD ModuleConfig.xml/);
 
+  // Resolver
+  const basicRoot = path.join(fx, "basic");
+  const ctx = { activeFiles: new Set() };
+  const def = core.defaultChoices(config, ctx);
+  assert.deepEqual(def.find((c) => c.group === "Size").plugins, ["Large"]);
+  let r = core.resolveFomod(config, basicRoot, [{ step: "Size", group: "Size", plugins: ["Small"] }, { step: "Extras", group: "Extras", plugins: [] }], ctx);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.files.map((f) => f.to).sort(), ["archive/pc/mod/size.archive", "r6/scripts/Test/core.reds"]);
+  assert.ok(r.files.find((f) => f.to === "archive/pc/mod/size.archive").from.endsWith(path.join("size", "small.dat")));
+  assert.deepEqual(r.visibleSteps, ["Size", "Extras"]);
+  r = core.resolveFomod(config, basicRoot, [{ step: "Size", group: "Size", plugins: ["Small"] }, { step: "Extras", group: "Extras", plugins: ["Hats"] }], ctx);
+  assert.deepEqual(r.visibleSteps, ["Size", "Extras", "Hat colour"]);
+  assert.equal(r.flags.hats, "on");
+  assert.match(r.errors.join("\n"), /Hat colour.*exactly one/i);
+  // A folder with an empty destination lands at the game root; a Missing file dependency makes Gloves unusable
+  const gloves = [{ step: "Size", group: "Size", plugins: ["Large"] }, { step: "Extras", group: "Extras", plugins: ["Gloves"] }];
+  r = core.resolveFomod(config, basicRoot, gloves, ctx);
+  assert.match(r.errors.join("\n"), /Extras.*Gloves.*not usable/i);
+  r = core.resolveFomod(config, basicRoot, gloves, { activeFiles: new Set(["archive/pc/mod/other.archive"]) });
+  assert.deepEqual(r.errors, []);
+  assert.ok(r.files.some((f) => f.to === "r6/tweaks/gloves.dat"));
+  // Wrong counts and unknown plugins
+  r = core.resolveFomod(config, basicRoot, [{ step: "Size", group: "Size", plugins: ["Small", "Large"] }, { step: "Extras", group: "Extras", plugins: ["Nope"] }], ctx);
+  assert.match(r.errors.join("\n"), /Size.*exactly one/i);
+  assert.match(r.errors.join("\n"), /Extras.*Nope/);
+
+  // Rules fixture: case-insensitive sources, no destination, priority, folders, SelectAll, conditionals
+  const rulesRoot = path.join(fx, "rules");
+  const rules = core.readModuleConfig(path.join(rulesRoot, "fomod", "ModuleConfig.xml")).config;
+  const pick = (...plugins) => [{ step: "Pick", group: "Pick", plugins }];
+  r = core.resolveFomod(rules, rulesRoot, pick(), ctx);
+  assert.deepEqual(r.errors, []);
+  assert.ok(r.files.some((f) => f.to === "CORE/Core.reds" && f.from.endsWith(path.join("core", "core.reds"))));
+  assert.ok(r.files.find((f) => f.to === "archive/pc/mod/p.archive").from.endsWith(path.join("a", "one.dat")));
+  assert.ok(r.files.some((f) => f.to === "r6/fixed.txt"));
+  assert.ok(!r.files.some((f) => f.to === "r6/both.txt"));
+  r = core.resolveFomod(rules, rulesRoot, pick("Two"), ctx);
+  assert.ok(r.files.find((f) => f.to === "archive/pc/mod/p.archive").from.endsWith(path.join("b", "two.dat")));
+  assert.ok(r.files.some((f) => f.to === "r6/both.txt"));
+  r = core.resolveFomod(rules, rulesRoot, pick("Two", "Three"), ctx);
+  assert.ok(r.files.find((f) => f.to === "archive/pc/mod/p.archive").from.endsWith(path.join("c", "three.dat")));
+  r = core.resolveFomod(rules, rulesRoot, pick("Pack"), ctx);
+  assert.ok(r.files.some((f) => f.to === "r6/pack/inner/deep.dat"));
+
   console.log("fomod tests passed");
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });

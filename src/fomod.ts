@@ -1,6 +1,7 @@
 // FOMOD: read a mod's fomod/ModuleConfig.xml into plain data. The resolver, the saved
 // choices and the installer window build on these types.
 import { XMLParser, XMLValidator } from "fast-xml-parser";
+import path from "node:path";
 import fs from "./fsx";
 
 export type GroupType = "SelectExactlyOne" | "SelectAtMostOne" | "SelectAtLeastOne" | "SelectAny" | "SelectAll";
@@ -201,4 +202,146 @@ export function parseModuleConfig(text: string): FomodConfig {
       files: filesOf(p.files),
     })),
   };
+}
+
+// ---- Resolving choices into files ----
+
+export interface StepChoice { step: string; group: string; plugins: string[] }
+// activeFiles: lower-case game paths (forward slashes) of files deployed by the mods that are on.
+export interface ResolveContext { activeFiles: Set<string> }
+export interface Resolved {
+  files: { from: string; to: string }[];
+  flags: Record<string, string>;
+  visibleSteps: string[];
+  errors: string[];
+}
+
+const slashes = (p: string): string => p.replace(/[\\]/g, "/").replace(/^\/+|\/+$/g, "");
+
+function holds(c: Condition, flags: Record<string, string>, ctx: ResolveContext): boolean {
+  const results: boolean[] = [
+    ...c.flags.map((f) => (flags[f.name] ?? "") === f.value),
+    ...c.files.map((f) => (ctx.activeFiles.has(slashes(f.file).toLowerCase()) ? f.state === "Active" : f.state !== "Active")),
+    ...c.nested.map((n) => holds(n, flags, ctx)),
+  ];
+  if (!results.length) return true;
+  return c.op === "Or" ? results.some(Boolean) : results.every(Boolean);
+}
+
+function typeOf(p: FomodPlugin, flags: Record<string, string>, ctx: ResolveContext): PluginType {
+  return p.typePatterns.find((t) => holds(t.when, flags, ctx))?.type ?? p.type;
+}
+
+const isVisible = (s: FomodStep, flags: Record<string, string>, ctx: ResolveContext): boolean =>
+  !s.visible || holds(s.visible, flags, ctx);
+
+// What the installer window starts with: Required and Recommended plugins, plus a first usable
+// one where the group needs a pick. Only the steps visible with those picks are listed.
+export function defaultChoices(cfg: FomodConfig, ctx: ResolveContext): StepChoice[] {
+  const flags: Record<string, string> = {};
+  const out: StepChoice[] = [];
+  for (const step of cfg.steps) {
+    if (!isVisible(step, flags, ctx)) continue;
+    for (const group of step.groups) {
+      const typed = group.plugins.map((p) => ({ p, t: typeOf(p, flags, ctx) }));
+      let chosen = group.type === "SelectAll"
+        ? typed.filter((x) => x.t !== "NotUsable")
+        : typed.filter((x) => x.t === "Required" || x.t === "Recommended");
+      if (group.type === "SelectExactlyOne" || group.type === "SelectAtMostOne") {
+        const must = typed.filter((x) => x.t === "Required");
+        chosen = must.length ? must.slice(0, 1) : chosen.slice(0, 1);
+        if (!chosen.length && group.type === "SelectExactlyOne") chosen = typed.filter((x) => x.t !== "NotUsable").slice(0, 1);
+      } else if (group.type === "SelectAtLeastOne" && !chosen.length) {
+        chosen = typed.filter((x) => x.t !== "NotUsable").slice(0, 1);
+      }
+      for (const x of chosen) for (const f of x.p.flags) flags[f.name] = f.value;
+      out.push({ step: step.name, group: group.name, plugins: chosen.map((x) => x.p.name) });
+    }
+  }
+  return out;
+}
+
+// Every file under root, keyed by lower-case relative path (forward slashes).
+function indexFiles(root: string): Map<string, string> {
+  const index = new Map<string, string>();
+  const walk = (dir: string, rel: string): void => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(`${dir}/${e.name}`, r);
+      else index.set(r.toLowerCase(), r);
+    }
+  };
+  try { walk(root, ""); } catch { /* an unreadable root has no files; every source then reports missing */ }
+  return index;
+}
+
+export function resolveFomod(cfg: FomodConfig, root: string, choices: StepChoice[], ctx: ResolveContext): Resolved {
+  const flags: Record<string, string> = {};
+  const errors: string[] = [];
+  const visibleSteps: string[] = [];
+  const index = indexFiles(root);
+  const picked = new Map<string, { to: string; from: string; priority: number }>();
+
+  const add = (list: FomodFile[]): void => {
+    for (const f of list) {
+      const source = slashes(f.source);
+      const dest = slashes(f.destination);
+      const hits: { rel: string; to: string }[] = [];
+      if (f.folder) {
+        const prefix = source ? source.toLowerCase() + "/" : "";
+        for (const [lower, rel] of index) {
+          if (!lower.startsWith(prefix)) continue;
+          const inside = rel.slice(prefix.length);
+          hits.push({ rel, to: dest ? `${dest}/${inside}` : inside });
+        }
+        if (!hits.length) errors.push(`Folder "${f.source}" is not in the mod.`);
+      } else {
+        const rel = index.get(source.toLowerCase());
+        if (!rel) { errors.push(`File "${f.source}" is not in the mod.`); continue; }
+        const endsDir = /[\\/]$/.test(f.destination);
+        const to = !dest ? source : endsDir ? `${dest}/${rel.split("/").pop()}` : dest;
+        hits.push({ rel, to });
+      }
+      for (const h of hits) {
+        const key = h.to.toLowerCase();
+        const old = picked.get(key);
+        if (!old || f.priority >= old.priority) picked.set(key, { to: h.to, from: path.join(root, ...h.rel.split("/")), priority: f.priority });
+      }
+    }
+  };
+
+  add(cfg.required);
+  for (const step of cfg.steps) {
+    if (!isVisible(step, flags, ctx)) continue;
+    visibleSteps.push(step.name);
+    for (const group of step.groups) {
+      const where = `Step "${step.name}", group "${group.name}"`;
+      const names = choices.find((c) => c.step === step.name && c.group === group.name)?.plugins ?? [];
+      const chosen: FomodPlugin[] = [];
+      for (const n of names) {
+        const p = group.plugins.find((x) => x.name === n);
+        if (p) { if (!chosen.includes(p)) chosen.push(p); } else errors.push(`${where}: there is no option "${n}".`);
+      }
+      if (group.type === "SelectAll") {
+        chosen.length = 0;
+        chosen.push(...group.plugins);
+      } else {
+        if (group.type === "SelectExactlyOne" && chosen.length !== 1) errors.push(`${where}: choose exactly one option.`);
+        if (group.type === "SelectAtLeastOne" && !chosen.length) errors.push(`${where}: choose at least one option.`);
+        if (group.type === "SelectAtMostOne" && chosen.length > 1) errors.push(`${where}: choose at most one option.`);
+        for (const p of group.plugins) {
+          const t = typeOf(p, flags, ctx);
+          if (t === "Required" && !chosen.includes(p)) errors.push(`${where}: "${p.name}" is required.`);
+          if (t === "NotUsable" && chosen.includes(p)) errors.push(`${where}: "${p.name}" is not usable here.`);
+        }
+      }
+      for (const p of chosen) {
+        add(p.files);
+        for (const f of p.flags) flags[f.name] = f.value;
+      }
+    }
+  }
+  for (const c of cfg.conditional) if (holds(c.when, flags, ctx)) add(c.files);
+
+  return { files: [...picked.values()].map(({ to, from }) => ({ from, to })), flags, visibleSteps, errors };
 }
