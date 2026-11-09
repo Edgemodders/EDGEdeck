@@ -105,6 +105,71 @@ try {
   r = core.resolveFomod(dst("a\\\\.\\b.txt"), rulesRoot, [], ctx);
   assert.deepEqual(r.files.map((f) => f.to), ["a/b.txt"]);
 
+  // Saved choices and compatibility
+  const hashed = (t) => core.configHash(t);
+  assert.equal(hashed("<a>  x \n y </a>"), hashed("<a> x y </a>"));
+  assert.notEqual(hashed("<a>x</a>"), hashed("<a>y</a>"));
+  const saved = { choices: [{ step: "Size", group: "Size", plugins: ["Small"] }, { step: "Extras", group: "Extras", plugins: ["Gloves"] }], configHash: core.configHash(text), structure: core.structureOf(config), from: "edgedeck" };
+  const gloveCtx = { activeFiles: new Set(["archive/pc/mod/other.archive"]) };
+  const installedOf = (rec) => core.resolveFomod(config, basicRoot, rec.choices, gloveCtx).files.map((f) => f.to);
+  const parsed = (t) => core.parseModuleConfig(t);
+  let a = core.applySaved(config, text, basicRoot, saved, installedOf(saved), gloveCtx);
+  assert.equal(a.compatible, true);
+  assert.deepEqual(a.warnings, []);
+  assert.deepEqual(a.choices.find((c) => c.group === "Size").plugins, ["Small"]);
+  // same hash, but the file dependency now resolves differently (the other mod is gone)
+  a = core.applySaved(config, text, basicRoot, saved, installedOf(saved), ctx);
+  assert.equal(a.compatible, false);
+  assert.ok(a.warnings.some((w) => w.kind === "required" && w.group === "Extras"));
+  // same hash, installed list unknown or different: not compatible
+  assert.equal(core.applySaved(config, text, basicRoot, saved, undefined, gloveCtx).compatible, false);
+  assert.equal(core.applySaved(config, text, basicRoot, saved, ["r6/scripts/Test/core.reds"], gloveCtx).compatible, false);
+  // new plugin in a SelectAny group
+  const textPlus = text.replace('<plugin name="Gloves">', '<plugin name="Scarf"><description>s</description></plugin><plugin name="Gloves">');
+  a = core.applySaved(parsed(textPlus), textPlus, basicRoot, saved, undefined, gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.deepEqual(a.warnings, [{ step: "Extras", group: "Extras", plugin: "Scarf", kind: "new" }]);
+  assert.deepEqual(a.choices.find((c) => c.group === "Extras").plugins, ["Gloves"]);
+  // chosen plugin renamed away: gone, the rest kept, default for the group
+  const textRen = text.replace('name="Small"', 'name="Tiny"');
+  a = core.applySaved(parsed(textRen), textRen, basicRoot, saved, undefined, gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.ok(a.warnings.some((w) => w.kind === "gone" && w.plugin === "Small" && w.group === "Size"));
+  assert.ok(a.warnings.some((w) => w.kind === "new" && w.plugin === "Tiny"));
+  assert.deepEqual(a.choices.find((c) => c.group === "Size").plugins, ["Large"]);
+  assert.deepEqual(a.choices.find((c) => c.group === "Extras").plugins, ["Gloves"]);
+  // a step that vanished
+  const textNoExtras = text.replace(/<installStep name="Extras">[\s\S]*?<\/installStep>\s*(?=<installStep name="Hat)/, "");
+  assert.notEqual(textNoExtras, text);
+  a = core.applySaved(parsed(textNoExtras), textNoExtras, basicRoot, saved, undefined, gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.ok(a.warnings.some((w) => w.kind === "gone" && w.step === "Extras"));
+  // no structure (imported from Vortex): not compatible even when nothing changed; choices kept
+  const vortex = { choices: saved.choices, configHash: saved.configHash, from: "vortex" };
+  a = core.applySaved(config, text, basicRoot, vortex, installedOf(saved), gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.deepEqual(a.choices.find((c) => c.group === "Size").plugins, ["Small"]);
+  // new SelectAll group: still compatible (hash differs, so the file list is not compared)
+  const textAll = text.replace(/<\/optionalFileGroups>(\s*<\/installStep>\s*<installStep name="Extras">)/, '<group name="Always" type="SelectAll"><plugins order="Explicit"><plugin name="Bonus"><description>b</description></plugin></plugins></group></optionalFileGroups>$1');
+  assert.notEqual(textAll, text);
+  a = core.applySaved(parsed(textAll), textAll, basicRoot, saved, undefined, gloveCtx);
+  assert.deepEqual(a.warnings, []);
+  assert.equal(a.compatible, true);
+  // the same new group needing a choice: not compatible
+  const textNewGroup = textAll.replace('type="SelectAll"', 'type="SelectAny"');
+  a = core.applySaved(parsed(textNewGroup), textNewGroup, basicRoot, saved, undefined, gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.deepEqual(a.warnings, [{ step: "Size", group: "Always", kind: "new" }]);
+  // a new required pick nobody made: required warning
+  const textReq = textAll.replace('type="SelectAll"', 'type="SelectAtLeastOne"').replace('<description>b</description>', '<description>b</description><typeDescriptor><type name="NotUsable"/></typeDescriptor>');
+  a = core.applySaved(parsed(textReq), textReq, basicRoot, saved, undefined, gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.ok(a.warnings.some((w) => w.kind === "required" && w.group === "Always"));
+  // no saved record: defaults, not compatible
+  a = core.applySaved(config, text, basicRoot, undefined, undefined, ctx);
+  assert.equal(a.compatible, false);
+  assert.deepEqual(a.choices, core.defaultChoices(config, ctx));
+
   console.log("fomod tests passed");
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
