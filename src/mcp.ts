@@ -76,10 +76,10 @@ server.registerTool(
   "edgedeck_add",
   {
     title: "Add a mod",
-    description: "Adds a zip, 7z, rar or folder to the library, working out what kind of mod it is and where its files go. The mod starts on; deploy to put it in the game. An archive with several options fails with their labels; call again with option.",
-    inputSchema: { path: z.string().describe("Full path of the archive or folder"), name: z.string().optional().describe("A name; default is the file name"), option: z.string().optional().describe("Which option of a multi-option archive to take") },
+    description: "Adds a zip, 7z, rar or folder to the library, working out what kind of mod it is and where its files go. The mod starts on; deploy to put it in the game. An archive with several options fails with their labels; call again with option. A FOMOD installer installs by itself when the earlier choices still fit; otherwise it fails with its options, and you call again with fomodChoices.",
+    inputSchema: { path: z.string().describe("Full path of the archive or folder"), name: z.string().optional().describe("A name; default is the file name"), option: z.string().optional().describe("Which option of a multi-option archive to take"), fomodChoices: z.array(z.object({ step: z.string(), group: z.string(), plugins: z.array(z.string()) })).optional().describe("For a FOMOD: the choices, one entry per step and group") },
   },
-  ({ path: p, name, option }) => run(() => verbs.add(session(), p, name, option))(),
+  ({ path: p, name, option, fomodChoices }) => run(() => verbs.add(session(), p, name, option, fomodChoices))(),
 );
 
 server.registerTool(

@@ -328,6 +328,64 @@ try {
   assert.equal(core.familyForDownload(lib, dl.toUpperCase().split(path.sep).join("/")).id, m2.id);
   assert.equal(core.familyForDownload(lib, path.join(tmp, "other.zip")), undefined);
 
+  // verbs.add: questions, choices, silent reinstall, download family
+  const sevenZa = path.join(import.meta.dirname, "..", "node_modules", "7zip-bin", "win", "x64", "7za.exe");
+  const vlib = core.loadLibrary(path.join(tmp, "vlib"), game);
+  const sess = { lib: vlib, libraryRoot: vlib.root, game, sevenZa };
+  await assert.rejects(() => core.verbs.add(sess, basicRoot), (e) => {
+    assert.match(e.message, /Size \/ Size \(SelectExactlyOne\): Small, Large/);
+    assert.match(e.message, /fomodChoices/);
+    return true;
+  });
+  assert.equal(vlib.mods.length, 0);
+  const picks = [{ step: "Size", group: "Size", plugins: ["Small"] }];
+  const r1 = await core.verbs.add(sess, basicRoot, undefined, undefined, picks);
+  assert.equal(r1.data.added.files, 2);
+  const m1 = vlib.mods[0];
+  assert.equal(m1.fomod.from, "edgedeck");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(core.modFolder(vlib, m1), "mod.json"), "utf8")).fomod.from, "edgedeck");
+  await assert.rejects(() => core.verbs.add(sess, basicRoot, undefined, undefined, [{ step: "Size", group: "Size", plugins: ["Nope"] }]), /no option "Nope"/);
+  const r2 = await core.verbs.add(sess, basicRoot);
+  assert.equal(vlib.mods.length, 1);
+  assert.equal(r2.data.added.id, m1.id);
+  assert.deepEqual(vlib.mods[0].fomod.choices.find((c) => c.group === "Size").plugins, ["Small"]);
+  // inferred records are never silent
+  vlib.mods[0].fomod.from = "inferred";
+  await assert.rejects(() => core.verbs.add(sess, basicRoot), /guessed/);
+  vlib.mods[0].fomod.from = "edgedeck";
+
+  // a kept download: the new mod inherits the Nexus data of the download's mod
+  if (fs.existsSync(sevenZa)) {
+    const { execFileSync } = require("node:child_process");
+    const zipDir = path.join(tmp, "zips");
+    fs.mkdirSync(zipDir);
+    const zipFile = path.join(zipDir, "Basic Pack-1-0.zip");
+    execFileSync(sevenZa, ["a", "-tzip", zipFile, path.join(basicRoot, "*")], { stdio: "ignore" });
+    const dlib = core.loadLibrary(path.join(tmp, "dlib"), game);
+    const ds = { lib: dlib, libraryRoot: dlib.root, game, sevenZa };
+    const kept = path.join(core.downloadsFolder(dlib.root), "Basic Pack-1-0.zip");
+    fs.mkdirSync(path.dirname(kept), { recursive: true });
+    const stub = core.addMod(dlib, cl.placements, { name: "Basic Pack", version: "", source: { type: "nexus", path: kept, modId: 77, fileId: 5, fileTitle: "Main" } });
+    await assert.rejects(() => core.verbs.add(ds, zipFile), /Size \/ Size/);
+    const rz = await core.verbs.add(ds, zipFile, undefined, undefined, picks);
+    // same version as the family's active mod: reinstalled over it
+    assert.equal(dlib.mods.length, 1);
+    assert.equal(rz.data.added.id, stub.id);
+    assert.equal(dlib.mods[0].fomod.from, "edgedeck");
+    // a different version: a new entry that keeps the Nexus ids and the kept download
+    stub.version = "0.9";
+    core.saveMod(dlib, stub);
+    const rn = await core.verbs.add(ds, zipFile, undefined, undefined, picks);
+    assert.equal(dlib.mods.length, 2);
+    const added = dlib.mods.find((m) => m.id === rn.data.added.id);
+    assert.equal(added.source.modId, 77);
+    assert.equal(added.source.fileId, 5);
+    assert.equal(added.source.fileTitle, "Main");
+    assert.equal(added.source.type, "nexus");
+    assert.equal(path.resolve(added.source.path).toLowerCase(), path.resolve(kept).toLowerCase());
+    assert.equal(stub.enabled, false);
+  }
+
   console.log("fomod tests passed");
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
