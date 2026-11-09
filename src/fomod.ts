@@ -539,7 +539,7 @@ export function stageFomod(resolved: Resolved, stageDir: string): string[] {
   const base = path.resolve(stageDir);
   const skipped: string[] = [];
   for (const f of resolved.files) {
-    const segs = f.to.split(/[\/]/);
+    const segs = f.to.split(/[\\/]/);
     if (!f.to || segs.some((s) => s.includes(":"))) throw new Error(`Refusing to install "${f.to}": not a valid target path.`);
     const dest = path.resolve(base, ...segs);
     if (!dest.startsWith(base + path.sep)) throw new Error(`Refusing to install "${f.to}": it points outside the mod folder.`);
@@ -607,7 +607,7 @@ export interface InstallFomodOptions {
   text: string;
   choices: StepChoice[];
   from: FomodRecord["from"];
-  /** Reinstall over this mod (same version) instead of adding a new one. */
+  /** Reinstall over this mod instead of adding a new one. Its version and source are kept as they are; only files, kinds and the FOMOD record change. */
   replace?: ModInfo;
 }
 
