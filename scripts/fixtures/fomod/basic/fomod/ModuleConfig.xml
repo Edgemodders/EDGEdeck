@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
+  <moduleName>Test Mod</moduleName>
+  <requiredInstallFiles>
+    <file source="core\core.reds" destination="r6\scripts\Test\core.reds"/>
+  </requiredInstallFiles>
+  <installSteps order="Explicit">
+    <installStep name="Size">
+      <optionalFileGroups order="Explicit">
+        <group name="Size" type="SelectExactlyOne">
+          <plugins order="Explicit">
+            <plugin name="Small">
+              <description>The small one.</description>
+              <files>
+                <file source="size\small.dat" destination="archive\pc\mod\size.archive"/>
+              </files>
+              <typeDescriptor><type name="Optional"/></typeDescriptor>
+            </plugin>
+            <plugin name="Large">
+              <description>The large one.</description>
+              <files>
+                <file source="size\large.dat" destination="archive\pc\mod\size.archive"/>
+              </files>
+              <typeDescriptor><type name="Recommended"/></typeDescriptor>
+            </plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
+    <installStep name="Extras">
+      <optionalFileGroups order="Explicit">
+        <group name="Extras" type="SelectAny">
+          <plugins order="Explicit">
+            <plugin name="Hats">
+              <description>Adds hats.</description>
+              <conditionFlags>
+                <flag name="hats">on</flag>
+              </conditionFlags>
+              <typeDescriptor><type name="Optional"/></typeDescriptor>
+            </plugin>
+            <plugin name="Gloves">
+              <description>Adds gloves.</description>
+              <files>
+                <folder source="extras\gloves" destination=""/>
+              </files>
+              <typeDescriptor>
+                <dependencyType>
+                  <defaultType name="Optional"/>
+                  <patterns>
+                    <pattern>
+                      <dependencies><fileDependency file="archive\pc\mod\other.archive" state="Missing"/></dependencies>
+                      <type name="NotUsable"/>
+                    </pattern>
+                  </patterns>
+                </dependencyType>
+              </typeDescriptor>
+            </plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
+    <installStep name="Hat colour">
+      <visible>
+        <flagDependency flag="hats" value="on"/>
+      </visible>
+      <optionalFileGroups order="Explicit">
+        <group name="Colour" type="SelectExactlyOne">
+          <plugins order="Explicit">
+            <plugin name="Red"><description>Red hats.</description></plugin>
+            <plugin name="Blue"><description>Blue hats.</description></plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
+  </installSteps>
+</config>

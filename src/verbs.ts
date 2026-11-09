@@ -7,6 +7,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { classify, rednodeManifest } from "./classifier";
 import { familyOf, renameFamily, settleNewVersion } from "./families";
+import { activeFiles, defaultChoices, findFomodRoot, resolveFomod, type FomodConfig, type StepChoice, type Warning } from "./fomod";
+import { finishFomodAdd, prepareFomodAdd } from "./fomodAdd";
 import { deploy, detectChanges, modStatus, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, type Decision, type Lost } from "./deploy";
 import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
 import { checkFrameworks, frameworkSummary } from "./frameworks";
@@ -64,6 +66,47 @@ function gameReady(s: Session): void {
   if (!isGameFolder(s.game)) throw new Error(`${s.game} does not look like the Cyberpunk 2077 folder (no bin\\x64\\Cyberpunk2077.exe). Pass --game or set it in EDGEdeck.`);
 }
 
+function fomodWarning(w: Warning): string {
+  const where = [w.step, w.group, w.plugin].filter(Boolean).join(" / ");
+  return `${w.kind === "new" ? "new since the last install" : w.kind === "gone" ? "no longer in the installer" : "now needs a choice"}: ${where}`;
+}
+
+/** What the installer asks, one line per visible group, for the caller to answer with fomodChoices. */
+function fomodQuestions(cfg: FomodConfig, root: string, ctx: { activeFiles: Set<string> }, why: string, warnings: Warning[]): string {
+  const visible = resolveFomod(cfg, root, defaultChoices(cfg, ctx), ctx).visibleSteps;
+  const lines = cfg.steps.filter((st) => visible.includes(st.name)).flatMap((st) => st.groups.map((g) => `${st.name} / ${g.name} (${g.type}): ${g.plugins.map((p) => p.name).join(", ")}`));
+  const warn = warnings.length ? `\nChanges to look at:\n${warnings.map(fomodWarning).join("\n")}` : "";
+  return `This mod has an installer (FOMOD) and ${why}. Its options:\n${lines.join("\n")}${warn}\nCall again with fomodChoices: one entry { step, group, plugins } per group above.`;
+}
+
+/** Adds a FOMOD: the given choices, or the family's saved ones when they still fit; otherwise it throws the questions. */
+function addFomod(s: Session, source: string, isFile: boolean, name: string | undefined, folder: string, given?: StepChoice[]): Verb {
+  const lib = s.lib;
+  const p = prepareFomodAdd(lib, { source, folder, isFile, name });
+  if (given) {
+    // A step or group the installer lacks would be dropped without a word: refuse it instead.
+    const unknown = given.filter((c) => !p.cfg.steps.some((st) => st.name === c.step && st.groups.some((g) => g.name === c.group)));
+    if (unknown.length) {
+      const ctx = { activeFiles: activeFiles(lib) };
+      throw new Error(`fomodChoices names steps or groups this installer does not have: ${unknown.map((c) => `${c.step} / ${c.group}`).join(", ")}.\n${fomodQuestions(p.cfg, p.root, ctx, "the choices given do not match it", [])}`);
+    }
+  }
+  let choices = given;
+  let from: "edgedeck" | "vortex" | "inferred" = "edgedeck";
+  if (!choices) {
+    const ctx = { activeFiles: activeFiles(lib) };
+    if (!p.record) throw new Error(fomodQuestions(p.cfg, p.root, ctx, "nothing is saved for it yet", []));
+    if (!p.silent) {
+      throw new Error(fomodQuestions(p.cfg, p.root, ctx, p.inferred ? "the earlier choices were only guessed" : "the saved choices no longer fit this version", p.applied.warnings));
+    }
+    choices = p.applied.choices;
+    from = p.record.from;
+  }
+  const { mod, unplaced, replaced, older } = finishFomodAdd(lib, p, choices, { from });
+  const note = p.target ? "; it replaces the files of the same version" : replaced ? `; a new version of ${replaced.name} ${replaced.version}, which is off now` : older ? `; older than ${older.version}, so it is off` : "";
+  return { data: { added: { id: mod.id, name: mod.name, version: mod.version, kinds: mod.kinds, files: mod.files.length, enabled: mod.enabled }, replaced: replaced?.id, unplaced }, text: `added ${mod.id} from its installer (${mod.files.length} files, ${mod.kinds.join(", ")})${note}; ${mod.enabled ? "it is on, " : ""}deploy to put it in the game${unplaced.length ? `; not placed: ${unplaced.join(", ")}` : ""}` };
+}
+
 export const verbs = {
   /** Every mod with its status and size, the library totals and the frameworks line. */
   async list(s: Session, largestFirst = false): Promise<Verb> {
@@ -110,7 +153,7 @@ export const verbs = {
   },
 
   /** Adds a zip, 7z, rar, a single mod file or a folder. An archive with options needs the option's label. */
-  async add(s: Session, source: string, name?: string, option?: string): Promise<Verb> {
+  async add(s: Session, source: string, name?: string, option?: string, fomodChoices?: StepChoice[]): Promise<Verb> {
     if (!fs.existsSync(source)) throw new Error(`${source} does not exist`);
     const isFile = fs.statSync(source).isFile();
     const modName = name ?? path.basename(source, isFile ? path.extname(source) : "");
@@ -122,6 +165,8 @@ export const verbs = {
         await unpackOrCopy(source, temp, s.sevenZa);
         folder = temp;
       }
+      const fomodRoot = findFomodRoot(folder);
+      if (fomodRoot) return addFomod(s, source, isFile, name, folder, fomodChoices);
       let c = classify(folder, modName);
       if (c.options) {
         const pick = option ? c.options.find((o) => o.label === option) : undefined;

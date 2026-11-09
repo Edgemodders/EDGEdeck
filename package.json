@@ -209,6 +209,16 @@
         "icon": "$(arrow-circle-up)"
       },
       {
+        "command": "edgedeck.importFomodChoices",
+        "title": "Import FOMOD choices from Vortex",
+        "category": "EDGEdeck"
+      },
+      {
+        "command": "edgedeck.reviewFomod",
+        "title": "Review FOMOD options",
+        "category": "EDGEdeck"
+      },
+      {
         "command": "edgedeck.refresh",
         "title": "Refresh",
         "category": "EDGEdeck",
@@ -736,6 +746,7 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "smoke": "node scripts/smoke.mjs",
+    "test:fomod": "node scripts/fomod-test.mjs",
     "package": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && vsce package --no-dependencies --target win32-x64 --readme-path docs/marketplace.md --out dist/",
     "test:ui": "node scripts/ui-test.mjs",
     "release:notes": "node scripts/release-notes.mjs",
@@ -745,6 +756,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
     "7zip-bin": "^5.2.0",
+    "fast-xml-parser": "4.5.0",
+    "snappyjs": "0.7.0",
     "vscode-jsonrpc": "^9.0.3",
     "zod": "^4.6.7"
   },
@@ -753,6 +766,7 @@
     "@types/vscode": "1.80.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
+    "classic-level": "1.4.1",
     "esbuild": "^0.28.2",
     "ovsx": "^1.2.0",
     "typescript": "~5.9.3"

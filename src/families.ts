@@ -5,6 +5,7 @@
 // on at a time. A Nexus page with several files that are mods of their own (two main files) has a
 // family per file, with `family` set on all but the first (nexusLines.ts).
 
+import * as path from "node:path";
 import { singleRednodeApp } from "./classifier";
 import { placeAbove, saveMod, type Library, type ModInfo } from "./library";
 import { versionNewer } from "./nexus";
@@ -37,6 +38,41 @@ export function baseName(name: string): string {
 export function rednodePackageId(mod: Pick<ModInfo, "files">): string | undefined {
   const manifest = singleRednodeApp(mod.files);
   return manifest ? /^red4ext\/plugins\/REDnode\/apps\/([^/]+)\//i.exec(manifest)![1].toLowerCase() : undefined;
+}
+
+/**
+ * The name, Nexus id and version in a Nexus file name, both ways Nexus names files:
+ * older `Name-<id>-<version with dashes>-<unix time>` (`Codeware-7780-1-20-3-1777845006`) and newer
+ * `Name <id> <version> <upload time> <hash>` (`Test Pack FOMOD 13535 1.9.1 2026-11-08T15-32Z OCk3C5Ak1`).
+ * Undefined for any other name.
+ */
+export function nexusFileName(base: string): { name: string; modId: number; version: string } | undefined {
+  const spaced = /^(.+) (\d+) (\S+) \d{4}-\d{2}-\d{2}T\d{2}-\d{2}Z \S+$/.exec(base);
+  if (spaced) return { name: spaced[1], modId: Number(spaced[2]), version: spaced[3] };
+  const dashed = /^(.*?)-(\d+)-([\d-]+)-(\d{10})$/.exec(base);
+  if (dashed) return { name: dashed[1], modId: Number(dashed[2]), version: dashed[3].replace(/-/g, ".") };
+  return undefined;
+}
+
+/**
+ * "Codeware-7780-1-20-3-1777845006", "Test Pack FOMOD 13535 1.9.1 2026-11-08T15-32Z OCk3C5Ak1" and
+ * "CET 1.37.1 - Scripting fixes-107-1-37-1-1759193708" are Nexus names; "REDnode-0.40.1" and
+ * "Codeware v1.20.3" end in their version, which goes in the version field.
+ */
+export function cleanName(base: string): string {
+  const n = nexusFileName(base);
+  const name = (n ? n.name : base).replace(/[_]+/g, " ").trim();
+  return name.replace(/[\s-]+v?\d+(?:\.\d+)+$/i, "").trim() || name;
+}
+
+/** The version a download's file name carries: a Nexus file name's, or a trailing "1.2.3" / "v1.2.3". "" when there is none. */
+export function versionFrom(base: string): string {
+  const n = nexusFileName(base.replace(/\.(7z|zip|rar)$/i, ""));
+  if (n) return n.version;
+  const m = /^(.*?)-(\d+)-([\d-]+)-(\d{10})/.exec(base);
+  if (m) return m[3].replace(/-/g, ".");
+  const v = /\b(v?\d+(?:\.\d+)+)\b/i.exec(base);
+  return v ? v[1].replace(/^v/i, "") : "";
 }
 
 export function familyKey(mod: ModInfo): string {
@@ -182,4 +218,11 @@ export function familiesWithTwoOn(lib: Library): Family[] {
  */
 export function findSameVersion(lib: Library, modId: number, fileId: number, version?: string, line = `nexus:${modId}`): ModInfo | undefined {
   return lib.mods.find((m) => m.source.modId === modId && (m.source.fileId === fileId || (!!version && m.version === version && familyKey(m) === line)));
+}
+
+/** The mod whose source is this kept download file (path compare, any case, either slash). */
+export function familyForDownload(lib: Library, file: string): ModInfo | undefined {
+  const norm = (p: string): string => path.resolve(p).toLowerCase();
+  const want = norm(file);
+  return lib.mods.find((m) => !!m.source.path && norm(m.source.path) === want);
 }

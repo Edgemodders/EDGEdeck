@@ -12,6 +12,17 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- FOMOD installers: choose options when you add a FOMOD mod; updates keep your choices and only ask when the installer changed.
+- Import FOMOD choices from Vortex for mods you brought over.
+- To change a FOMOD mod's options, add the same file again (or press Mod manager download again on Nexus): its installer opens with your current choices.
+
+**Fixed**
+
+- A FOMOD mod no longer installs every option at once, and its option folders are no longer offered as whole-mod choices.
+- Adding a file with Nexus's newer name (`Name 12345 1.2.0 2026-11-08T15-32Z hash`) gives the mod its name and version without the id, date and hash, and finds the mod of that Nexus page in the library, so a FOMOD file goes over it instead of becoming a second mod.
+
 ## 0.30.1 (2026-11-08)
 
 **New**

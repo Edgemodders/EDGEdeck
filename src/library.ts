@@ -6,6 +6,7 @@ import fs from "./fsx";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { Placement } from "./classifier";
+import type { FomodRecord } from "./fomod";
 
 /** What is inside a mod, by where its files land. A mod can be several kinds at once. */
 export type ModKind = "archive" | "xl" | "redmod" | "reds" | "tweak" | "cet" | "red4ext" | "audioware" | "input" | "config" | "asi" | "framework" | "rednode" | "other";
@@ -37,6 +38,8 @@ export interface ModInfo {
   renamedFrom?: string;
   /** For a project's mod: a hash of the file list its packed folder had at the last sync, so a removed or renamed file re-syncs it too. */
   packedList?: string;
+  /** What the FOMOD installer was given (choices, what it offered), so an update can reuse it. */
+  fomod?: FomodRecord;
   /** What Nexus last said about this mod, when it has a mod id. */
   nexus?: { name: string; version: string; latestVersion: string; latestFileId: number; latestFileName: string; checked: string; author?: string; summary?: string };
 }
@@ -79,6 +82,9 @@ export function backupFolder(root: string): string {
   return path.join(root, "backup");
 }
 
+/** Work folders of replaceModFiles that a crash or a locked file left behind: never mods. */
+const LeftoverFolder = /[.](new|old)-[^/]*$/;
+
 /** Reads the library, creating an empty one if the folder is new. */
 export function loadLibrary(root: string, gamePath: string): Library {
   fs.mkdirSync(libraryFolder(root), { recursive: true });
@@ -90,7 +96,7 @@ export function loadLibrary(root: string, gamePath: string): Library {
   info.gamePath = gamePath || info.gamePath;
   const mods: ModInfo[] = [];
   for (const entry of fs.readdirSync(libraryFolder(root), { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory() || LeftoverFolder.test(entry.name)) continue;
     const file = path.join(libraryFolder(root), entry.name, "mod.json");
     if (!fs.existsSync(file)) continue;
     try {
@@ -168,6 +174,69 @@ export function addMod(lib: Library, placements: Placement[], opts: AddOptions):
   saveMod(lib, mod);
   saveLibrary(lib);
   return mod;
+}
+
+/**
+ * Reinstall over an existing mod: builds the whole new tree beside the mod folder, then swaps it in, so a
+ * failed copy leaves the mod as it was. Id, order and settings stay; files in the folder that the mod did
+ * not list are carried over. Files are copied, never written through an existing (hardlinked) file.
+ */
+export function replaceModFiles(lib: Library, mod: ModInfo, placements: Placement[]): void {
+  const dir = modFolder(lib, mod);
+  const stamp = `${process.pid}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const fresh = `${dir}.new-${stamp}`;
+  const aside = `${dir}.old-${stamp}`;
+  const next: ModInfo = { ...mod };
+  try {
+    fs.mkdirSync(fresh, { recursive: true });
+    const files = new Set<string>();
+    const placed = new Set<string>(); // lower case: the library folder is case-insensitive on Windows
+    for (const p of placements) {
+      const dest = path.join(fresh, ...p.to.split("/"));
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(p.from, dest);
+      files.add(p.to);
+      placed.add(p.to.toLowerCase());
+    }
+    // Whatever else sits in the folder (not listed in mod.files, not mod.json) stays.
+    const listed = new Set(mod.files.map((f) => f.toLowerCase()));
+    const carry = (sub: string): void => {
+      for (const e of fs.readdirSync(path.join(dir, sub), { withFileTypes: true })) {
+        const rel = sub ? `${sub}/${e.name}` : e.name;
+        if (e.isDirectory()) carry(rel);
+        else if (!listed.has(rel.toLowerCase()) && rel !== "mod.json" && !placed.has(rel.toLowerCase())) {
+          fs.mkdirSync(path.dirname(path.join(fresh, ...rel.split("/"))), { recursive: true });
+          fs.copyFileSync(path.join(dir, ...rel.split("/")), path.join(fresh, ...rel.split("/")));
+        }
+      }
+    };
+    if (fs.existsSync(dir)) carry("");
+    next.files = [...files].sort();
+    next.kinds = [...new Set(placements.map((p) => p.kind))];
+    fs.writeFileSync(path.join(fresh, "mod.json"), JSON.stringify(next, null, 2) + "\n");
+  } catch (e) {
+    fs.rmSync(fresh, { recursive: true, force: true });
+    throw e;
+  }
+  try {
+    fs.renameSync(dir, aside);
+  } catch (e) {
+    fs.rmSync(fresh, { recursive: true, force: true });
+    throw e;
+  }
+  try {
+    fs.renameSync(fresh, dir);
+  } catch (e) {
+    fs.renameSync(aside, dir);
+    fs.rmSync(fresh, { recursive: true, force: true });
+    throw e;
+  }
+  mod.files = next.files;
+  mod.kinds = next.kinds;
+  // The swap is done. Dropping the old folder is best effort (a scanner may hold a file in it): its mod.json goes
+  // first, and the loader skips leftover .old-/.new- folders anyway.
+  try { fs.unlinkSync(path.join(aside, "mod.json")); } catch { /* leftover is skipped by the loader */ }
+  try { fs.rmSync(aside, { recursive: true, force: true }); } catch { /* same */ }
 }
 
 export function removeMod(lib: Library, mod: ModInfo): void {

@@ -17,6 +17,8 @@ export interface DetailData {
   bridge: string;
   /** A version on Nexus newer than every version of this mod in the library. */
   update?: string;
+  /** The version of a downloaded FOMOD update waiting for its options to be reviewed. */
+  review?: string;
   /** This mod's versions in the library, newest first. */
   versions: { id: string; version: string; enabled: boolean }[];
   /** The Nexus page group this mod is a file of: the page's name and every file of it in the library (pageGroups.ts). */
@@ -150,6 +152,7 @@ ${nexusLine}
   <button data-action="open">Open folder</button>
   <button data-action="rename" title="A new name in EDGEdeck; files and the game do not change">Rename</button>
   ${mod.source.modId ? `<button data-action="nexus">Open on Nexus</button>` : ""}
+  ${d.review ? `<button data-action="reviewFomod" title="Open the installer for the downloaded update; the version in use stays until you install">Review options of ${esc(d.review)}</button>` : ""}
   ${update ? `<button data-action="update" title="Download it from Nexus and put it in this mod's place">Update to ${esc(update)}</button>` : ""}
   <button data-action="remove" class="danger">Remove</button>
 </div>
