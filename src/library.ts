@@ -82,6 +82,9 @@ export function backupFolder(root: string): string {
   return path.join(root, "backup");
 }
 
+/** Work folders of replaceModFiles that a crash or a locked file left behind: never mods. */
+const LeftoverFolder = /[.](new|old)-[^/]*$/;
+
 /** Reads the library, creating an empty one if the folder is new. */
 export function loadLibrary(root: string, gamePath: string): Library {
   fs.mkdirSync(libraryFolder(root), { recursive: true });
@@ -93,7 +96,7 @@ export function loadLibrary(root: string, gamePath: string): Library {
   info.gamePath = gamePath || info.gamePath;
   const mods: ModInfo[] = [];
   for (const entry of fs.readdirSync(libraryFolder(root), { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory() || LeftoverFolder.test(entry.name)) continue;
     const file = path.join(libraryFolder(root), entry.name, "mod.json");
     if (!fs.existsSync(file)) continue;
     try {
@@ -228,7 +231,10 @@ export function replaceModFiles(lib: Library, mod: ModInfo, placements: Placemen
   }
   mod.files = next.files;
   mod.kinds = next.kinds;
-  fs.rmSync(aside, { recursive: true, force: true });
+  // The swap is done. Dropping the old folder is best effort (a scanner may hold a file in it): its mod.json goes
+  // first, and the loader skips leftover .old-/.new- folders anyway.
+  try { fs.unlinkSync(path.join(aside, "mod.json")); } catch { /* leftover is skipped by the loader */ }
+  try { fs.rmSync(aside, { recursive: true, force: true }); } catch { /* same */ }
 }
 
 export function removeMod(lib: Library, mod: ModInfo): void {
