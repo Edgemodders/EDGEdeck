@@ -173,27 +173,62 @@ export function addMod(lib: Library, placements: Placement[], opts: AddOptions):
   return mod;
 }
 
-/** Same-version reinstall: removes the files the mod had, copies the new ones in and rewrites its file list and kinds. Id, order and settings stay. */
+/**
+ * Reinstall over an existing mod: builds the whole new tree beside the mod folder, then swaps it in, so a
+ * failed copy leaves the mod as it was. Id, order and settings stay; files in the folder that the mod did
+ * not list are carried over. Files are copied, never written through an existing (hardlinked) file.
+ */
 export function replaceModFiles(lib: Library, mod: ModInfo, placements: Placement[]): void {
   const dir = modFolder(lib, mod);
-  for (const f of mod.files) {
-    const file = path.join(dir, ...f.split("/"));
-    fs.rmSync(file, { force: true });
-    // Tidy the emptied folders, never the mod folder itself.
-    for (let d = path.dirname(file); d !== dir && d.startsWith(dir); d = path.dirname(d)) {
-      try { if (fs.readdirSync(d).length) break; fs.rmdirSync(d); } catch { break; }
+  const stamp = `${process.pid}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const fresh = `${dir}.new-${stamp}`;
+  const aside = `${dir}.old-${stamp}`;
+  const next: ModInfo = { ...mod };
+  try {
+    fs.mkdirSync(fresh, { recursive: true });
+    const files = new Set<string>();
+    for (const p of placements) {
+      const dest = path.join(fresh, ...p.to.split("/"));
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(p.from, dest);
+      files.add(p.to);
     }
+    // Whatever else sits in the folder (not listed in mod.files, not mod.json) stays.
+    const listed = new Set(mod.files.map((f) => f.toLowerCase()));
+    const carry = (sub: string): void => {
+      for (const e of fs.readdirSync(path.join(dir, sub), { withFileTypes: true })) {
+        const rel = sub ? `${sub}/${e.name}` : e.name;
+        if (e.isDirectory()) carry(rel);
+        else if (!listed.has(rel.toLowerCase()) && rel !== "mod.json" && !files.has(rel)) {
+          fs.mkdirSync(path.dirname(path.join(fresh, ...rel.split("/"))), { recursive: true });
+          fs.copyFileSync(path.join(dir, ...rel.split("/")), path.join(fresh, ...rel.split("/")));
+        }
+      }
+    };
+    if (fs.existsSync(dir)) carry("");
+    next.files = [...files].sort();
+    next.kinds = [...new Set(placements.map((p) => p.kind))];
+    fs.writeFileSync(path.join(fresh, "mod.json"), JSON.stringify(next, null, 2) + "\n");
+  } catch (e) {
+    fs.rmSync(fresh, { recursive: true, force: true });
+    throw e;
   }
-  const files = new Set<string>();
-  for (const p of placements) {
-    const dest = path.join(dir, ...p.to.split("/"));
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.copyFileSync(p.from, dest);
-    files.add(p.to);
+  try {
+    fs.renameSync(dir, aside);
+  } catch (e) {
+    fs.rmSync(fresh, { recursive: true, force: true });
+    throw e;
   }
-  mod.files = [...files].sort();
-  mod.kinds = [...new Set(placements.map((p) => p.kind))];
-  saveMod(lib, mod);
+  try {
+    fs.renameSync(fresh, dir);
+  } catch (e) {
+    fs.renameSync(aside, dir);
+    fs.rmSync(fresh, { recursive: true, force: true });
+    throw e;
+  }
+  mod.files = next.files;
+  mod.kinds = next.kinds;
+  fs.rmSync(aside, { recursive: true, force: true });
 }
 
 export function removeMod(lib: Library, mod: ModInfo): void {

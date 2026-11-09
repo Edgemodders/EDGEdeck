@@ -242,6 +242,7 @@ try {
   bad("a/b:stream");
   bad("C:/x");
   bad("../x");
+  bad(["a", "..", "..", "x"].join(String.fromCharCode(92)));
   bad("a/../../x");
   assert.ok(!fs.existsSync(path.join(tmp, "x")));
 
@@ -283,6 +284,21 @@ try {
   assert.ok(!fs.existsSync(path.join(folder, "r6", "scripts", "Test", "stale.reds")));
   assert.deepEqual(again.mod.files, ["archive/pc/mod/size.archive", "r6/scripts/Test/core.reds"]);
   assert.deepEqual(fs.readFileSync(lm), fs.readFileSync(path.join(basicRoot, "size", "small.dat")));
+
+  // replaceModFiles is all or nothing
+  const keep = path.join(core.modFolder(lib, again.mod), "archive", "pc", "mod", "size.archive");
+  const oldBytes = fs.readFileSync(keep);
+  const oldJson = fs.readFileSync(path.join(core.modFolder(lib, again.mod), "mod.json"), "utf8");
+  const oldFiles = [...again.mod.files];
+  assert.throws(() => core.replaceModFiles(lib, again.mod, [
+    { from: path.join(basicRoot, "size", "large.dat"), to: "archive/pc/mod/size.archive", kind: "archive" },
+    { from: path.join(tmp, "does-not-exist"), to: "r6/scripts/Test/x.reds", kind: "reds" },
+  ]));
+  assert.deepEqual(fs.readFileSync(keep), oldBytes);
+  assert.equal(fs.readFileSync(path.join(core.modFolder(lib, again.mod), "mod.json"), "utf8"), oldJson);
+  assert.deepEqual(again.mod.files, oldFiles);
+  assert.ok(fs.existsSync(path.join(core.modFolder(lib, again.mod), "r6", "scripts", "Test", "core.reds")));
+  assert.deepEqual(fs.readdirSync(core.libraryFolder(lib.root)).filter((n) => /\.(new|old)-/.test(n)), []);
 
   // familyForDownload: case and slash insensitive
   const dl = path.join(tmp, "downloads", "Some Mod-1-0.zip");
