@@ -534,6 +534,14 @@ export function findFomodRoot(folder: string): string | undefined {
   return undefined;
 }
 
+/** The path of fomod/ModuleConfig.xml under a root findFomodRoot returned (names in any case). */
+export function moduleConfigPath(root: string): string {
+  const dir = fs.readdirSync(root, { withFileTypes: true }).find((e) => e.isDirectory() && e.name.toLowerCase() === "fomod");
+  const file = dir && fs.readdirSync(path.join(root, dir.name)).find((n) => n.toLowerCase() === "moduleconfig.xml");
+  if (!dir || !file) throw new Error(`${root} has no fomod/ModuleConfig.xml`);
+  return path.join(root, dir.name, file);
+}
+
 /** Copies each resolved file to stageDir/<to>. The XML is untrusted, so every target is checked again here. Returns the files skipped (symlinks). */
 export function stageFomod(resolved: Resolved, stageDir: string): string[] {
   const base = path.resolve(stageDir);
