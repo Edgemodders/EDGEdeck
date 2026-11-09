@@ -14,6 +14,8 @@ export interface PageRow {
   enabled: boolean;
   /** The plain-words status phrase. */
   status: string;
+  /** A downloaded FOMOD update waits for its options to be reviewed. */
+  review?: boolean;
   framework: boolean;
   deployed: boolean;
   /** Bytes in the library for the active version. */
@@ -84,7 +86,7 @@ export interface PageData {
 
 export interface PageMessage {
   action:
-    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate" | "deployOne"
+    | "setup" | "reviewFomod" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate" | "deployOne"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport"
     | "groupOn" | "groupMove" | "groupSection" | "groupNexus" | "groupCheck" | "groupRemove" | "placeGroup";
@@ -169,6 +171,7 @@ function facetsOf(r: PageRow): string[] {
   if (r.changed) f.push("changed");
   if (r.conflicts) f.push("conflicts");
   if (r.update) f.push("update");
+  if (r.review) f.push("review");
   return f;
 }
 
@@ -182,6 +185,7 @@ const FacetLabels: [string, string][] = [
   ["changed", "Changed in game folder"],
   ["conflicts", "Conflicts"],
   ["update", "Update available"],
+  ["review", "Options to review"],
 ];
 
 const fmt = (n: number): string => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(n >= 10 * (1 << 30) ? 0 : 1)} GB` : n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(n >= 10 * (1 << 20) ? 0 : 1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
@@ -198,7 +202,7 @@ export function renderPage(d: PageData, csp: string): string {
 
   const groupName = new Map(d.sections.flatMap((s) => s.groups.map((g) => [g.key, g.name] as const)));
   const row = (r: PageRow, section: string, first: boolean, last: boolean) => {
-    const statusClass = r.changed || r.conflicts ? "warn" : r.needsDeploy ? "pend" : r.deployed && r.enabled ? "ok" : "dim";
+    const statusClass = r.review || r.changed || r.conflicts ? "warn" : r.needsDeploy ? "pend" : r.deployed && r.enabled ? "ok" : "dim";
     const oneTitle =
       r.oneMod === "undeploy"
         ? r.enabled
@@ -234,7 +238,7 @@ export function renderPage(d: PageData, csp: string): string {
 <td class="vercell">${versionCell}</td>
 <td>${[...r.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>
 <td class="mono size" data-size="${r.size}" title="${r.size.toLocaleString()} bytes in the library">${fmt(r.size)}</td>
-<td class="${statusClass}">${r.needsDeploy || r.changed ? `<a class="st" data-msg='${msg({ action: "changes", id: r.id })}' title="What the next deploy does for this mod">${esc(r.status)}</a>` : esc(r.status)}${r.update ? `<a class="upd" data-msg='${msg({ action: "update", id: r.id })}' title="Download ${esc(r.update)} from Nexus and put it in this mod's place">update ${esc(r.update)} available</a>` : ""}</td>
+<td class="${statusClass}">${r.review ? `<a class="st" data-msg='${msg({ action: "reviewFomod", id: r.id })}' title="Open the installer for the downloaded update">${esc(r.status)}</a>` : r.needsDeploy || r.changed ? `<a class="st" data-msg='${msg({ action: "changes", id: r.id })}' title="What the next deploy does for this mod">${esc(r.status)}</a>` : esc(r.status)}${r.update ? `<a class="upd" data-msg='${msg({ action: "update", id: r.id })}' title="Download ${esc(r.update)} from Nexus and put it in this mod's place">update ${esc(r.update)} available</a>` : ""}</td>
 <td class="acts">${buttons.map((b) => `<button class="ico ${b.cls ?? ""}" data-msg='${msg(b.m)}' title="${esc(b.title)}" aria-label="${esc(b.title)}" ${b.off ? "disabled" : ""}>${icon(b.icon)}</button>`).join("")}</td>
 </tr>`;
   };

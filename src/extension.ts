@@ -15,6 +15,9 @@ import { ChangesPanel, type ChangesMessage } from "./changesPanel";
 import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, latestBridgeRelease, removeOlderBridges } from "./bridgeInstall";
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
+import { activeFiles, findFomodRoot } from "./fomod";
+import { finishFomodAdd, prepareFomodAdd, type PreparedFomod } from "./fomodAdd";
+import { openFomodInstaller } from "./fomodPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey, versionFrom, cleanName } from "./families";
 import { lineFile, lineName, lineOfFile, newestInLine, otherLineFiles, splitPage } from "./nexusLines";
 import { childName, gatherGroups, groupOfFamily, groupToggle, pageGroups, setFamiliesOn, type PageGroup } from "./pageGroups";
@@ -116,6 +119,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.moveLibrary", () => run(moveLibraryCommand)),
     vscode.commands.registerCommand("edgedeck.getFrameworks", () => run(getFrameworksCommand)),
     vscode.commands.registerCommand("edgedeck.updateAll", () => run(updateAllCommand)),
+    vscode.commands.registerCommand("edgedeck.reviewFomod", (arg?: string | ModNode) => run(() => reviewFomodCommand(arg))),
     vscode.commands.registerCommand("edgedeck.remove", (node: ModNode) => run(() => removeCommand(modOf(node)))),
     vscode.commands.registerCommand("edgedeck.deployMod", (node: ModNode) => run(() => deployModCommand(modOf(node)))),
     vscode.commands.registerCommand("edgedeck.undeployMod", (node: ModNode) => run(() => undeployModCommand(modOf(node)))),
@@ -929,6 +933,7 @@ function detailData(mod: ModInfo) {
     names: new Map((library?.mods ?? []).map((m) => [m.id, m.name])),
     bridge: bridgeExe,
     update: library ? familyUpdate(library, mod) : undefined,
+    review: library ? familyOf(library, mod).mods.find((m) => m.fomod?.pending)?.fomod?.pending?.version : undefined,
     versions: library ? familyOf(library, mod).mods.map((m) => ({ id: m.id, version: m.version, enabled: m.enabled })) : [],
     page: (() => {
       const g = library ? groupOfFamily(pageGroups(families(library)), familyKey(mod)) : undefined;
@@ -957,6 +962,9 @@ function editedLoadout(): string | undefined {
 function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo; enabled: boolean }): PageRow {
   const p = state.plan;
   const mod = viewed?.mod ?? fam.active;
+  // A downloaded FOMOD update waiting for its options: said first, it is the thing to do.
+  const review = fam.mods.some((m) => m.fomod?.pending);
+  const status = statusFor(mod, false);
   return {
     id: mod.id,
     name: fam.name,
@@ -964,7 +972,8 @@ function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo
     versions: fam.mods.map((m) => ({ id: m.id, version: m.version, active: m.id === mod.id })),
     kinds: mod.kinds,
     enabled: viewed ? viewed.enabled : mod.enabled,
-    status: statusFor(mod, false),
+    status: review ? ["options to review", status].filter(Boolean).join(", ") : status,
+    review,
     framework: mod.kinds.includes("framework"),
     deployed: manifestMods.has(mod.id),
     size: library ? modSize(library, mod).total : 0,
@@ -1199,6 +1208,10 @@ async function pageAction(m: PageMessage): Promise<void> {
       break;
     case "details":
       showDetails(mod);
+      offerReview(mod);
+      break;
+    case "reviewFomod":
+      await reviewFomodCommand(mod.id);
       break;
     case "activate":
       switchVersion(mod);
@@ -1734,6 +1747,9 @@ async function detailAction(action: string, id: string): Promise<void> {
     case "deployOne":
       await deployOrUndeployCommand(mod);
       break;
+    case "reviewFomod":
+      await reviewFomodCommand(mod.id);
+      break;
   }
 }
 
@@ -1762,8 +1778,11 @@ async function addModCommand(): Promise<void> {
   for (const uri of picked) await addFrom(uri.fsPath);
 }
 
+/** What a caller knows of a file it adds: a Nexus download's name, version, ids and line, a framework release's. */
+type AddPreset = { name: string; version: string; source: ModSource; quiet?: boolean; family?: string };
+
 /** Adds one file or folder: extract if needed, classify, ask about options, copy into the library. */
-async function addFrom(source: string, preset?: { name: string; version: string; source: ModSource; quiet?: boolean; family?: string }): Promise<ModInfo | undefined> {
+async function addFrom(source: string, preset?: AddPreset): Promise<ModInfo | undefined> {
   if (!library) return;
   const isFile = fs.statSync(source).isFile();
   let name = preset?.name ?? cleanName(path.basename(source, isFile ? path.extname(source) : ""));
@@ -1776,6 +1795,8 @@ async function addFrom(source: string, preset?: { name: string; version: string;
       await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Opening ${path.basename(source)}` }, () => unpackOrCopy(source, temp!, sevenZa));
       folder = temp;
     }
+    // A FOMOD installer says which files go where; the window asks only when the saved choices do not fit.
+    if (findFomodRoot(folder)) return await addFomodFrom(source, isFile, folder, preset);
     let c = classify(folder, name.trim());
     if (c.options) {
       const pick = await vscode.window.showQuickPick(
@@ -1818,6 +1839,79 @@ async function addFrom(source: string, preset?: { name: string; version: string;
   } finally {
     if (temp) logTempLeft(temp);
   }
+}
+
+/** The installer window's header line: what is installed over what, and how much the author changed. */
+function installerSubtitle(p: PreparedFomod): string {
+  const lines: string[] = [];
+  if (p.target) lines.push(`Reinstall of ${p.version || "this version"}: change the options and install again.`);
+  else if (p.active) lines.push(`Update from ${p.active.version || "?"} to ${p.version || "?"}.`);
+  const changed = p.applied.warnings.filter((w) => w.kind !== "required").length;
+  if (p.inferred) lines.push("EDGEdeck worked out your earlier options from the installed files. Check them before you install.");
+  else if (p.record && changed) lines.push(`The author changed the installer: ${changed} thing${changed === 1 ? "" : "s"} new or gone (marked \u26a0). The rest keeps what you had.`);
+  else if (!p.record) lines.push("The author's suggested options are picked.");
+  return lines.join("\n");
+}
+
+/** Keeps a downloaded update of a FOMOD waiting for its options to be reviewed; the version in use stays. */
+function holdForReview(p: PreparedFomod): void {
+  if (!library || !p.active) return;
+  const holder = p.active;
+  const download = p.isFile ? keepDownload(library, p.sourcePath) : p.sourcePath;
+  holder.fomod = { ...(holder.fomod ?? { choices: p.applied.choices, configHash: "", from: "inferred" as const }), pending: { download, version: p.version, fileId: p.source.fileId, fileTitle: p.source.fileTitle } };
+  saveMod(library, holder);
+  log.appendLine(`${holder.name} ${p.version}: options to review before it installs; ${holder.version} stays in use. Download kept at ${download}`);
+  refresh();
+}
+
+/**
+ * Adds a FOMOD: without a window when the saved choices still fit, else through the installer.
+ * Cancel on a download (or a quiet Update all) keeps the update waiting for review.
+ */
+async function addFomodFrom(source: string, isFile: boolean, folder: string, preset?: AddPreset): Promise<ModInfo | undefined> {
+  const lib = library!;
+  const p = prepareFomodAdd(lib, { source, folder, isFile, name: preset?.name, preset: preset && { version: preset.version, source: preset.source, family: preset.family } });
+  // An update of a mod in the library (not a reinstall of a version it has) can wait for review.
+  const waits = !!preset && !!p.active && !p.target;
+  let choices = p.applied.choices;
+  let from = p.record?.from ?? "edgedeck";
+  let name: string | undefined;
+  if (!p.silent) {
+    if (preset?.quiet && waits) return void holdForReview(p);
+    const title = `${p.target?.name ?? p.active?.name ?? preset?.name ?? (p.cfg.moduleName || p.name)}${p.version ? ` ${p.version}` : ""}`;
+    const picked = await openFomodInstaller({ title, subtitle: installerSubtitle(p), cfg: p.cfg, root: p.root, choices, warnings: p.applied.warnings, ctx: { activeFiles: activeFiles(lib) } });
+    if (!picked) {
+      if (waits) {
+        holdForReview(p);
+        void vscode.window.showInformationMessage(`${p.active!.name} ${p.version} waits for you to review its options; ${p.active!.version} stays in use. Find it on the EDGEdeck page.`);
+      }
+      return undefined;
+    }
+    choices = picked;
+    from = "edgedeck";
+    if (!preset && !p.target && !p.active) {
+      const typed = await vscode.window.showInputBox({ prompt: "Name for this mod", value: p.cfg.moduleName || p.name, validateInput: (v) => (v.trim() ? undefined : "A name is needed") });
+      if (!typed) return undefined;
+      name = typed.trim();
+    }
+  }
+  const r = finishFomodAdd(lib, p, choices, { from, name });
+  const mod = r.mod;
+  log.appendLine(`${p.target ? "Reinstalled" : "Added"} ${mod.name} ${mod.version} from its installer (${mod.files.length} files, ${mod.kinds.join(", ")}) from ${source}${p.silent ? ", with the saved options" : ""}`);
+  if (p.target) {
+    if (!preset?.quiet) void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is installed again with the options picked. Deploy to put it in the game.`);
+  } else if (r.replaced) {
+    log.appendLine(`  a new version of ${r.replaced.name}: takes the place of ${r.replaced.version || "the earlier one"}, which is off now`);
+    if (!preset?.quiet) void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is a new version of ${r.replaced.name} ${r.replaced.version}${p.silent ? ", installed with your saved options" : ""}. It takes its place${mod.enabled ? " and is on" : ""}; ${r.replaced.version || "the earlier one"} stays in the library, off. Pick it from the version list to go back.`);
+  } else if (r.older && !preset?.quiet) {
+    void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is older than ${r.older.version}, so it was added switched off. Pick it from the version list to use it.`);
+  }
+  if (r.unplaced.length) {
+    log.appendLine(`  not placed: ${r.unplaced.join(", ")}`);
+    void vscode.window.showWarningMessage(`${mod.name} added. ${r.unplaced.length} file${r.unplaced.length === 1 ? "" : "s"} EDGEdeck did not know where to put ${r.unplaced.length === 1 ? "was" : "were"} left out. See the log.`);
+  }
+  refresh();
+  return mod;
 }
 
 function logTempLeft(temp: string): void {
@@ -2905,7 +2999,18 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   }
   const line = lineOfFile(library, modId, fileId, files);
   const same = findSameVersion(library, modId, fileId, file?.version, line.key);
-  if (same) {
+  // A FOMOD already in the library installs again through its window, with the options it has now:
+  // from its kept download of this very file, else from a fresh one below.
+  const kept = same?.fomod && same.source.fileId === fileId && same.source.path && fs.existsSync(same.source.path) && fs.statSync(same.source.path).isFile() ? same.source.path : undefined;
+  if (same && kept) {
+    const again = await addFrom(kept, { name: same.name, version: same.version, source: { ...same.source, type: "nexus" }, quiet, family: familyKey(same) });
+    if (again) {
+      activateVersion(library, again);
+      refresh();
+    }
+    return;
+  }
+  if (same && !same.fomod) {
     const r = activateVersion(library, same);
     log.appendLine(`${same.name} ${same.version} is already in the library (${same.id}); made it the active version`);
     refresh();
@@ -2938,13 +3043,18 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   const existing = line.entries[0];
   const name = existing?.name ?? (line.newLine ? lineName(info.name, file?.name) : info.name);
   if (line.newLine) log.appendLine(`${file?.name ?? fileId} is another file of ${info.name} on Nexus, so it is a mod of its own: ${name}`);
-  await addFrom(dest, { name, version: file?.version ?? info.version, source: { type: "nexus", modId: nxm.modId, fileId: nxm.fileId, path: dest, fileTitle: file?.name }, quiet, family: line.key });
-  const added = library.mods[library.mods.length - 1];
-  if (added && added.source.modId === nxm.modId && added.source.fileId === nxm.fileId) {
+  const added = await addFrom(dest, { name: same?.name ?? name, version: same ? same.version : (file?.version ?? info.version), source: { type: "nexus", modId: nxm.modId, fileId: nxm.fileId, path: dest, fileTitle: file?.name }, quiet, family: same ? familyKey(same) : line.key });
+  // Nothing added: the option pick or the installer was cancelled.
+  if (!added) return;
+  if (same) {
+    activateVersion(library, added);
+    refresh();
+  }
+  if (added.source.modId === nxm.modId && added.source.fileId === nxm.fileId) {
     added.nexus = { name: info.name, version: info.version, latestVersion: file?.version ?? info.version, latestFileId: nxm.fileId, latestFileName: fileName, checked: new Date().toISOString(), author: info.author, summary: info.summary };
     saveMod(library, added);
   }
-  if (existing && added && added.id !== existing.id) {
+  if (!same && existing && added.id !== existing.id) {
     const r = activateVersion(library, added);
     log.appendLine(`${added.name} ${added.version} takes the place of ${r.previous.version}, which is now off`);
     refresh();
@@ -3060,6 +3170,7 @@ async function updateAllCommand(ids?: string[]): Promise<void> {
   );
   if (a !== "Update all") return;
   const updated: string[] = [];
+  const review: { id: string; text: string; inUse: string }[] = [];
   const premium: { modId: number; fileId: number }[] = [];
   const failed: string[] = [];
   let client: NexusClient | undefined;
@@ -3079,6 +3190,11 @@ async function updateAllCommand(ids?: string[]): Promise<void> {
           continue;
         }
         const now = families(library!).find((f) => f.key === fam.key)?.active;
+        // A FOMOD whose saved options no longer fit waits for review; the version in use stays.
+        if (now?.fomod?.pending) {
+          review.push({ id: now.id, text: `${fam.name} ${now.fomod.pending.version}`, inUse: now.version });
+          continue;
+        }
         updated.push(`${fam.name} ${now?.version ?? fam.update!.version}`);
       } catch (err) {
         log.appendLine(`Update all: ${fam.name}: ${err instanceof Error ? err.message : String(err)}`);
@@ -3090,6 +3206,57 @@ async function updateAllCommand(ids?: string[]): Promise<void> {
   if (premium.length) await premiumPages(premium);
   if (failed.length) void vscode.window.showWarningMessage(`EDGEdeck could not update ${failed.join(", ")}. See the log.`, "Show log").then((x) => x && log.show(true));
   if (updated.length) offerDeploy(`Updated ${updated.join(", ")}.`);
+  for (const r of review) {
+    log.appendLine(`Update all: ${r.text}: options to review`);
+    void vscode.window.showInformationMessage(`${r.text} is downloaded, and its installer options need a look before it installs. ${r.inUse || "The version you have"} stays in use until then.`, "Review options").then((a) => {
+      if (a) void run(() => reviewFomodCommand(r.id));
+    });
+  }
+}
+
+/** On opening a mod with an update waiting for its options: one press away. */
+function offerReview(mod: ModInfo): void {
+  const holder = library ? familyOf(library, mod).mods.find((m) => m.fomod?.pending) : undefined;
+  if (!holder?.fomod?.pending) return;
+  void vscode.window.showInformationMessage(`${holder.name} ${holder.fomod.pending.version} is downloaded and waits for you to review its installer options.`, "Review options").then((a) => {
+    if (a) void run(() => reviewFomodCommand(mod.id));
+  });
+}
+
+/** Opens the installer again for an update kept waiting for review (fomod.pending on the family's active mod). */
+async function reviewFomodCommand(arg?: string | ModNode): Promise<void> {
+  if (!library) return;
+  let picked = typeof arg === "string" ? library.mods.find((m) => m.id === arg) : modOf(arg ?? tree.selection[0]);
+  if (!arg && !(picked && familyOf(library, picked).mods.some((m) => m.fomod?.pending))) {
+    // From the command palette: the mods with options to review.
+    const waiting = library.mods.filter((m) => m.fomod?.pending);
+    const pick = waiting.length > 1
+      ? await vscode.window.showQuickPick(waiting.map((m) => ({ label: m.name, description: `${m.version} to ${m.fomod!.pending!.version}`, mod: m })), { placeHolder: "Which update's options?" })
+      : waiting[0] ? { mod: waiting[0] } : undefined;
+    if (waiting.length > 1 && !pick) return;
+    picked = pick?.mod ?? picked;
+  }
+  const fam = picked ? familyOf(library, picked) : undefined;
+  const holder = fam?.mods.find((m) => m.fomod?.pending);
+  const pending = holder?.fomod?.pending;
+  if (!fam || !holder || !pending) {
+    void vscode.window.showInformationMessage(picked ? `${picked.name} has no update waiting for its options.` : "No update waits for its options to be reviewed.");
+    return;
+  }
+  if (!fs.existsSync(pending.download)) {
+    delete holder.fomod!.pending;
+    saveMod(library, holder);
+    refresh();
+    void vscode.window.showWarningMessage(`The download of ${fam.name} ${pending.version} is gone from the library's downloads. Get it again from Nexus.`);
+    return;
+  }
+  const source: ModSource = { ...holder.source, type: holder.source.modId ? "nexus" : holder.source.type, path: pending.download, fileId: pending.fileId, fileTitle: pending.fileTitle };
+  const added = await addFrom(pending.download, { name: fam.name, version: pending.version, source, family: fam.key });
+  if (added && holder.fomod?.pending) {
+    delete holder.fomod.pending;
+    saveMod(library, holder);
+    refresh();
+  }
 }
 
 /**

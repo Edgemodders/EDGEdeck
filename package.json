@@ -209,6 +209,11 @@
         "icon": "$(arrow-circle-up)"
       },
       {
+        "command": "edgedeck.reviewFomod",
+        "title": "Review FOMOD options",
+        "category": "EDGEdeck"
+      },
+      {
         "command": "edgedeck.refresh",
         "title": "Refresh",
         "category": "EDGEdeck",
