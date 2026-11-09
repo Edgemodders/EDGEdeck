@@ -196,7 +196,13 @@ function stepOf(n: Node): FomodStep {
 export function parseModuleConfig(text: string): FomodConfig {
   const valid = XMLValidator.validate(text);
   if (valid !== true) throw new Error(`not a FOMOD ModuleConfig.xml: ${valid.err.msg} (line ${valid.err.line})`);
-  const root = toNode(parser.parse(text)).config;
+  let parsed: any[];
+  try {
+    parsed = parser.parse(text);
+  } catch (e) {
+    throw new Error(`not a FOMOD ModuleConfig.xml: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const root = toNode(parsed).config;
   if (!root) throw new Error("not a FOMOD ModuleConfig.xml: no <config> element");
   const install = node(root.installsteps);
   return {
@@ -371,6 +377,8 @@ export interface FomodRecord {
   configHash: string;
   structure?: StructureStep[];
   from: "edgedeck" | "vortex" | "inferred";
+  /** The game paths the installer resolved to at install (lower case, forward slashes), before classify drops or moves any. */
+  targets?: string[];
   pending?: { download: string; version: string; fileId?: number; fileTitle?: string };
 }
 
@@ -396,12 +404,30 @@ const sameFiles = (a: string[], b: string[]): boolean => {
   return x.length === y.length && x.every((v, i) => v === y[i]);
 };
 
+/** Lower-case targets with forward slashes, as a record keeps them. */
+export const targetsOf = (r: Resolved): string[] => r.files.map((f) => slashes(f.to).toLowerCase()).sort();
+
+/** What the mod would hold after classify for this resolve, from a dry-run staging; undefined when it cannot tell. */
+function placedFiles(resolved: Resolved, name: string): string[] | undefined {
+  const stage = fs.mkdtempSync(path.join(os.tmpdir(), "edgedeck-fomod-check-"));
+  try {
+    stageFomod(resolved, stage);
+    const c = classify(stage, name);
+    return c.options ? undefined : c.placements.map((p) => p.to);
+  } catch {
+    return undefined;
+  } finally {
+    fs.rmSync(stage, { recursive: true, force: true });
+  }
+}
+
 // Carries the saved choices onto a new version of the installer. compatible is true only when
 // the new version installs with them and nothing the user has not decided on has appeared; any
 // doubt (no structure, unknown installed list) says false, since a wrong true changes the install silently.
+// name: the mod's name, for a record without targets (the dry run classifies as the install did).
 export function applySaved(
   cfg: FomodConfig, text: string, root: string, saved: FomodRecord | undefined,
-  installedFiles: string[] | undefined, ctx: ResolveContext,
+  installedFiles: string[] | undefined, ctx: ResolveContext, name?: string,
 ): Applied {
   const defaults = defaultChoices(cfg, ctx);
   const kept = saved?.choices ?? [];
@@ -486,8 +512,13 @@ export function applySaved(
 
   let compatible = !!saved && !!old && !lost && !fresh && !resolved.errors.length;
   if (compatible && saved!.configHash === configHash(text)) {
-    // Same installer text: a different file list means a fileDependency resolves differently now.
-    compatible = !!installedFiles && sameFiles(resolved.files.map((f) => f.to), installedFiles);
+    // Same installer text: a different file list means a fileDependency resolves differently now. The
+    // record's own targets are compared; an older record without them compares what classify would place.
+    if (saved!.targets) compatible = sameFiles(targetsOf(resolved), saved!.targets);
+    else {
+      const placed = installedFiles && placedFiles(resolved, name ?? cfg.moduleName);
+      compatible = !!installedFiles && !!placed && sameFiles(placed, installedFiles);
+    }
   }
   return { choices, warnings, compatible };
 }
@@ -721,6 +752,9 @@ export function installFomod(lib: Library, opts: InstallFomodOptions): { mod: Mo
   try {
     const skipped = stageFomod(resolved, stage);
     const c = classify(stage, opts.name);
+    if (c.options) {
+      throw new Error(`The installer's output could not be placed: it puts its files in folders that are not Cyberpunk 2077 game folders (${c.options.map((o) => o.label).join(", ")}). Nothing was added or changed.`);
+    }
     let mod: ModInfo;
     if (opts.replace) {
       if (!c.placements.length) throw new Error("Nothing to add: no files could be placed.");
@@ -729,7 +763,7 @@ export function installFomod(lib: Library, opts: InstallFomodOptions): { mod: Mo
     } else {
       mod = addMod(lib, c.placements, { name: opts.name, version: opts.version, source: opts.source });
     }
-    mod.fomod = { choices: completed, configHash: configHash(opts.text), structure: structureOf(opts.cfg), from: opts.from };
+    mod.fomod = { choices: completed, configHash: configHash(opts.text), structure: structureOf(opts.cfg), from: opts.from, targets: targetsOf(resolved) };
     saveMod(lib, mod);
     return { mod, unplaced: [...c.unplaced, ...skipped] };
   } finally {
