@@ -469,6 +469,26 @@ try {
     assert.deepEqual(settled.find((c) => c.group === "Extras").plugins, []);
   }
 
+  // What a prepared FOMOD does: never a window in a quiet add (Update all)
+  {
+    const act = { id: "a" }, tgt = { id: "t" };
+    assert.deepEqual(core.fomodAddStep({ silent: true, active: act }, { quiet: true }), { action: "install" });
+    assert.deepEqual(core.fomodAddStep({ silent: false, active: act }, { quiet: true }), { action: "hold", holder: act });
+    // a quiet reinstall over a version the library has: held on that mod, no window
+    assert.deepEqual(core.fomodAddStep({ silent: false, target: tgt }, { quiet: true }), { action: "hold", holder: tgt });
+    assert.deepEqual(core.fomodAddStep({ silent: false, active: act, target: tgt }, { quiet: true }), { action: "hold", holder: act });
+    // a download the user pressed: the window, and Cancel keeps a new version waiting
+    assert.deepEqual(core.fomodAddStep({ silent: false, active: act }, {}), { action: "window", holder: act });
+    assert.deepEqual(core.fomodAddStep({ silent: false, active: act, target: tgt }, {}), { action: "window", holder: undefined });
+    assert.deepEqual(core.fomodAddStep({ silent: false, active: act }, undefined), { action: "window", holder: undefined });
+    // a Nexus file the library has: reinstall only from a pressed link with the kept file
+    assert.equal(core.sameVersionStep({ fomod: true, keptFile: true, key: "k", quiet: false }), "reinstall");
+    assert.equal(core.sameVersionStep({ fomod: true, keptFile: true, key: undefined, quiet: false }), "activate");
+    assert.equal(core.sameVersionStep({ fomod: true, keptFile: true, key: "k", quiet: true }), "activate");
+    assert.equal(core.sameVersionStep({ fomod: true, keptFile: false, key: "k", quiet: false }), "activate");
+    assert.equal(core.sameVersionStep({ fomod: false, keptFile: true, key: "k", quiet: false }), "activate");
+  }
+
   console.log("fomod tests passed");
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });

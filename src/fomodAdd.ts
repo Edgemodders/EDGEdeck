@@ -131,3 +131,24 @@ export function finishFomodAdd(lib: Library, p: PreparedFomod, choices: StepChoi
 const defined = <T extends object>(o: T): Partial<T> => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
 
 const samePath = (a: string, b: string): boolean => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
+/**
+ * What to do with a prepared FOMOD. "install": the saved choices fit. "hold": a quiet add (Update all)
+ * that would need the window: it waits for review on `holder` (the family's active mod, else the mod
+ * reinstalled over), since Update all never waits on a window. "window": ask; on Cancel the update
+ * waits on `holdOnCancel` when it is a download of a new version of a mod in the library.
+ */
+export function fomodAddStep(p: Pick<PreparedFomod, "silent" | "active" | "target">, preset?: { quiet?: boolean }): { action: "install" | "hold" | "window"; holder?: ModInfo } {
+  if (p.silent) return { action: "install" };
+  if (preset?.quiet) return { action: "hold", holder: p.active ?? p.target };
+  return { action: "window", holder: preset && p.active && !p.target ? p.active : undefined };
+}
+
+/**
+ * A Nexus file the library has already. A FOMOD installs again through its window only for a
+ * link the user pressed (it has a key, not a quiet update) and from the kept download of that very
+ * file; anything else makes the version active as before, with no download.
+ */
+export function sameVersionStep(o: { fomod: boolean; keptFile: boolean; key?: string; quiet: boolean }): "reinstall" | "activate" {
+  return o.fomod && o.keptFile && !!o.key && !o.quiet ? "reinstall" : "activate";
+}

@@ -16,7 +16,7 @@ import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, lat
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activeFiles, findFomodRoot } from "./fomod";
-import { finishFomodAdd, prepareFomodAdd, type PreparedFomod } from "./fomodAdd";
+import { finishFomodAdd, fomodAddStep, prepareFomodAdd, sameVersionStep, type PreparedFomod } from "./fomodAdd";
 import { openFomodInstaller } from "./fomodPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey, versionFrom, cleanName } from "./families";
 import { lineFile, lineName, lineOfFile, newestInLine, otherLineFiles, splitPage } from "./nexusLines";
@@ -1854,9 +1854,8 @@ function installerSubtitle(p: PreparedFomod): string {
 }
 
 /** Keeps a downloaded update of a FOMOD waiting for its options to be reviewed; the version in use stays. */
-function holdForReview(p: PreparedFomod): void {
-  if (!library || !p.active) return;
-  const holder = p.active;
+function holdForReview(p: PreparedFomod, holder: ModInfo): void {
+  if (!library) return;
   const download = p.isFile ? keepDownload(library, p.sourcePath) : p.sourcePath;
   holder.fomod = { ...(holder.fomod ?? { choices: p.applied.choices, configHash: "", from: "inferred" as const }), pending: { download, version: p.version, fileId: p.source.fileId, fileTitle: p.source.fileTitle } };
   saveMod(library, holder);
@@ -1871,19 +1870,23 @@ function holdForReview(p: PreparedFomod): void {
 async function addFomodFrom(source: string, isFile: boolean, folder: string, preset?: AddPreset): Promise<ModInfo | undefined> {
   const lib = library!;
   const p = prepareFomodAdd(lib, { source, folder, isFile, name: preset?.name, preset: preset && { version: preset.version, source: preset.source, family: preset.family } });
-  // An update of a mod in the library (not a reinstall of a version it has) can wait for review.
-  const waits = !!preset && !!p.active && !p.target;
+  const step = fomodAddStep(p, preset);
   let choices = p.applied.choices;
   let from = p.record?.from ?? "edgedeck";
   let name: string | undefined;
-  if (!p.silent) {
-    if (preset?.quiet && waits) return void holdForReview(p);
+  if (step.action === "hold") {
+    // A quiet add (Update all) never waits on a window: the update waits for review instead.
+    if (step.holder) holdForReview(p, step.holder);
+    else log.appendLine(`${p.name} ${p.version}: its installer needs a look and there is no mod of it in the library to keep it on; add the file again to choose its options`);
+    return undefined;
+  }
+  if (step.action === "window") {
     const title = `${p.target?.name ?? p.active?.name ?? preset?.name ?? (p.cfg.moduleName || p.name)}${p.version ? ` ${p.version}` : ""}`;
     const picked = await openFomodInstaller({ title, subtitle: installerSubtitle(p), cfg: p.cfg, root: p.root, choices, warnings: p.applied.warnings, ctx: { activeFiles: activeFiles(lib) } });
     if (!picked) {
-      if (waits) {
-        holdForReview(p);
-        void vscode.window.showInformationMessage(`${p.active!.name} ${p.version} waits for you to review its options; ${p.active!.version} stays in use. Find it on the EDGEdeck page.`);
+      if (step.holder) {
+        holdForReview(p, step.holder);
+        void vscode.window.showInformationMessage(`${step.holder.name} ${p.version} waits for you to review its options; ${step.holder.version} stays in use. Find it on the EDGEdeck page.`);
       }
       return undefined;
     }
@@ -2999,10 +3002,10 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   }
   const line = lineOfFile(library, modId, fileId, files);
   const same = findSameVersion(library, modId, fileId, file?.version, line.key);
-  // A FOMOD already in the library installs again through its window, with the options it has now:
-  // from its kept download of this very file, else from a fresh one below.
+  // A FOMOD already in the library installs again through its window, with the options it has now,
+  // when the user pressed the link and its kept download of this very file is there; else as before.
   const kept = same?.fomod && same.source.fileId === fileId && same.source.path && fs.existsSync(same.source.path) && fs.statSync(same.source.path).isFile() ? same.source.path : undefined;
-  if (same && kept) {
+  if (same && kept && sameVersionStep({ fomod: !!same.fomod, keptFile: true, key, quiet }) === "reinstall") {
     const again = await addFrom(kept, { name: same.name, version: same.version, source: { ...same.source, type: "nexus" }, quiet, family: familyKey(same) });
     if (again) {
       activateVersion(library, again);
@@ -3010,7 +3013,7 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
     }
     return;
   }
-  if (same && !same.fomod) {
+  if (same) {
     const r = activateVersion(library, same);
     log.appendLine(`${same.name} ${same.version} is already in the library (${same.id}); made it the active version`);
     refresh();
@@ -3043,18 +3046,14 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   const existing = line.entries[0];
   const name = existing?.name ?? (line.newLine ? lineName(info.name, file?.name) : info.name);
   if (line.newLine) log.appendLine(`${file?.name ?? fileId} is another file of ${info.name} on Nexus, so it is a mod of its own: ${name}`);
-  const added = await addFrom(dest, { name: same?.name ?? name, version: same ? same.version : (file?.version ?? info.version), source: { type: "nexus", modId: nxm.modId, fileId: nxm.fileId, path: dest, fileTitle: file?.name }, quiet, family: same ? familyKey(same) : line.key });
+  const added = await addFrom(dest, { name, version: file?.version ?? info.version, source: { type: "nexus", modId: nxm.modId, fileId: nxm.fileId, path: dest, fileTitle: file?.name }, quiet, family: line.key });
   // Nothing added: the option pick or the installer was cancelled.
   if (!added) return;
-  if (same) {
-    activateVersion(library, added);
-    refresh();
-  }
   if (added.source.modId === nxm.modId && added.source.fileId === nxm.fileId) {
     added.nexus = { name: info.name, version: info.version, latestVersion: file?.version ?? info.version, latestFileId: nxm.fileId, latestFileName: fileName, checked: new Date().toISOString(), author: info.author, summary: info.summary };
     saveMod(library, added);
   }
-  if (!same && existing && added.id !== existing.id) {
+  if (existing && added.id !== existing.id) {
     const r = activateVersion(library, added);
     log.appendLine(`${added.name} ${added.version} takes the place of ${r.previous.version}, which is now off`);
     refresh();
