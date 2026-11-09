@@ -209,6 +209,11 @@
         "icon": "$(arrow-circle-up)"
       },
       {
+        "command": "edgedeck.importFomodChoices",
+        "title": "Import FOMOD choices from Vortex",
+        "category": "EDGEdeck"
+      },
+      {
         "command": "edgedeck.reviewFomod",
         "title": "Review FOMOD options",
         "category": "EDGEdeck"
