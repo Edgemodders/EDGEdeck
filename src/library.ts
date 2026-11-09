@@ -173,6 +173,29 @@ export function addMod(lib: Library, placements: Placement[], opts: AddOptions):
   return mod;
 }
 
+/** Same-version reinstall: removes the files the mod had, copies the new ones in and rewrites its file list and kinds. Id, order and settings stay. */
+export function replaceModFiles(lib: Library, mod: ModInfo, placements: Placement[]): void {
+  const dir = modFolder(lib, mod);
+  for (const f of mod.files) {
+    const file = path.join(dir, ...f.split("/"));
+    fs.rmSync(file, { force: true });
+    // Tidy the emptied folders, never the mod folder itself.
+    for (let d = path.dirname(file); d !== dir && d.startsWith(dir); d = path.dirname(d)) {
+      try { if (fs.readdirSync(d).length) break; fs.rmdirSync(d); } catch { break; }
+    }
+  }
+  const files = new Set<string>();
+  for (const p of placements) {
+    const dest = path.join(dir, ...p.to.split("/"));
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(p.from, dest);
+    files.add(p.to);
+  }
+  mod.files = [...files].sort();
+  mod.kinds = [...new Set(placements.map((p) => p.kind))];
+  saveMod(lib, mod);
+}
+
 export function removeMod(lib: Library, mod: ModInfo): void {
   fs.rmSync(modFolder(lib, mod), { recursive: true, force: true });
   lib.mods = lib.mods.filter((m) => m.id !== mod.id);
