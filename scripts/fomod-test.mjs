@@ -86,6 +86,25 @@ try {
   r = core.resolveFomod(rules, rulesRoot, pick("Pack"), ctx);
   assert.ok(r.files.some((f) => f.to === "r6/pack/inner/deep.dat"));
 
+  // gameDependency (and FOMM/FOSE) terms count as met
+  const gd = (op, flagVal) => core.parseModuleConfig(
+    `<config><moduleName>G</moduleName><conditionalFileInstalls><patterns><pattern><dependencies operator="${op}"><gameDependency version="1.0"/><flagDependency flag="x" value="${flagVal}"/></dependencies><files><file source="core/core.reds" destination="hit.txt"/></files></pattern></patterns></conditionalFileInstalls></config>`,
+  );
+  assert.equal(core.resolveFomod(gd("Or", "on"), rulesRoot, [], ctx).files.length, 1);
+  assert.equal(core.resolveFomod(gd("And", "on"), rulesRoot, [], ctx).files.length, 0);
+
+  // Targets outside the game folder are refused, and paths are tidied
+  const dst = (d) => core.parseModuleConfig(
+    `<config><moduleName>D</moduleName><requiredInstallFiles><file source="core/core.reds" destination="${d}"/></requiredInstallFiles></config>`,
+  );
+  for (const bad of ["..\\..\\evil.dll", "C:\\Windows\\x.dll", "\\abs\\x.dll", "/abs/x.dll", "a\\..\\..\\x.dll"]) {
+    r = core.resolveFomod(dst(bad), rulesRoot, [], ctx);
+    assert.equal(r.files.length, 0, bad);
+    assert.match(r.errors.join("\n"), /outside the game folder/, bad);
+  }
+  r = core.resolveFomod(dst("a\\\\.\\b.txt"), rulesRoot, [], ctx);
+  assert.deepEqual(r.files.map((f) => f.to), ["a/b.txt"]);
+
   console.log("fomod tests passed");
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });

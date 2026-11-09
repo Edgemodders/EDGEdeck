@@ -19,6 +19,7 @@ export interface Condition {
   flags: { name: string; value: string }[];
   files: { file: string; state: "Active" | "Inactive" | "Missing" }[];
   nested: Condition[];
+  met: number; // game/FOMM/FOSE version terms: always counted as met
 }
 
 export interface FomodPlugin {
@@ -66,7 +67,7 @@ export function readModuleConfig(xmlPath: string): { config: FomodConfig; text: 
 // Tag and attribute names are read in lower case, since mod authors mix the case.
 const REPEATING = new Set([
   "installstep", "group", "plugin", "file", "folder", "flag", "flagdependency",
-  "filedependency", "dependencies", "pattern",
+  "filedependency", "dependencies", "pattern", "gamedependency", "fommdependency", "fosedependency",
 ]);
 // preserveOrder keeps the document order of mixed <file> and <folder> entries; toNode turns its
 // output into plain objects (repeating elements as arrays) with the children's order in $order.
@@ -142,6 +143,7 @@ function conditionOf(x: unknown): Condition {
     flags: list(n.flagdependency).map((f) => ({ name: attr(f, "flag"), value: attr(f, "value") })),
     files: list(n.filedependency).map((f) => ({ file: attr(f, "file"), state: state(attr(f, "state")) })),
     nested: list(n.dependencies).map(conditionOf),
+    met: list(n.gamedependency).length + list(n.fommdependency).length + list(n.fosedependency).length,
   };
 }
 
@@ -223,6 +225,7 @@ function holds(c: Condition, flags: Record<string, string>, ctx: ResolveContext)
     ...c.flags.map((f) => (flags[f.name] ?? "") === f.value),
     ...c.files.map((f) => (ctx.activeFiles.has(slashes(f.file).toLowerCase()) ? f.state === "Active" : f.state !== "Active")),
     ...c.nested.map((n) => holds(n, flags, ctx)),
+    ...Array<boolean>(c.met).fill(true),
   ];
   if (!results.length) return true;
   return c.op === "Or" ? results.some(Boolean) : results.every(Boolean);
@@ -282,8 +285,14 @@ export function resolveFomod(cfg: FomodConfig, root: string, choices: StepChoice
   const index = indexFiles(root);
   const picked = new Map<string, { to: string; from: string; priority: number }>();
 
-  const add = (list: FomodFile[]): void => {
+  const add = (list: FomodFile[], who: string): void => {
     for (const f of list) {
+      // The XML is untrusted: a target outside the game folder is refused.
+      const target = (f.destination || f.source).replace(/[\\]/g, "/");
+      if (/^\/|^[A-Za-z]:/.test(target) || target.split("/").includes("..")) {
+        errors.push(`${who}: "${f.destination || f.source}" points outside the game folder.`);
+        continue;
+      }
       const source = slashes(f.source);
       const dest = slashes(f.destination);
       const hits: { rel: string; to: string }[] = [];
@@ -303,6 +312,7 @@ export function resolveFomod(cfg: FomodConfig, root: string, choices: StepChoice
         hits.push({ rel, to });
       }
       for (const h of hits) {
+        h.to = h.to.split("/").filter((s) => s && s !== ".").join("/");
         const key = h.to.toLowerCase();
         const old = picked.get(key);
         if (!old || f.priority >= old.priority) picked.set(key, { to: h.to, from: path.join(root, ...h.rel.split("/")), priority: f.priority });
@@ -310,7 +320,7 @@ export function resolveFomod(cfg: FomodConfig, root: string, choices: StepChoice
     }
   };
 
-  add(cfg.required);
+  add(cfg.required, "Required files");
   for (const step of cfg.steps) {
     if (!isVisible(step, flags, ctx)) continue;
     visibleSteps.push(step.name);
@@ -336,12 +346,12 @@ export function resolveFomod(cfg: FomodConfig, root: string, choices: StepChoice
         }
       }
       for (const p of chosen) {
-        add(p.files);
+        add(p.files, `${where}, "${p.name}"`);
         for (const f of p.flags) flags[f.name] = f.value;
       }
     }
   }
-  for (const c of cfg.conditional) if (holds(c.when, flags, ctx)) add(c.files);
+  for (const c of cfg.conditional) if (holds(c.when, flags, ctx)) add(c.files, "Conditional files");
 
   return { files: [...picked.values()].map(({ to, from }) => ({ from, to })), flags, visibleSteps, errors };
 }
