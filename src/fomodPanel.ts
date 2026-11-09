@@ -3,6 +3,7 @@
 // Install at the bottom. One window at a time: a second one waits until the first closes.
 
 import * as vscode from "vscode";
+import { randomBytes } from "node:crypto";
 import * as os from "node:os";
 import * as path from "node:path";
 import fs from "./fsx";
@@ -68,12 +69,29 @@ function showInstaller(opts: FomodInstallerOptions): Promise<StepChoice[] | unde
   return new Promise((resolve) => {
     const { cfg, root, warnings, ctx } = opts;
     const imgDir = fs.mkdtempSync(path.join(os.tmpdir(), "edgedeck-fomod-img-"));
-    const panel = vscode.window.createWebviewPanel("edgedeck.fomod", `Install ${opts.title}`, { viewColumn: vscode.ViewColumn.Active, preserveFocus: false }, {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-      localResourceRoots: [vscode.Uri.file(imgDir)],
-    });
-    const images = copyImages(cfg, root, imgDir);
+    const dropImages = (): void => {
+      try {
+        fs.rmSync(imgDir, { recursive: true, force: true });
+      } catch {
+        /* the temp folder goes with the next clean-up */
+      }
+    };
+    let panel: vscode.WebviewPanel | undefined;
+    let images: Map<string, string>;
+    try {
+      panel = vscode.window.createWebviewPanel("edgedeck.fomod", `Install ${opts.title}`, { viewColumn: vscode.ViewColumn.Active, preserveFocus: false }, {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.file(imgDir)],
+      });
+      images = copyImages(cfg, root, imgDir);
+    } catch (err) {
+      // Nothing is shown: the picture folder goes too, and the caller gets the error.
+      panel?.dispose();
+      dropImages();
+      throw err;
+    }
+    const win = panel;
     let choices = settleChoices(cfg, opts.choices, ctx);
     let done = false;
     const view = () => installerView(cfg, root, choices, warnings, ctx);
@@ -81,18 +99,18 @@ function showInstaller(opts: FomodInstallerOptions): Promise<StepChoice[] | unde
       if (done) return;
       done = true;
       resolve(result);
-      panel.dispose();
+      win.dispose();
     };
     const post = (): void => {
       const v = view();
       const uri = (img?: string) => {
         const name = img ? images.get(img.toLowerCase()) : undefined;
-        return name ? panel.webview.asWebviewUri(vscode.Uri.file(path.join(imgDir, name))).toString() : undefined;
+        return name ? win.webview.asWebviewUri(vscode.Uri.file(path.join(imgDir, name))).toString() : undefined;
       };
       const steps = v.steps.map((s) => ({ ...s, groups: s.groups.map((g) => ({ ...g, plugins: g.plugins.map((p) => ({ ...p, image: uri(p.image) })) })) }));
-      void panel.webview.postMessage({ type: "view", steps, canInstall: v.canInstall });
+      void win.webview.postMessage({ type: "view", steps, canInstall: v.canInstall });
     };
-    panel.webview.onDidReceiveMessage((m: InstallerMessage) => {
+    win.webview.onDidReceiveMessage((m: InstallerMessage) => {
       if (done || !m || typeof m !== "object") return;
       switch (m.action) {
         case "ready":
@@ -115,18 +133,14 @@ function showInstaller(opts: FomodInstallerOptions): Promise<StepChoice[] | unde
           break;
       }
     });
-    panel.onDidDispose(() => {
-      try {
-        fs.rmSync(imgDir, { recursive: true, force: true });
-      } catch {
-        /* the temp folder goes with the next clean-up */
-      }
+    win.onDidDispose(() => {
+      dropImages();
       if (!done) {
         done = true;
         resolve(undefined);
       }
     });
-    panel.webview.html = render(opts.title, opts.subtitle, panel.webview.cspSource);
+    win.webview.html = render(opts.title, opts.subtitle, win.webview.cspSource);
   });
 }
 
@@ -136,7 +150,7 @@ function esc(s: string): string {
 
 /** The window's page. Everything from the installer is put in by the script as text, never as HTML. */
 function render(title: string, subtitle: string | undefined, csp: string): string {
-  const nonce = Array.from({ length: 4 }, () => Math.random().toString(36).slice(2)).join("");
+  const nonce = randomBytes(16).toString("base64");
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${csp}; style-src 'unsafe-inline' ${csp}; script-src 'nonce-${nonce}';">
 <style>
