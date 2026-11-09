@@ -1,0 +1,1 @@
+test core/core.reds

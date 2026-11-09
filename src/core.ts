@@ -15,6 +15,7 @@ export * from "./pageColumns";
 export * from "./frameworks";
 export * from "./frameworkGet";
 export * from "./game";
+export * from "./fomod";
 export * from "./library";
 export * from "./libraryMove";
 export * from "./loadouts";

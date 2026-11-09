@@ -736,6 +736,7 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "smoke": "node scripts/smoke.mjs",
+    "test:fomod": "node scripts/fomod-test.mjs",
     "package": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && vsce package --no-dependencies --target win32-x64 --readme-path docs/marketplace.md --out dist/",
     "test:ui": "node scripts/ui-test.mjs",
     "release:notes": "node scripts/release-notes.mjs",
@@ -745,6 +746,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
     "7zip-bin": "^5.2.0",
+    "fast-xml-parser": "4.5.0",
     "vscode-jsonrpc": "^9.0.3",
     "zod": "^4.6.7"
   },
