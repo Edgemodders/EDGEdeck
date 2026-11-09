@@ -150,6 +150,12 @@ try {
   a = core.applySaved(config, text, basicRoot, vortex, installedOf(saved), gloveCtx);
   assert.equal(a.compatible, false);
   assert.deepEqual(a.choices.find((c) => c.group === "Size").plugins, ["Small"]);
+  // Vortex left a single step's name out: its groups are found by group name
+  const nameless = { choices: saved.choices.map((c) => ({ ...c, step: "" })), configHash: "", from: "vortex" };
+  a = core.applySaved(config, text, basicRoot, nameless, undefined, gloveCtx);
+  assert.deepEqual(a.choices.find((c) => c.group === "Size").plugins, ["Small"]);
+  assert.deepEqual(a.choices.find((c) => c.group === "Extras").plugins, ["Gloves"]);
+  assert.ok(!a.warnings.some((w) => w.kind === "gone"));
   // new SelectAll group: still compatible (hash differs, so the file list is not compared)
   const textAll = text.replace(/<\/optionalFileGroups>(\s*<\/installStep>\s*<installStep name="Extras">)/, '<group name="Always" type="SelectAll"><plugins order="Explicit"><plugin name="Bonus"><description>b</description></plugin></plugins></group></optionalFileGroups>$1');
   assert.notEqual(textAll, text);
@@ -672,13 +678,17 @@ try {
       await put("Held Cloak-99-1-0-9", "installerChoices###type", JSON.stringify("fomod"));
       await put("Empty-88-1-0-8", "installerChoices###options", "[]");
       await put("Empty-88-1-0-8", "installerChoices###type", JSON.stringify("fomod"));
+      // a one-step installer: Vortex stores the step without a name
+      await put("Nameless-12-1-0-12", "installerChoices###options", JSON.stringify([{ groups: [{ name: "Core", choices: [{ name: "Install Core", idx: 0 }] }] }]));
+      await put("Nameless-12-1-0-12", "installerChoices###type", JSON.stringify("fomod"));
       await put("Plain-55-1-0-555", "installerChoices###type", JSON.stringify("unknown"));
       await put("Other-66-1-0-666", "installerChoices###options", opts("A", "A", ["x"]));
       await put("Other-66-1-0-666", "installerChoices###type", JSON.stringify("other"));
       await db.close();
 
       const list = core.readVortexChoices(stateDir);
-      assert.deepEqual(list.map((v) => v.vortexId).sort(), ["Gone-44-1-0-444", "Held Cloak-99-1-0-9", "Mine-33-1-0-333", "Quux Boots-22-2-0-222", "Twin A-77-3-0-1", "Twin B-77-3-0-2", "Zed Cape-11-1-0-111"]);
+      assert.deepEqual(list.map((v) => v.vortexId).sort(), ["Gone-44-1-0-444", "Held Cloak-99-1-0-9", "Mine-33-1-0-333", "Nameless-12-1-0-12", "Quux Boots-22-2-0-222", "Twin A-77-3-0-1", "Twin B-77-3-0-2", "Zed Cape-11-1-0-111"]);
+      assert.deepEqual(list.find((v) => v.vortexId.startsWith("Nameless")).choices, [{ step: "", group: "Core", plugins: ["Install Core"] }]);
       const quux = list.find((v) => v.vortexId.startsWith("Quux"));
       assert.deepEqual(quux, { vortexId: "Quux Boots-22-2-0-222", modId: 22, version: "2.0", choices: [{ step: "Size", group: "Size", plugins: ["Big", "Wide"] }] });
 
@@ -711,7 +721,7 @@ try {
       // an update waiting for review stays waiting
       assert.deepEqual(modJson("held").fomod, { choices: [{ step: "Cut", group: "Cut", plugins: ["Long"] }], configHash: "", from: "vortex", pending: { download: "D:/dl/Held Cloak-99-2-0-9.zip", version: "2.0" } });
       assert.deepEqual(r.skipped, ["mine"]);
-      assert.deepEqual(r.unmatched.sort(), ["Gone-44-1-0-444", "Twin A-77-3-0-1", "Twin B-77-3-0-2"]);
+      assert.deepEqual(r.unmatched.sort(), ["Gone-44-1-0-444", "Nameless-12-1-0-12", "Twin A-77-3-0-1", "Twin B-77-3-0-2"]);
       const back = core.loadLibrary(vlib.root, game);
       assert.deepEqual(back.mods.find((m) => m.id === "zed-cape").fomod, { choices: [{ step: "Colour", group: "Colour", plugins: ["Red"] }], configHash: "", from: "vortex" });
       assert.equal(back.mods.find((m) => m.id === "mine").fomod.from, "edgedeck");

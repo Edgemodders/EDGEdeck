@@ -234,12 +234,13 @@ export function readVortexChoices(stateDir: string): VortexChoices[] {
     const opts = parseStored(raw);
     if (!Array.isArray(opts)) continue;
     const choices: StepChoice[] = [];
-    for (const step of opts as { name?: unknown; groups?: unknown }[]) {
-      if (!step || typeof step.name !== "string" || !Array.isArray(step.groups)) continue;
+    for (const step of opts as { name?: string; groups?: unknown }[]) {
+      // A one-step installer is stored without the step's name; applySaved finds it by group name.
+      if (!step || (step.name !== undefined && typeof step.name !== "string") || !Array.isArray(step.groups)) continue;
       for (const g of step.groups as { name?: unknown; choices?: unknown }[]) {
         if (!g || typeof g.name !== "string" || !Array.isArray(g.choices)) continue;
         const plugins = (g.choices as { name?: unknown }[]).map((c) => c?.name).filter((n): n is string => typeof n === "string");
-        choices.push({ step: step.name, group: g.name, plugins });
+        choices.push({ step: step.name ?? "", group: g.name, plugins });
       }
     }
     const id = Number(parseStored(rows.get(`${pre}${vortexId}###attributes###modId`)));
