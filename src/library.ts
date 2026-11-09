@@ -190,11 +190,13 @@ export function replaceModFiles(lib: Library, mod: ModInfo, placements: Placemen
   try {
     fs.mkdirSync(fresh, { recursive: true });
     const files = new Set<string>();
+    const placed = new Set<string>(); // lower case: the library folder is case-insensitive on Windows
     for (const p of placements) {
       const dest = path.join(fresh, ...p.to.split("/"));
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.copyFileSync(p.from, dest);
       files.add(p.to);
+      placed.add(p.to.toLowerCase());
     }
     // Whatever else sits in the folder (not listed in mod.files, not mod.json) stays.
     const listed = new Set(mod.files.map((f) => f.toLowerCase()));
@@ -202,7 +204,7 @@ export function replaceModFiles(lib: Library, mod: ModInfo, placements: Placemen
       for (const e of fs.readdirSync(path.join(dir, sub), { withFileTypes: true })) {
         const rel = sub ? `${sub}/${e.name}` : e.name;
         if (e.isDirectory()) carry(rel);
-        else if (!listed.has(rel.toLowerCase()) && rel !== "mod.json" && !files.has(rel)) {
+        else if (!listed.has(rel.toLowerCase()) && rel !== "mod.json" && !placed.has(rel.toLowerCase())) {
           fs.mkdirSync(path.dirname(path.join(fresh, ...rel.split("/"))), { recursive: true });
           fs.copyFileSync(path.join(dir, ...rel.split("/")), path.join(fresh, ...rel.split("/")));
         }

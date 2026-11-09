@@ -62,11 +62,14 @@ if (cmd === "mcp") {
     process.exit(1);
   };
   const parseChoices = (v) => {
-    try {
-      const j = JSON.parse(String(v));
-      if (!Array.isArray(j)) throw new Error("not an array");
-      return j;
-    } catch { return fail("--fomod-choices needs a JSON array of { step, group, plugins }"); }
+    const shape = '--fomod-choices needs a JSON array of { "step": string, "group": string, "plugins": [string, ...] }';
+    let j;
+    try { j = JSON.parse(String(v)); } catch { return fail(shape); }
+    if (!Array.isArray(j)) return fail(shape);
+    const fits = (c) => !!c && typeof c === "object" && typeof c.step === "string" && typeof c.group === "string" && Array.isArray(c.plugins) && c.plugins.every((n) => typeof n === "string");
+    const bad = j.map((c, i) => (fits(c) ? 0 : i + 1)).filter(Boolean);
+    if (bad.length) return fail(`${shape}; not like that: entry ${bad.join(", ")}`);
+    return j.map((c) => ({ step: c.step, group: c.group, plugins: c.plugins }));
   };
   const need = (value, what) => value ?? fail(`${cmd} needs ${what}`);
   const usage = () => console.log(fs.readFileSync(new URL(import.meta.url), "utf8").split("\n").filter((l) => l.startsWith("//")).slice(1).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));

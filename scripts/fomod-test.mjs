@@ -407,6 +407,14 @@ try {
     const r2v = await core.verbs.add(vs, v2);
     assert.equal(r2v.data.added.version, "2.0");
     assert.equal(vl.mods.find((m) => m.id === act.id).enabled, false);
+    // ...in the same family: it keeps the page's Nexus id, and its source is the kept download
+    const newEntry = vl.mods.find((m) => m.id === r2v.data.added.id);
+    assert.notEqual(newEntry.id, act.id);
+    assert.equal(newEntry.source.modId, 123);
+    const keptV2 = path.join(core.downloadsFolder(vl.root), path.basename(v2));
+    assert.equal(path.resolve(newEntry.source.path).toLowerCase(), path.resolve(keptV2).toLowerCase());
+    assert.ok(fs.existsSync(keptV2));
+    assert.equal(core.familyOf(vl, newEntry).key, core.familyOf(vl, vl.mods.find((m) => m.id === act.id)).key);
     // no version information with an existing family: replaces the active mod
     const vl3 = core.loadLibrary(path.join(tmp, "vlib3"), game);
     const vs3 = { lib: vl3, libraryRoot: vl3.root, game, sevenZa };
@@ -490,6 +498,105 @@ try {
     assert.equal(core.sameVersionStep({ fomod: false, keptFile: true, key: "k", quiet: false }), "activate");
   }
 
+  // Final review fixes
+  {
+    const same = (src) => ({ source: src, folder: src, isFile: false });
+    // 1. Reinstalling to change options opens the window even when the saved choices fit; Update all never does
+    const act = { id: "a" }, tgt = { id: "t" };
+    assert.deepEqual(core.fomodAddStep({ silent: true, target: tgt }, undefined), { action: "window", holder: undefined });
+    assert.deepEqual(core.fomodAddStep({ silent: true, active: act, target: tgt }, {}), { action: "window", holder: undefined });
+    assert.deepEqual(core.fomodAddStep({ silent: true, active: act, target: tgt }, { quiet: true }), { action: "install" });
+    assert.deepEqual(core.fomodAddStep({ silent: false, active: act, target: tgt }, { quiet: true }), { action: "hold", holder: act });
+    assert.deepEqual(core.fomodAddStep({ silent: true, active: act }, {}), { action: "install" });
+    const rlib = core.loadLibrary(path.join(tmp, "rlib"), game);
+    core.finishFomodAdd(rlib, core.prepareFomodAdd(rlib, same(basicRoot)), picks);
+    const p1 = core.prepareFomodAdd(rlib, same(basicRoot));
+    assert.ok(p1.target);
+    assert.equal(p1.silent, true);
+    assert.equal(core.fomodAddStep(p1, undefined).action, "window");
+    assert.equal(core.fomodAddStep(p1, { quiet: true }).action, "install");
+
+    // 2. Same installer re-added: compared by the FOMOD's own targets, so files classify drops (a readme) do not count
+    const b2 = path.join(tmp, "readme-mod");
+    fs.cpSync(basicRoot, b2, { recursive: true });
+    fs.writeFileSync(path.join(b2, "extras", "gloves", "readme.txt"), "read me");
+    // a conditional file that only installs while the other mod's file is active
+    const xml2 = path.join(b2, "fomod", "ModuleConfig.xml");
+    fs.writeFileSync(xml2, fs.readFileSync(xml2, "utf8").replace("</config>", '<conditionalFileInstalls><patterns><pattern><dependencies><fileDependency file="archive\\pc\\mod\\other.archive" state="Active"/></dependencies><files><file source="core\\core.reds" destination="r6\\scripts\\Test\\cond.reds"/></files></pattern></patterns></conditionalFileInstalls></config>'));
+    const rl = core.loadLibrary(path.join(tmp, "rdlib"), game);
+    const other = core.addMod(rl, [{ from: path.join(basicRoot, "size", "small.dat"), to: "archive/pc/mod/other.archive", kind: "archive" }], { name: "Other", source: { type: "folder", path: basicRoot } });
+    const gl = [{ step: "Size", group: "Size", plugins: ["Small"] }, { step: "Extras", group: "Extras", plugins: ["Gloves"] }];
+    const { mod: rm } = core.finishFomodAdd(rl, core.prepareFomodAdd(rl, same(b2)), gl);
+    assert.ok(!rm.files.includes("readme.txt"));
+    assert.ok(rm.fomod.targets.includes("readme.txt"));
+    assert.ok(rm.fomod.targets.includes("r6/scripts/test/cond.reds"));
+    assert.equal(core.prepareFomodAdd(rl, same(b2)).applied.compatible, true);
+    // an older record without targets: the staged and classified result is compared with the mod's files
+    delete rm.fomod.targets;
+    assert.equal(core.prepareFomodAdd(rl, same(b2)).applied.compatible, true);
+    // a fileDependency that resolves differently now: not compatible
+    core.finishFomodAdd(rl, core.prepareFomodAdd(rl, same(b2)), [{ step: "Size", group: "Size", plugins: ["Small"] }, { step: "Extras", group: "Extras", plugins: [] }]);
+    assert.equal(core.prepareFomodAdd(rl, same(b2)).applied.compatible, true);
+    other.enabled = false;
+    core.saveMod(rl, other);
+    const off = core.prepareFomodAdd(rl, same(b2));
+    assert.equal(off.applied.compatible, false);
+    assert.deepEqual(off.applied.warnings, []);
+    other.enabled = true;
+    core.saveMod(rl, other);
+
+    // 6. replaceModFiles: a carried file never overwrites a new placement that differs only in case
+    const cl6 = core.loadLibrary(path.join(tmp, "clib"), game);
+    const small = path.join(basicRoot, "size", "small.dat");
+    const large = path.join(basicRoot, "size", "large.dat");
+    const m6 = core.addMod(cl6, [{ from: small, to: "archive/pc/mod/a.archive", kind: "archive" }], { name: "Case", source: { type: "folder", path: basicRoot } });
+    fs.writeFileSync(path.join(core.modFolder(cl6, m6), "archive", "pc", "mod", "Notes.TXT"), "old notes");
+    core.replaceModFiles(cl6, m6, [{ from: small, to: "archive/pc/mod/a.archive", kind: "archive" }, { from: large, to: "archive/pc/mod/notes.txt", kind: "archive" }]);
+    const notes = fs.readdirSync(path.join(core.modFolder(cl6, m6), "archive", "pc", "mod")).find((n) => n.toLowerCase() === "notes.txt");
+    assert.deepEqual(fs.readFileSync(path.join(core.modFolder(cl6, m6), "archive", "pc", "mod", notes)), fs.readFileSync(large));
+
+    // 7. Given choices naming a step or group the installer lacks are refused, listing them
+    const glib = core.loadLibrary(path.join(tmp, "glib"), game);
+    const gs = { lib: glib, libraryRoot: glib.root, game, sevenZa };
+    await assert.rejects(() => core.verbs.add(gs, basicRoot, undefined, undefined, [...picks, { step: "Nope", group: "Size", plugins: [] }, { step: "Size", group: "Wrong", plugins: ["Small"] }]), (e) => {
+      assert.match(e.message, /Nope \/ Size/);
+      assert.match(e.message, /Size \/ Wrong/);
+      return true;
+    });
+    assert.equal(glib.mods.length, 0);
+    // the command line checks each entry's shape
+    {
+      const { spawnSync } = require("node:child_process");
+      const cli = path.join(import.meta.dirname, "..", "bin", "edgedeck.mjs");
+      const r7 = spawnSync(process.execPath, [cli, "add", basicRoot, "--library", path.join(tmp, "clilib"), "--game", game, "--fomod-choices", JSON.stringify([{ step: "Size", group: "Size", plugins: "Small" }])], { encoding: "utf8" });
+      assert.equal(r7.status, 1);
+      assert.match(r7.stderr, /fomod-choices/);
+      assert.match(r7.stderr, /entry 1/);
+    }
+
+    // 8. Output that classifies as a choice of folders says so, naming them
+    const optCfg = core.parseModuleConfig('<config><moduleName>O</moduleName><requiredInstallFiles><file source="size\\small.dat" destination="Alpha\\a.archive"/><file source="size\\large.dat" destination="Beta\\b.archive"/></requiredInstallFiles></config>');
+    assert.throws(() => core.installFomod(cl6, { name: "Opts", source: { type: "folder", path: basicRoot }, root: basicRoot, cfg: optCfg, text: "x", choices: [], from: "edgedeck" }), (e) => {
+      assert.match(e.message, /could not be placed/);
+      assert.match(e.message, /Alpha/);
+      assert.match(e.message, /Beta/);
+      return true;
+    });
+
+    // 9. A window that waited: prepared again, it sees the mod another window added meanwhile
+    const qlib = core.loadLibrary(path.join(tmp, "qlib"), game);
+    const waited = core.prepareFomodAdd(qlib, same(basicRoot));
+    assert.equal(waited.target, undefined);
+    core.finishFomodAdd(qlib, core.prepareFomodAdd(qlib, same(basicRoot)), picks);
+    const fresh = core.reprepareFomodAdd(qlib, waited);
+    assert.equal(fresh.target?.id, qlib.mods[0].id);
+    core.finishFomodAdd(qlib, fresh, picks);
+    assert.equal(qlib.mods.length, 1);
+
+    // 10. A parser error reads as "not a FOMOD"
+    assert.throws(() => core.parseModuleConfig('<!DOCTYPE config [<!DOCTYPE inner [<!ENTITY a "x">]>]><config/>'), /not a FOMOD ModuleConfig.xml/);
+  }
+
   // Vortex's LevelDB read without a native module: tables, log, overwrites and deletions
   {
     let ClassicLevel;
@@ -561,6 +668,8 @@ try {
         await put(id, "modId", JSON.stringify(77));
         await put(id, "version", JSON.stringify("3.0"));
       }
+      await put("Held Cloak-99-1-0-9", "installerChoices###options", opts("Cut", "Cut", ["Long"]));
+      await put("Held Cloak-99-1-0-9", "installerChoices###type", JSON.stringify("fomod"));
       await put("Empty-88-1-0-8", "installerChoices###options", "[]");
       await put("Empty-88-1-0-8", "installerChoices###type", JSON.stringify("fomod"));
       await put("Plain-55-1-0-555", "installerChoices###type", JSON.stringify("unknown"));
@@ -569,7 +678,7 @@ try {
       await db.close();
 
       const list = core.readVortexChoices(stateDir);
-      assert.deepEqual(list.map((v) => v.vortexId).sort(), ["Gone-44-1-0-444", "Mine-33-1-0-333", "Quux Boots-22-2-0-222", "Twin A-77-3-0-1", "Twin B-77-3-0-2", "Zed Cape-11-1-0-111"]);
+      assert.deepEqual(list.map((v) => v.vortexId).sort(), ["Gone-44-1-0-444", "Held Cloak-99-1-0-9", "Mine-33-1-0-333", "Quux Boots-22-2-0-222", "Twin A-77-3-0-1", "Twin B-77-3-0-2", "Zed Cape-11-1-0-111"]);
       const quux = list.find((v) => v.vortexId.startsWith("Quux"));
       assert.deepEqual(quux, { vortexId: "Quux Boots-22-2-0-222", modId: 22, version: "2.0", choices: [{ step: "Size", group: "Size", plugins: ["Big", "Wide"] }] });
 
@@ -588,6 +697,7 @@ try {
       mkMod("old-guess", { type: "vortex", path: "C:\\Staging\\Plain-55-1-0-555" }, { fomod: { choices: [], configHash: "", from: "inferred" } });
       mkMod("not-vortex", { type: "folder", path: "C:\\Staging\\Gone-44-1-0-444" });
       mkMod("twin", { type: "vortex", path: "D:/moved/twin", modId: 77 }, { version: "3.0" });
+      mkMod("held", { type: "vortex", path: "C:\\Staging\\Held Cloak-99-1-0-9" }, { fomod: { choices: [], configHash: "", from: "inferred", pending: { download: "D:/dl/Held Cloak-99-2-0-9.zip", version: "2.0" } } });
       mkMod("empty-one", { type: "vortex", path: "C:\\Staging\\Empty-88-1-0-8" }, { fomod: { choices: [], configHash: "", from: "inferred" } });
       const modJson = (id) => JSON.parse(fs.readFileSync(path.join(core.modFolder(vlib, { id }), "mod.json"), "utf8"));
       const before = modJson("zed-cape");
@@ -597,7 +707,9 @@ try {
       assert.deepEqual(afterRest, beforeRest, "only fomod changes in mod.json");
       assert.equal(modJson("twin").fomod, undefined, "two files at one modId and version are ambiguous");
       assert.deepEqual(modJson("empty-one").fomod, { choices: [], configHash: "", from: "inferred" });
-      assert.deepEqual(r.matched.map((m) => m.id).sort(), ["quux-boots", "zed-cape"]);
+      assert.deepEqual(r.matched.map((m) => m.id).sort(), ["held", "quux-boots", "zed-cape"]);
+      // an update waiting for review stays waiting
+      assert.deepEqual(modJson("held").fomod, { choices: [{ step: "Cut", group: "Cut", plugins: ["Long"] }], configHash: "", from: "vortex", pending: { download: "D:/dl/Held Cloak-99-2-0-9.zip", version: "2.0" } });
       assert.deepEqual(r.skipped, ["mine"]);
       assert.deepEqual(r.unmatched.sort(), ["Gone-44-1-0-444", "Twin A-77-3-0-1", "Twin B-77-3-0-2"]);
       const back = core.loadLibrary(vlib.root, game);

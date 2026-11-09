@@ -267,7 +267,9 @@ export function importVortexChoices(lib: Library, list: VortexChoices[]): { matc
       skipped.push(mod.id);
       return;
     }
-    mod.fomod = { choices: v.choices, configHash: "", from: "vortex" };
+    // An update already waiting for review keeps waiting.
+    const pending = mod.fomod?.pending;
+    mod.fomod = { choices: v.choices, configHash: "", from: "vortex", ...(pending ? { pending } : {}) };
     saveMod(lib, mod);
     matched.push({ id: mod.id, vortexId: v.vortexId });
   };
