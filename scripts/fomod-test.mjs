@@ -1,6 +1,7 @@
 // Tests the FOMOD reader against the fixtures in scripts/fixtures/fomod.
 //   node scripts/fomod-test.mjs       after npm run build
 import assert from "node:assert/strict";
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -487,6 +488,45 @@ try {
     assert.equal(core.sameVersionStep({ fomod: true, keptFile: true, key: "k", quiet: true }), "activate");
     assert.equal(core.sameVersionStep({ fomod: true, keptFile: false, key: "k", quiet: false }), "activate");
     assert.equal(core.sameVersionStep({ fomod: false, keptFile: true, key: "k", quiet: false }), "activate");
+  }
+
+  // Vortex's LevelDB read without a native module: tables, log, overwrites and deletions
+  {
+    let ClassicLevel;
+    try {
+      ({ ClassicLevel } = require("classic-level"));
+    } catch (e) {
+      console.log(`note: classic-level did not load (${String(e.message).slice(0, 80)}), LevelDB reader test skipped`);
+    }
+    if (ClassicLevel) {
+      const dbDir = path.join(tmp, "leveldb");
+      const pre = "persistent###mods###cyberpunk2077###";
+      const key = (i) => `${pre}m${i}###attributes###installerChoices###options`;
+      const val = (i, tag) => JSON.stringify({ i, tag, pad: i % 2 ? "x".repeat(4000) : crypto.randomBytes(2000).toString("hex") });
+      let db = new ClassicLevel(dbDir);
+      await db.open();
+      for (let i = 0; i < 2000; i++) await db.put(key(i), val(i, "first"));
+      await db.put("other###key", "ignored");
+      await db.close();
+      db = new ClassicLevel(dbDir);
+      await db.open();
+      const batch = db.batch();
+      for (let i = 0; i < 10; i++) batch.put(key(i), val(i, "second"));
+      for (let i = 10; i < 20; i++) batch.del(key(i));
+      await batch.write();
+      await db.close();
+      const files = fs.readdirSync(dbDir);
+      assert.ok(files.some((f) => /.(ldb|sst)$/.test(f)), "the database has table files");
+      assert.ok(files.some((f) => f.endsWith(".log")), "the database has a log");
+      const got = core.readLevelDb(dbDir, pre);
+      assert.equal(got.size, 1990);
+      assert.equal(JSON.parse(got.get(key(3))).tag, "second");
+      assert.equal(JSON.parse(got.get(key(500))).tag, "first");
+      assert.equal(JSON.parse(got.get(key(501))).i, 501);
+      assert.equal(got.has(key(15)), false);
+      assert.equal(core.readLevelDb(dbDir, "other###").get("other###key"), "ignored");
+      assert.deepEqual(fs.readdirSync(dbDir).sort(), files.sort(), "the original folder is untouched");
+    }
   }
 
   console.log("fomod tests passed");
