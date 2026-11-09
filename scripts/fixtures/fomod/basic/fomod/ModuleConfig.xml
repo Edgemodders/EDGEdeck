@@ -40,7 +40,20 @@
             </plugin>
             <plugin name="Gloves">
               <description>Adds gloves.</description>
-              <typeDescriptor><type name="Optional"/></typeDescriptor>
+              <files>
+                <folder source="extras\gloves" destination=""/>
+              </files>
+              <typeDescriptor>
+                <dependencyType>
+                  <defaultType name="Optional"/>
+                  <patterns>
+                    <pattern>
+                      <dependencies><fileDependency file="archive\pc\mod\other.archive" state="Missing"/></dependencies>
+                      <type name="NotUsable"/>
+                    </pattern>
+                  </patterns>
+                </dependencyType>
+              </typeDescriptor>
             </plugin>
           </plugins>
         </group>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+  <moduleName>Rules Mod</moduleName>
+  <requiredInstallFiles>
+    <file source="CORE\Core.reds"/>
+    <file source="a\one.dat" destination="archive\pc\mod\p.archive" priority="1"/>
+  </requiredInstallFiles>
+  <installSteps order="Explicit">
+    <installStep name="Pick">
+      <optionalFileGroups order="Explicit">
+        <group name="Pick" type="SelectAny">
+          <plugins order="Explicit">
+            <plugin name="Two">
+              <files><file source="B\TWO.dat" destination="archive\pc\mod\p.archive" priority="2"/></files>
+              <conditionFlags><flag name="two">yes</flag></conditionFlags>
+            </plugin>
+            <plugin name="Three">
+              <files><file source="c\three.dat" destination="archive\pc\mod\p.archive" priority="2"/></files>
+            </plugin>
+            <plugin name="Pack">
+              <files><folder source="pack" destination="r6\pack"/></files>
+            </plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
+    <installStep name="Always">
+      <optionalFileGroups order="Explicit">
+        <group name="Fixed" type="SelectAll">
+          <plugins order="Explicit">
+            <plugin name="Fixed">
+              <files><file source="b\two.dat" destination="r6\fixed.txt"/></files>
+              <conditionFlags><flag name="fixed">1</flag></conditionFlags>
+            </plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
+  </installSteps>
+  <conditionalFileInstalls>
+    <patterns>
+      <pattern>
+        <dependencies operator="And">
+          <flagDependency flag="two" value="yes"/>
+          <flagDependency flag="fixed" value="1"/>
+        </dependencies>
+        <files><file source="c\three.dat" destination="r6\both.txt"/></files>
+      </pattern>
+    </patterns>
+  </conditionalFileInstalls>
+</config>
