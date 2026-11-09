@@ -6,6 +6,7 @@ import fs from "./fsx";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { Placement } from "./classifier";
+import type { FomodRecord } from "./fomod";
 
 /** What is inside a mod, by where its files land. A mod can be several kinds at once. */
 export type ModKind = "archive" | "xl" | "redmod" | "reds" | "tweak" | "cet" | "red4ext" | "audioware" | "input" | "config" | "asi" | "framework" | "rednode" | "other";
@@ -37,6 +38,8 @@ export interface ModInfo {
   renamedFrom?: string;
   /** For a project's mod: a hash of the file list its packed folder had at the last sync, so a removed or renamed file re-syncs it too. */
   packedList?: string;
+  /** What the FOMOD installer was given (choices, what it offered), so an update can reuse it. */
+  fomod?: FomodRecord;
   /** What Nexus last said about this mod, when it has a mod id. */
   nexus?: { name: string; version: string; latestVersion: string; latestFileId: number; latestFileName: string; checked: string; author?: string; summary?: string };
 }

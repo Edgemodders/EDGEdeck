@@ -2,6 +2,7 @@
 // choices and the installer window build on these types.
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import fs from "./fsx";
 
 export type GroupType = "SelectExactlyOne" | "SelectAtMostOne" | "SelectAtLeastOne" | "SelectAny" | "SelectAll";
@@ -354,4 +355,111 @@ export function resolveFomod(cfg: FomodConfig, root: string, choices: StepChoice
   for (const c of cfg.conditional) if (holds(c.when, flags, ctx)) add(c.files, "Conditional files");
 
   return { files: [...picked.values()].map(({ to, from }) => ({ from, to })), flags, visibleSteps, errors };
+}
+
+// ---- Saved choices across versions ----
+
+/** The steps, groups and plugins an installer offered, so a later version can tell what is new. */
+export interface StructureStep { step: string; groups: { name: string; type: GroupType; plugins: string[] }[] }
+
+/** What a mod remembers of its installer. `pending` is the downloaded update waiting for review (on the family's active mod). */
+export interface FomodRecord {
+  choices: StepChoice[];
+  configHash: string;
+  structure?: StructureStep[];
+  from: "edgedeck" | "vortex" | "inferred";
+  pending?: { download: string; version: string; fileId?: number; fileTitle?: string };
+}
+
+// sha256 of the XML with whitespace runs collapsed, so re-indenting does not count as a change.
+export function configHash(text: string): string {
+  return createHash("sha256").update(text.replace(/\s+/g, " ").trim()).digest("hex");
+}
+
+export function structureOf(cfg: FomodConfig): StructureStep[] {
+  return cfg.steps.map((s) => ({
+    step: s.name,
+    groups: s.groups.map((g) => ({ name: g.name, type: g.type, plugins: g.plugins.map((p) => p.name) })),
+  }));
+}
+
+export interface Warning { step: string; group?: string; plugin?: string; kind: "new" | "gone" | "required" }
+export interface Applied { choices: StepChoice[]; warnings: Warning[]; compatible: boolean }
+
+const sameFiles = (a: string[], b: string[]): boolean => {
+  const norm = (l: string[]): string[] => l.map((x) => slashes(x).toLowerCase()).sort();
+  const x = norm(a);
+  const y = norm(b);
+  return x.length === y.length && x.every((v, i) => v === y[i]);
+};
+
+// Carries the saved choices onto a new version of the installer. compatible is true only when
+// the new version installs with them and nothing the user has not decided on has appeared; any
+// doubt (no structure, unknown installed list) says false, since a wrong true changes the install silently.
+export function applySaved(
+  cfg: FomodConfig, text: string, root: string, saved: FomodRecord | undefined,
+  installedFiles: string[] | undefined, ctx: ResolveContext,
+): Applied {
+  const defaults = defaultChoices(cfg, ctx);
+  const kept = saved?.choices ?? [];
+  const warnings: Warning[] = [];
+
+  // Surviving saved picks; a group with none left takes its default.
+  const choices: StepChoice[] = [];
+  for (const step of cfg.steps) {
+    for (const group of step.groups) {
+      const old = kept.find((c) => c.step === step.name && c.group === group.name);
+      const survivors = old ? old.plugins.filter((n) => group.plugins.some((p) => p.name === n)) : [];
+      if (old && (survivors.length || !old.plugins.length)) {
+        choices.push({ step: step.name, group: group.name, plugins: survivors });
+      } else {
+        const d = defaults.find((c) => c.step === step.name && c.group === group.name);
+        if (d) choices.push(d);
+      }
+    }
+  }
+
+  // Saved picks that no longer exist.
+  let lost = false;
+  for (const c of kept) {
+    const group = cfg.steps.find((s) => s.name === c.step)?.groups.find((g) => g.name === c.group);
+    if (!group) { warnings.push({ step: c.step, group: c.group, kind: "gone" }); lost = true; continue; }
+    for (const n of c.plugins) {
+      if (!group.plugins.some((p) => p.name === n)) { warnings.push({ step: c.step, group: c.group, plugin: n, kind: "gone" }); lost = true; }
+    }
+  }
+
+  // Things the saved structure does not know (SelectAll groups need no decision).
+  let fresh = false;
+  const old = saved?.structure;
+  if (old) {
+    for (const step of cfg.steps) {
+      const os = old.find((s) => s.step === step.name);
+      if (!os) {
+        if (step.groups.some((g) => g.type !== "SelectAll")) { warnings.push({ step: step.name, kind: "new" }); fresh = true; }
+        continue;
+      }
+      for (const group of step.groups) {
+        if (group.type === "SelectAll") continue;
+        const og = os.groups.find((g) => g.name === group.name);
+        if (!og) { warnings.push({ step: step.name, group: group.name, kind: "new" }); fresh = true; continue; }
+        for (const p of group.plugins) {
+          if (!og.plugins.includes(p.name)) { warnings.push({ step: step.name, group: group.name, plugin: p.name, kind: "new" }); fresh = true; }
+        }
+      }
+    }
+  }
+
+  const resolved = resolveFomod(cfg, root, choices, ctx);
+  for (const e of resolved.errors) {
+    const m = /^Step "(.*)", group "(.*?)"/.exec(e);
+    warnings.push(m ? { step: m[1], group: m[2], kind: "required" } : { step: "", kind: "required" });
+  }
+
+  let compatible = !!saved && !!old && !lost && !fresh && !resolved.errors.length;
+  if (compatible && saved!.configHash === configHash(text)) {
+    // Same installer text: a different file list means a fileDependency resolves differently now.
+    compatible = !!installedFiles && sameFiles(resolved.files.map((f) => f.to), installedFiles);
+  }
+  return { choices, warnings, compatible };
 }
