@@ -6,13 +6,14 @@ import fs from "./fsx";
 import * as os from "node:os";
 import * as path from "node:path";
 import { classify, rednodeManifest } from "./classifier";
-import { baseName, families, familyForDownload, familyKey, familyOf, renameFamily, settleNewVersion, versionFrom, cleanName } from "./families";
-import { activeFiles, applySaved, defaultChoices, findFomodRoot, installFomod, moduleConfigPath, readModuleConfig, resolveFomod, type FomodConfig, type StepChoice, type Warning } from "./fomod";
+import { familyOf, renameFamily, settleNewVersion } from "./families";
+import { activeFiles, defaultChoices, findFomodRoot, resolveFomod, type FomodConfig, type StepChoice, type Warning } from "./fomod";
+import { finishFomodAdd, prepareFomodAdd } from "./fomodAdd";
 import { deploy, detectChanges, modStatus, modsTouched, writeDeployReport, pendingChanges, plan, readManifest, undo, type Decision, type Lost } from "./deploy";
 import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
 import { checkFrameworks, frameworkSummary } from "./frameworks";
 import { findGame, gameRunning, gameVersion, isGameFolder } from "./game";
-import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, moveMod, removeMod, saveLibrary, saveMod, type Library, type ModInfo, type ModSource } from "./library";
+import { addMod, defaultLibraryPath, keepDownload, loadLibrary, modFolder, moveMod, removeMod, saveLibrary, saveMod, type Library, type ModInfo } from "./library";
 import { activeLoadout, importLoadout, listLoadouts, makeActive, saveLoadout } from "./loadouts";
 import { installProject, sameNameMod, type BesideHow } from "./project";
 import { deployedRedmodPackages, deployRedmod, enabledRedmodPackages } from "./redmod";
@@ -79,51 +80,22 @@ function fomodQuestions(cfg: FomodConfig, root: string, ctx: { activeFiles: Set<
 }
 
 /** Adds a FOMOD: the given choices, or the family's saved ones when they still fit; otherwise it throws the questions. */
-function addFomod(s: Session, source: string, isFile: boolean, name: string | undefined, modName: string, root: string, given?: StepChoice[]): Verb {
-  const { config: cfg, text } = readModuleConfig(moduleConfigPath(root));
+function addFomod(s: Session, source: string, isFile: boolean, name: string | undefined, folder: string, given?: StepChoice[]): Verb {
   const lib = s.lib;
-  const ctx = { activeFiles: activeFiles(lib) };
-  const keptPath = isFile ? path.join(downloadsFolder(lib.root), path.basename(source)) : undefined;
-  const download = keptPath ? familyForDownload(lib, keptPath) : undefined;
-  const label = name ?? (isFile ? cleanName(modName) : modName);
-  const fam = download ? familyOf(lib, download) : families(lib).find((f) => f.mods.some((m) => familyKey(m) === `name:${baseName(label)}` || baseName(m.name) === baseName(label)));
-  const active = fam?.active;
-  // The version: the one of the mod this download is kept for, else the file name's, else the family's active one (a reinstall).
-  const version = download?.version || versionFrom(path.basename(source, isFile ? path.extname(source) : "")) || active?.version || "";
-  // Reinstall over: the very mod this download is kept for, else the family's mod of the same version.
-  const target = download ?? (fam ? fam.mods.find((m) => m.version === version && m.enabled) ?? fam.mods.find((m) => m.version === version) : undefined);
+  const p = prepareFomodAdd(lib, { source, folder, isFile, name });
   let choices = given;
   let from: "edgedeck" | "vortex" | "inferred" = "edgedeck";
   if (!choices) {
-    const base = target ?? active;
-    const rec = base?.fomod;
-    if (!base || !rec) throw new Error(fomodQuestions(cfg, root, ctx, "nothing is saved for it yet", []));
-    const applied = applySaved(cfg, text, root, rec, base.files, ctx);
-    if (!applied.compatible || rec.from === "inferred") {
-      throw new Error(fomodQuestions(cfg, root, ctx, rec.from === "inferred" ? "the earlier choices were only guessed" : "the saved choices no longer fit this version", applied.warnings));
+    const ctx = { activeFiles: activeFiles(lib) };
+    if (!p.record) throw new Error(fomodQuestions(p.cfg, p.root, ctx, "nothing is saved for it yet", []));
+    if (!p.silent) {
+      throw new Error(fomodQuestions(p.cfg, p.root, ctx, p.inferred ? "the earlier choices were only guessed" : "the saved choices no longer fit this version", p.applied.warnings));
     }
-    choices = applied.choices;
-    from = rec.from;
+    choices = p.applied.choices;
+    from = p.record.from;
   }
-  const kept = isFile ? keepDownload(lib, source) : source;
-  // Nexus data: all of it from this download's own mod; just the page from the family's active mod.
-  const inherit = download?.source ?? (active?.source.modId ? { type: active.source.type, modId: active.source.modId } as ModSource : undefined);
-  const src: ModSource = isFile
-    ? { type: inherit?.type ?? "file", path: kept, ...(inherit?.modId ? { modId: inherit.modId, fileId: inherit.fileId, fileTitle: inherit.fileTitle } : {}) }
-    : { type: "folder", path: source };
-  const { mod, unplaced } = installFomod(lib, { name: target ? target.name : label, version, source: src, root, cfg, text, choices, from, replace: target });
-  let note = "; it replaces the files of the same version";
-  let replaced: ModInfo | undefined;
-  if (target) {
-    // Id, order, on/off and version stay; the source follows the file just added, and Nexus ids it lacked are filled in.
-    const old = mod.source;
-    if (isFile) mod.source = { ...old, ...(old.modId || !inherit?.modId ? {} : { type: inherit.type, modId: inherit.modId, fileId: inherit.fileId, fileTitle: inherit.fileTitle }), path: kept };
-    saveMod(lib, mod);
-  } else {
-    const settled = settleNewVersion(lib, mod);
-    replaced = settled.replaced;
-    note = settled.replaced ? `; a new version of ${settled.replaced.name} ${settled.replaced.version}, which is off now` : settled.older ? `; older than ${settled.older.version}, so it is off` : "";
-  }
+  const { mod, unplaced, replaced, older } = finishFomodAdd(lib, p, choices, { from });
+  const note = p.target ? "; it replaces the files of the same version" : replaced ? `; a new version of ${replaced.name} ${replaced.version}, which is off now` : older ? `; older than ${older.version}, so it is off` : "";
   return { data: { added: { id: mod.id, name: mod.name, version: mod.version, kinds: mod.kinds, files: mod.files.length, enabled: mod.enabled }, replaced: replaced?.id, unplaced }, text: `added ${mod.id} from its installer (${mod.files.length} files, ${mod.kinds.join(", ")})${note}; ${mod.enabled ? "it is on, " : ""}deploy to put it in the game${unplaced.length ? `; not placed: ${unplaced.join(", ")}` : ""}` };
 }
 
@@ -186,7 +158,7 @@ export const verbs = {
         folder = temp;
       }
       const fomodRoot = findFomodRoot(folder);
-      if (fomodRoot) return addFomod(s, source, isFile, name, modName, fomodRoot, fomodChoices);
+      if (fomodRoot) return addFomod(s, source, isFile, name, folder, fomodChoices);
       let c = classify(folder, modName);
       if (c.options) {
         const pick = option ? c.options.find((o) => o.label === option) : undefined;

@@ -419,6 +419,56 @@ try {
     assert.equal(vl3.mods.length, 1);
   }
 
+  // The installer window's view model
+  {
+    const vctx = { activeFiles: new Set(["archive/pc/mod/other.archive"]) };
+    // a new plugin since the saved structure: its step is marked, the plugin is new, Install stays possible
+    const plusCfg = parsed(textPlus);
+    const ap = core.applySaved(plusCfg, textPlus, basicRoot, saved, undefined, vctx);
+    let v = core.installerView(plusCfg, basicRoot, ap.choices, ap.warnings, vctx);
+    assert.deepEqual(v.steps.map((s) => [s.name, s.mark]), [["Size", "ok"], ["Extras", "warn"]]);
+    const extras = v.steps.find((s) => s.name === "Extras").groups[0];
+    assert.equal(extras.type, "SelectAny");
+    assert.equal(extras.plugins.find((p) => p.name === "Scarf").isNew, true);
+    assert.equal(extras.plugins.find((p) => p.name === "Gloves").isNew, false);
+    assert.equal(extras.plugins.find((p) => p.name === "Gloves").checked, true);
+    assert.equal(extras.plugins.find((p) => p.name === "Hats").checked, false);
+    assert.equal(extras.plugins.find((p) => p.name === "Hats").description, "Adds hats.");
+    assert.equal(v.canInstall, true);
+    // a pick-one group with nothing picked: its step is marked and Install is off
+    v = core.installerView(config, basicRoot, [{ step: "Size", group: "Size", plugins: [] }, { step: "Extras", group: "Extras", plugins: [] }], [], vctx);
+    assert.equal(v.steps.find((s) => s.name === "Size").mark, "warn");
+    assert.equal(v.canInstall, false);
+    // Gloves is not usable without the other mod; a step that shows up with a pick is listed
+    v = core.installerView(config, basicRoot, [{ step: "Size", group: "Size", plugins: ["Large"] }, { step: "Extras", group: "Extras", plugins: ["Hats"] }], [], ctx);
+    assert.equal(v.steps.find((s) => s.name === "Extras").groups[0].plugins.find((p) => p.name === "Gloves").disabled, true);
+    assert.deepEqual(v.steps.map((s) => [s.name, s.mark]), [["Size", "ok"], ["Extras", "ok"], ["Hat colour", "warn"]]);
+    assert.equal(v.canInstall, false);
+    // a Required plugin is checked and locked
+    const reqText = text.replace('<type name="Recommended"/>', '<type name="Required"/>');
+    const reqCfg = parsed(reqText);
+    v = core.installerView(reqCfg, basicRoot, core.defaultChoices(reqCfg, ctx), [], ctx);
+    const large = v.steps[0].groups[0].plugins.find((p) => p.name === "Large");
+    assert.equal(large.checked && large.locked, true);
+    assert.equal(v.steps[0].groups[0].plugins.find((p) => p.name === "Small").locked, false);
+    assert.equal(v.canInstall, true);
+    // the image path comes as the installer names it, with forward slashes
+    const imgCfg = parsed(text.replace("<description>The small one.</description>", '<description>The small one.</description><image path="fomod\\images\\small.png"/>'));
+    v = core.installerView(imgCfg, basicRoot, core.defaultChoices(imgCfg, ctx), [], ctx);
+    assert.equal(v.steps[0].groups[0].plugins.find((p) => p.name === "Small").image, "fomod/images/small.png");
+    // toggling: a pick-one group takes the new pick, a pick-any group adds and drops
+    let ch = core.toggleChoice(config, [{ step: "Size", group: "Size", plugins: ["Large"] }], "Size", "Size", "Small");
+    assert.deepEqual(ch.find((c) => c.group === "Size").plugins, ["Small"]);
+    ch = core.toggleChoice(config, ch, "Extras", "Extras", "Hats");
+    assert.deepEqual(ch.find((c) => c.group === "Extras").plugins, ["Hats"]);
+    ch = core.toggleChoice(config, ch, "Extras", "Extras", "Hats");
+    assert.deepEqual(ch.find((c) => c.group === "Extras").plugins, []);
+    // settleChoices puts a Required plugin back in and takes a not usable one out
+    const settled = core.settleChoices(reqCfg, [{ step: "Size", group: "Size", plugins: ["Small"] }, { step: "Extras", group: "Extras", plugins: ["Gloves"] }], ctx);
+    assert.deepEqual(settled.find((c) => c.group === "Size").plugins, ["Large"]);
+    assert.deepEqual(settled.find((c) => c.group === "Extras").plugins, []);
+  }
+
   console.log("fomod tests passed");
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });

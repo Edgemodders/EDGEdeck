@@ -507,6 +507,98 @@ export function completeChoices(cfg: FomodConfig, root: string, choices: StepCho
   return out;
 }
 
+// ---- The installer window's model ----
+
+export interface ViewPlugin { name: string; description: string; image?: string; checked: boolean; locked: boolean; disabled: boolean; isNew: boolean }
+export interface ViewStep { name: string; mark: "ok" | "warn"; groups: { name: string; type: GroupType; plugins: ViewPlugin[] }[] }
+
+// Walks the visible steps in order with the flags the picks so far set, the way resolveFomod does,
+// and hands each group its plugins' types at that point. visit may return the group's new picks.
+function walkGroups(
+  cfg: FomodConfig, choices: StepChoice[], ctx: ResolveContext,
+  visit: (step: FomodStep, group: FomodGroup, types: PluginType[], picked: string[]) => string[] | void,
+): void {
+  const flags: Record<string, string> = {};
+  for (const step of cfg.steps) {
+    if (!isVisible(step, flags, ctx)) continue;
+    for (const group of step.groups) {
+      const types = group.plugins.map((p) => typeOf(p, flags, ctx));
+      const had = choices.find((c) => c.step === step.name && c.group === group.name)?.plugins ?? [];
+      const picked = visit(step, group, types, had) ?? had;
+      const chosen = group.type === "SelectAll" ? group.plugins : group.plugins.filter((p) => picked.includes(p.name));
+      for (const p of chosen) for (const f of p.flags) flags[f.name] = f.value;
+    }
+  }
+}
+
+/** What the window shows: the visible steps with their marks, and whether Install can run. */
+export function installerView(cfg: FomodConfig, root: string, choices: StepChoice[], warnings: Warning[], ctx: ResolveContext): { steps: ViewStep[]; canInstall: boolean } {
+  const resolved = resolveFomod(cfg, root, choices, ctx);
+  // The errors now, not the "required" warnings passed in, say what still needs a pick: they clear as the user picks.
+  const stepErrors = new Set(resolved.errors.map((e) => /^Step "(.*)", group "/.exec(e)?.[1]).filter((s): s is string => s !== undefined));
+  const changed = warnings.filter((w) => w.kind !== "required");
+  const steps: ViewStep[] = [];
+  walkGroups(cfg, choices, ctx, (step, group, types, picked) => {
+    let vs = steps.find((s) => s.name === step.name);
+    if (!vs) {
+      // A step with a group never decided on (one a pick just made appear, say) is new to the user.
+      const unasked = step.groups.some((g) => g.type !== "SelectAll" && !choices.some((c) => c.step === step.name && c.group === g.name));
+      vs = { name: step.name, mark: stepErrors.has(step.name) || unasked || changed.some((w) => w.step === step.name) ? "warn" : "ok", groups: [] };
+      steps.push(vs);
+    }
+    const all = group.type === "SelectAll";
+    vs.groups.push({
+      name: group.name,
+      type: group.type,
+      plugins: group.plugins.map((p, i) => ({
+        name: p.name,
+        description: p.description.trim(),
+        ...(p.image ? { image: slashes(p.image) } : {}),
+        checked: all || picked.includes(p.name),
+        locked: all || types[i] === "Required",
+        disabled: !all && types[i] === "NotUsable",
+        isNew: changed.some((w) => w.kind === "new" && w.step === step.name && w.group === group.name && w.plugin === p.name),
+      })),
+    });
+  });
+  return { steps, canInstall: resolved.errors.length === 0 };
+}
+
+/** One click on a plugin: a pick-one group takes it (at most one: drops it when it was picked), the others add or drop it. */
+export function toggleChoice(cfg: FomodConfig, choices: StepChoice[], step: string, group: string, plugin: string): StepChoice[] {
+  const g = cfg.steps.find((s) => s.name === step)?.groups.find((x) => x.name === group);
+  if (!g || g.type === "SelectAll" || !g.plugins.some((p) => p.name === plugin)) return choices;
+  const had = choices.find((c) => c.step === step && c.group === group)?.plugins ?? [];
+  const on = had.includes(plugin);
+  const plugins = g.type === "SelectExactlyOne" ? [plugin]
+    : g.type === "SelectAtMostOne" ? (on ? [] : [plugin])
+    : on ? had.filter((n) => n !== plugin) : g.plugins.map((p) => p.name).filter((n) => n === plugin || had.includes(n));
+  const out = choices.filter((c) => !(c.step === step && c.group === group));
+  out.push({ step, group, plugins });
+  return out;
+}
+
+/** The picks with Required plugins put in and NotUsable ones taken out, at the flags of each group's place. */
+export function settleChoices(cfg: FomodConfig, choices: StepChoice[], ctx: ResolveContext): StepChoice[] {
+  const out = choices.map((c) => ({ ...c, plugins: [...c.plugins] }));
+  walkGroups(cfg, out, ctx, (step, group, types, picked) => {
+    if (group.type === "SelectAll") return;
+    const required = group.plugins.filter((_, i) => types[i] === "Required").map((p) => p.name);
+    let next = picked.filter((n) => types[group.plugins.findIndex((p) => p.name === n)] !== "NotUsable");
+    if (group.type === "SelectExactlyOne" || group.type === "SelectAtMostOne") {
+      if (required.length) next = [required[0]];
+    } else {
+      next = group.plugins.map((p) => p.name).filter((n) => next.includes(n) || required.includes(n));
+    }
+    if (next.length === picked.length && next.every((n, i) => n === picked[i])) return;
+    const entry = out.find((c) => c.step === step.name && c.group === group.name);
+    if (entry) entry.plugins = next;
+    else out.push({ step: step.name, group: group.name, plugins: next });
+    return next;
+  });
+  return out;
+}
+
 // ---- Installing ----
 
 /** The folder that holds fomod/ModuleConfig.xml: the folder itself or at most 2 levels down, the shallowest, names in any case. */
