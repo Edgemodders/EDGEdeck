@@ -83,6 +83,14 @@ function fomodQuestions(cfg: FomodConfig, root: string, ctx: { activeFiles: Set<
 function addFomod(s: Session, source: string, isFile: boolean, name: string | undefined, folder: string, given?: StepChoice[]): Verb {
   const lib = s.lib;
   const p = prepareFomodAdd(lib, { source, folder, isFile, name });
+  if (given) {
+    // A step or group the installer lacks would be dropped without a word: refuse it instead.
+    const unknown = given.filter((c) => !p.cfg.steps.some((st) => st.name === c.step && st.groups.some((g) => g.name === c.group)));
+    if (unknown.length) {
+      const ctx = { activeFiles: activeFiles(lib) };
+      throw new Error(`fomodChoices names steps or groups this installer does not have: ${unknown.map((c) => `${c.step} / ${c.group}`).join(", ")}.\n${fomodQuestions(p.cfg, p.root, ctx, "the choices given do not match it", [])}`);
+    }
+  }
   let choices = given;
   let from: "edgedeck" | "vortex" | "inferred" = "edgedeck";
   if (!choices) {
