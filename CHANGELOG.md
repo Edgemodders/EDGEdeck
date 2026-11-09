@@ -16,6 +16,7 @@ How to keep it:
 
 - FOMOD installers: choose options when you add a FOMOD mod; updates keep your choices and only ask when the installer changed.
 - Import FOMOD choices from Vortex for mods you brought over.
+- To change a FOMOD mod's options, add the same file again (or press Mod manager download again on Nexus): its installer opens with your current choices.
 
 **Fixed**
 

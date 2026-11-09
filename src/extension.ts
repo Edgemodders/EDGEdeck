@@ -16,7 +16,7 @@ import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, lat
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activeFiles, findFomodRoot } from "./fomod";
-import { finishFomodAdd, fomodAddStep, prepareFomodAdd, sameVersionStep, type PreparedFomod } from "./fomodAdd";
+import { finishFomodAdd, fomodAddStep, prepareFomodAdd, reprepareFomodAdd, sameVersionStep, type PreparedFomod } from "./fomodAdd";
 import { openFomodInstaller } from "./fomodPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey, versionFrom, cleanName } from "./families";
 import { lineFile, lineName, lineOfFile, newestInLine, otherLineFiles, splitPage } from "./nexusLines";
@@ -1870,8 +1870,9 @@ function holdForReview(p: PreparedFomod, holder: ModInfo): void {
  */
 async function addFomodFrom(source: string, isFile: boolean, folder: string, preset?: AddPreset): Promise<ModInfo | undefined> {
   const lib = library!;
-  const p = prepareFomodAdd(lib, { source, folder, isFile, name: preset?.name, preset: preset && { version: preset.version, source: preset.source, family: preset.family } });
+  let p = prepareFomodAdd(lib, { source, folder, isFile, name: preset?.name, preset: preset && { version: preset.version, source: preset.source, family: preset.family } });
   const step = fomodAddStep(p, preset);
+  const saved = step.action === "install";
   let choices = p.applied.choices;
   let from = p.record?.from ?? "edgedeck";
   let name: string | undefined;
@@ -1898,15 +1899,17 @@ async function addFomodFrom(source: string, isFile: boolean, folder: string, pre
       if (!typed) return undefined;
       name = typed.trim();
     }
+    // The window may have waited behind others: the family as it is now decides what this replaces.
+    p = reprepareFomodAdd(lib, p);
   }
   const r = finishFomodAdd(lib, p, choices, { from, name });
   const mod = r.mod;
-  log.appendLine(`${p.target ? "Reinstalled" : "Added"} ${mod.name} ${mod.version} from its installer (${mod.files.length} files, ${mod.kinds.join(", ")}) from ${source}${p.silent ? ", with the saved options" : ""}`);
+  log.appendLine(`${p.target ? "Reinstalled" : "Added"} ${mod.name} ${mod.version} from its installer (${mod.files.length} files, ${mod.kinds.join(", ")}) from ${source}${saved ? ", with the saved options" : ""}`);
   if (p.target) {
     if (!preset?.quiet) void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is installed again with the options picked. Deploy to put it in the game.`);
   } else if (r.replaced) {
     log.appendLine(`  a new version of ${r.replaced.name}: takes the place of ${r.replaced.version || "the earlier one"}, which is off now`);
-    if (!preset?.quiet) void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is a new version of ${r.replaced.name} ${r.replaced.version}${p.silent ? ", installed with your saved options" : ""}. It takes its place${mod.enabled ? " and is on" : ""}; ${r.replaced.version || "the earlier one"} stays in the library, off. Pick it from the version list to go back.`);
+    if (!preset?.quiet) void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is a new version of ${r.replaced.name} ${r.replaced.version}${saved ? ", installed with your saved options" : ""}. It takes its place${mod.enabled ? " and is on" : ""}; ${r.replaced.version || "the earlier one"} stays in the library, off. Pick it from the version list to go back.`);
   } else if (r.older && !preset?.quiet) {
     void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is older than ${r.older.version}, so it was added switched off. Pick it from the version list to use it.`);
   }
@@ -3245,7 +3248,7 @@ async function importFomodChoicesCommand(): Promise<void> {
   for (const v of r.unmatched) log.appendLine(`FOMOD choices unused: ${v} has no mod here`);
   refresh();
   void vscode.window.showInformationMessage(
-    `${r.matched.length} mod${r.matched.length === 1 ? "" : "s"} got their installer choices from Vortex; ${r.unmatched.length} had none here; ${r.skipped.length} kept their EDGEdeck choices.`,
+    `${r.matched.length} mod${r.matched.length === 1 ? "" : "s"} got their installer choices from Vortex; ${r.unmatched.length} Vortex mod${r.unmatched.length === 1 ? " is" : "s are"} not in the library; ${r.skipped.length} kept their EDGEdeck choices.`,
     { modal: true },
   );
 }
