@@ -41,9 +41,13 @@ export interface PreparedFomod {
   silent: boolean;
   /** The choices were worked out from the installed files: always confirm them. */
   inferred: boolean;
+  /** What it was prepared from, to prepare it again after a wait (reprepareFomodAdd). */
+  input: FomodAddInput;
 }
 
-export function prepareFomodAdd(lib: Library, opts: { source: string; folder: string; isFile: boolean; name?: string; preset?: FomodAddPreset }): PreparedFomod {
+export interface FomodAddInput { source: string; folder: string; isFile: boolean; name?: string; preset?: FomodAddPreset }
+
+export function prepareFomodAdd(lib: Library, opts: FomodAddInput): PreparedFomod {
   const { source, folder, isFile, preset } = opts;
   const root = findFomodRoot(folder);
   if (!root) throw new Error(`${path.basename(source)} has no installer (fomod/ModuleConfig.xml).`);
@@ -79,7 +83,7 @@ export function prepareFomodAdd(lib: Library, opts: { source: string; folder: st
   let applied: Applied;
   let inferred = false;
   if (record) {
-    applied = applySaved(cfg, text, root, record, base!.files, ctx);
+    applied = applySaved(cfg, text, root, record, base!.files, ctx, base!.name);
     inferred = record.from === "inferred";
   } else if (base) {
     // Installed before EDGEdeck knew FOMOD: guess the picks from its files, and always show them.
@@ -91,8 +95,16 @@ export function prepareFomodAdd(lib: Library, opts: { source: string; folder: st
   }
   return {
     root, cfg, text, sourcePath: source, isFile, name: label, target, active, family: preset?.family, preset: !!preset, version, source: src, record, applied,
-    silent: !!record && applied.compatible && !inferred, inferred,
+    silent: !!record && applied.compatible && !inferred, inferred, input: opts,
   };
+}
+
+/**
+ * The same add prepared again from the library as it is now: a window that waited in the queue may
+ * find the family changed meanwhile (another window added this version, an update made another active).
+ */
+export function reprepareFomodAdd(lib: Library, p: PreparedFomod): PreparedFomod {
+  return prepareFomodAdd(lib, p.input);
 }
 
 /** Installs the prepared FOMOD with these choices: over the target, or as a new version of its family. */
@@ -136,9 +148,11 @@ const samePath = (a: string, b: string): boolean => path.resolve(a).toLowerCase(
  * What to do with a prepared FOMOD. "install": the saved choices fit. "hold": a quiet add (Update all)
  * that would need the window: it waits for review on `holder` (the family's active mod, else the mod
  * reinstalled over), since Update all never waits on a window. "window": ask; on Cancel the update
- * waits on `holdOnCancel` when it is a download of a new version of a mod in the library.
+ * waits on `holder` when it is a download of a new version of a mod in the library. A reinstall the
+ * user started (a target, not quiet) always asks: adding the same file again is how options change.
  */
 export function fomodAddStep(p: Pick<PreparedFomod, "silent" | "active" | "target">, preset?: { quiet?: boolean }): { action: "install" | "hold" | "window"; holder?: ModInfo } {
+  if (p.target && !preset?.quiet) return { action: "window", holder: undefined };
   if (p.silent) return { action: "install" };
   if (preset?.quiet) return { action: "hold", holder: p.active ?? p.target };
   return { action: "window", holder: preset && p.active && !p.target ? p.active : undefined };
