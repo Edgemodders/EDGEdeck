@@ -430,7 +430,12 @@ export function applySaved(
   installedFiles: string[] | undefined, ctx: ResolveContext, name?: string,
 ): Applied {
   const defaults = defaultChoices(cfg, ctx);
-  const kept = saved?.choices ?? [];
+  // A choice without a step (Vortex leaves a one-step installer's name out) belongs to the one step holding its group.
+  const kept = (saved?.choices ?? []).map((c) => {
+    if (c.step) return c;
+    const holders = cfg.steps.filter((s) => s.groups.some((g) => g.name === c.group));
+    return holders.length === 1 ? { ...c, step: holders[0].name } : c;
+  });
   const warnings: Warning[] = [];
 
   // Surviving saved picks; a group with none left takes its default.
