@@ -440,9 +440,14 @@ export function applySaved(
         continue;
       }
       for (const group of step.groups) {
-        if (group.type === "SelectAll") continue;
         const og = os.groups.find((g) => g.name === group.name);
-        if (!og) { warnings.push({ step: step.name, group: group.name, kind: "new" }); fresh = true; continue; }
+        if (!og) {
+          if (group.type !== "SelectAll") { warnings.push({ step: step.name, group: group.name, kind: "new" }); fresh = true; }
+          continue;
+        }
+        // A changed group type changes what the old picks mean (SelectAll installs every option).
+        if (og.type !== group.type) { warnings.push({ step: step.name, group: group.name, kind: "new" }); fresh = true; continue; }
+        if (group.type === "SelectAll") continue;
         for (const p of group.plugins) {
           if (!og.plugins.includes(p.name)) { warnings.push({ step: step.name, group: group.name, plugin: p.name, kind: "new" }); fresh = true; }
         }
@@ -456,10 +461,45 @@ export function applySaved(
     warnings.push(m ? { step: m[1], group: m[2], kind: "required" } : { step: "", kind: "required" });
   }
 
+  // Steps that hide under the saved picks lose them; visible groups never decided on are new.
+  if (saved) {
+    for (const c of kept) {
+      if (c.plugins.length && cfg.steps.some((x) => x.name === c.step) && !resolved.visibleSteps.includes(c.step)
+        && !warnings.some((w) => w.kind === "gone" && w.step === c.step && w.group === c.group)) {
+        warnings.push({ step: c.step, group: c.group, kind: "gone" });
+        lost = true;
+      }
+    }
+    for (const step of cfg.steps) {
+      if (!resolved.visibleSteps.includes(step.name)) continue;
+      for (const group of step.groups) {
+        if (group.type === "SelectAll" || kept.some((c) => c.step === step.name && c.group === group.name)) continue;
+        if (warnings.some((w) => w.kind === "new" && w.step === step.name && (!w.group || w.group === group.name))) continue;
+        warnings.push({ step: step.name, group: group.name, kind: "new" });
+        fresh = true;
+      }
+    }
+  }
+
   let compatible = !!saved && !!old && !lost && !fresh && !resolved.errors.length;
   if (compatible && saved!.configHash === configHash(text)) {
     // Same installer text: a different file list means a fileDependency resolves differently now.
     compatible = !!installedFiles && sameFiles(resolved.files.map((f) => f.to), installedFiles);
   }
   return { choices, warnings, compatible };
+}
+
+// The choices with an entry for every group of every visible step (empty where nothing is picked),
+// and none for steps that are not visible. Saving these lets an update tell "never decided" apart.
+export function completeChoices(cfg: FomodConfig, root: string, choices: StepChoice[], ctx: ResolveContext): StepChoice[] {
+  const visible = resolveFomod(cfg, root, choices, ctx).visibleSteps;
+  const out: StepChoice[] = [];
+  for (const step of cfg.steps) {
+    if (!visible.includes(step.name)) continue;
+    for (const group of step.groups) {
+      const had = choices.find((c) => c.step === step.name && c.group === group.name);
+      out.push({ step: step.name, group: group.name, plugins: had ? [...had.plugins] : [] });
+    }
+  }
+  return out;
 }

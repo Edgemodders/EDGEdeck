@@ -165,6 +165,43 @@ try {
   a = core.applySaved(parsed(textReq), textReq, basicRoot, saved, undefined, gloveCtx);
   assert.equal(a.compatible, false);
   assert.ok(a.warnings.some((w) => w.kind === "required" && w.group === "Always"));
+
+  // A changed group type is a change (SelectAll installs every option)
+  const textToAll = text.replace('<group name="Extras" type="SelectAny">', '<group name="Extras" type="SelectAll">');
+  assert.notEqual(textToAll, text);
+  a = core.applySaved(parsed(textToAll), textToAll, basicRoot, saved, undefined, gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.ok(a.warnings.some((w) => w.kind === "new" && w.step === "Extras" && w.group === "Extras" && !w.plugin));
+  const textToAny = text.replace('<group name="Size" type="SelectExactlyOne">', '<group name="Size" type="SelectAny">');
+  assert.notEqual(textToAny, text);
+  a = core.applySaved(parsed(textToAny), textToAny, basicRoot, saved, undefined, gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.deepEqual(a.warnings, [{ step: "Size", group: "Size", kind: "new" }]);
+
+  // Step visibility
+  const withHats = { ...saved, choices: [...saved.choices.slice(0, 1), { step: "Extras", group: "Extras", plugins: ["Hats"] }, { step: "Hat colour", group: "Colour", plugins: ["Red"] }] };
+  a = core.applySaved(config, text, basicRoot, withHats, installedOf(withHats), gloveCtx);
+  assert.equal(a.compatible, true, JSON.stringify(a.warnings));
+  const textHide = text.replace('flag="hats" value="on"/>', 'flag="hats" value="never"/>');
+  assert.notEqual(textHide, text);
+  a = core.applySaved(parsed(textHide), textHide, basicRoot, withHats, undefined, gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.deepEqual(a.warnings, [{ step: "Hat colour", group: "Colour", kind: "gone" }]);
+  const textShow = text.replace('flag="hats" value="on"/>', 'flag="hats" value=""/>');
+  a = core.applySaved(parsed(textShow), textShow, basicRoot, saved, undefined, gloveCtx);
+  assert.equal(a.compatible, false);
+  assert.deepEqual(a.warnings, [{ step: "Hat colour", group: "Colour", kind: "new" }]);
+
+  // completeChoices: every group of every visible step, none for hidden steps
+  assert.deepEqual(core.completeChoices(config, basicRoot, saved.choices, gloveCtx), saved.choices);
+  assert.deepEqual(
+    core.completeChoices(config, basicRoot, [{ step: "Size", group: "Size", plugins: ["Small"] }, { step: "Hat colour", group: "Colour", plugins: ["Red"] }], gloveCtx),
+    [{ step: "Size", group: "Size", plugins: ["Small"] }, { step: "Extras", group: "Extras", plugins: [] }],
+  );
+  assert.deepEqual(
+    core.completeChoices(config, basicRoot, withHats.choices, gloveCtx).map((c) => c.step),
+    ["Size", "Extras", "Hat colour"],
+  );
   // no saved record: defaults, not compatible
   a = core.applySaved(config, text, basicRoot, undefined, undefined, ctx);
   assert.equal(a.compatible, false);
