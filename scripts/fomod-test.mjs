@@ -300,6 +300,28 @@ try {
   assert.ok(fs.existsSync(path.join(core.modFolder(lib, again.mod), "r6", "scripts", "Test", "core.reds")));
   assert.deepEqual(fs.readdirSync(core.libraryFolder(lib.root)).filter((n) => /\.(new|old)-/.test(n)), []);
 
+  // A held handle on the old folder after the swap: replace still returns, the mod is listed once
+  const cjsFs = require("node:fs");
+  const realRm = cjsFs.rmSync;
+  cjsFs.rmSync = (p, o) => { if (String(p).includes(".old-")) throw Object.assign(new Error("EBUSY"), { code: "EBUSY" }); return realRm(p, o); };
+  try {
+    core.replaceModFiles(lib, again.mod, [{ from: path.join(basicRoot, "size", "large.dat"), to: "archive/pc/mod/size.archive", kind: "archive" }]);
+  } finally { cjsFs.rmSync = realRm; }
+  assert.deepEqual(again.mod.files, ["archive/pc/mod/size.archive"]);
+  const libDir = core.libraryFolder(lib.root);
+  const leftovers = () => fs.readdirSync(libDir).filter((n) => /[.](new|old)-/.test(n));
+  const left = leftovers();
+  assert.equal(left.length, 1);
+  assert.ok(!fs.existsSync(path.join(libDir, left[0], "mod.json")));
+  fs.mkdirSync(path.join(libDir, "crash.new-1"));
+  fs.writeFileSync(path.join(libDir, "crash.new-1", "mod.json"), JSON.stringify(again.mod));
+  fs.mkdirSync(path.join(libDir, "crash.old-1"));
+  fs.writeFileSync(path.join(libDir, "crash.old-1", "mod.json"), JSON.stringify(again.mod));
+  const reopened = core.loadLibrary(lib.root, game);
+  assert.equal(reopened.mods.filter((m) => m.id === again.mod.id).length, 1);
+  assert.equal(reopened.mods.length, lib.mods.length);
+  for (const n of leftovers()) fs.rmSync(path.join(libDir, n), { recursive: true, force: true });
+
   // familyForDownload: case and slash insensitive
   const dl = path.join(tmp, "downloads", "Some Mod-1-0.zip");
   const m2 = core.addMod(lib, cl.placements, { name: "Dl", source: { type: "nexus", path: dl } });
