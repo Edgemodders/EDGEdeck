@@ -3,7 +3,10 @@
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import * as os from "node:os";
 import fs from "./fsx";
+import { classify } from "./classifier";
+import { addMod, modFolder, replaceModFiles, saveMod, type Library, type ModInfo, type ModSource } from "./library";
 
 export type GroupType = "SelectExactlyOne" | "SelectAtMostOne" | "SelectAtLeastOne" | "SelectAny" | "SelectAll";
 export type PluginType = "Required" | "Recommended" | "Optional" | "NotUsable" | "CouldBeUsable";
@@ -502,4 +505,134 @@ export function completeChoices(cfg: FomodConfig, root: string, choices: StepCho
     }
   }
   return out;
+}
+
+// ---- Installing ----
+
+/** The folder that holds fomod/ModuleConfig.xml: the folder itself or at most 2 levels down, the shallowest, names in any case. */
+export function findFomodRoot(folder: string): string | undefined {
+  const has = (dir: string): boolean => {
+    try {
+      const f = fs.readdirSync(dir, { withFileTypes: true }).find((e) => e.isDirectory() && e.name.toLowerCase() === "fomod");
+      return !!f && fs.readdirSync(path.join(dir, f.name)).some((n) => n.toLowerCase() === "moduleconfig.xml");
+    } catch {
+      return false;
+    }
+  };
+  let level = [folder];
+  for (let depth = 0; depth <= 2 && level.length; depth++) {
+    const hit = level.find(has);
+    if (hit) return hit;
+    const next: string[] = [];
+    for (const dir of level) {
+      try {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) if (e.isDirectory()) next.push(path.join(dir, e.name));
+      } catch { /* unreadable folder: skip */ }
+    }
+    level = next;
+  }
+  return undefined;
+}
+
+/** Copies each resolved file to stageDir/<to>. The XML is untrusted, so every target is checked again here. Returns the files skipped (symlinks). */
+export function stageFomod(resolved: Resolved, stageDir: string): string[] {
+  const base = path.resolve(stageDir);
+  const skipped: string[] = [];
+  for (const f of resolved.files) {
+    const segs = f.to.split(/[\/]/);
+    if (!f.to || segs.some((s) => s.includes(":"))) throw new Error(`Refusing to install "${f.to}": not a valid target path.`);
+    const dest = path.resolve(base, ...segs);
+    if (!dest.startsWith(base + path.sep)) throw new Error(`Refusing to install "${f.to}": it points outside the mod folder.`);
+    if (fs.lstatSync(f.from).isSymbolicLink()) { skipped.push(f.to); continue; }
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(f.from, dest);
+  }
+  return skipped;
+}
+
+/** Lower-case game paths of the files of the mods that are on. */
+export function activeFiles(lib: Library): Set<string> {
+  const out = new Set<string>();
+  for (const m of lib.mods) if (m.enabled) for (const f of m.files) out.add(f.toLowerCase());
+  return out;
+}
+
+function sameBytes(a: string, b: string): boolean {
+  try {
+    if (fs.statSync(a).size !== fs.statSync(b).size) return false;
+    const sha1 = (f: string): string => createHash("sha1").update(fs.readFileSync(f)).digest("hex");
+    return sha1(a) === sha1(b);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Works out which options a mod already in the library was installed with: an option counts when every
+ * file it adds is in the mod with the same bytes. An option that adds no files (only sets a flag) cannot
+ * be told and is left out; a pick-one group with no match gets its default.
+ */
+export function inferChoices(cfg: FomodConfig, root: string, lib: Library, mod: ModInfo): StepChoice[] {
+  const ctx: ResolveContext = { activeFiles: activeFiles(lib) };
+  const defaults = defaultChoices(cfg, ctx);
+  const dir = modFolder(lib, mod);
+  const baseKey = new Set(resolveFomod(cfg, root, [], ctx).files.map((f) => `${f.to.toLowerCase()}|${f.from}`));
+  const choices: StepChoice[] = [];
+  for (const step of cfg.steps) {
+    if (!resolveFomod(cfg, root, choices, ctx).visibleSteps.includes(step.name)) continue;
+    for (const group of step.groups) {
+      const matches = group.plugins.filter((p) => {
+        const r = resolveFomod(cfg, root, [{ step: step.name, group: group.name, plugins: [p.name] }], ctx);
+        const own = r.files.filter((f) => !baseKey.has(`${f.to.toLowerCase()}|${f.from}`));
+        return own.length > 0 && own.every((f) => sameBytes(f.from, path.join(dir, ...f.to.split("/"))));
+      }).map((p) => p.name);
+      const def = defaults.find((c) => c.step === step.name && c.group === group.name)?.plugins ?? [];
+      let plugins = matches;
+      if (group.type === "SelectExactlyOne" || group.type === "SelectAtMostOne") {
+        plugins = matches.length ? [matches.find((n) => def.includes(n)) ?? matches[0]] : group.type === "SelectExactlyOne" ? def : [];
+      } else if (group.type === "SelectAll") plugins = group.plugins.map((p) => p.name);
+      else if (group.type === "SelectAtLeastOne" && !plugins.length) plugins = def;
+      choices.push({ step: step.name, group: group.name, plugins });
+    }
+  }
+  return completeChoices(cfg, root, choices, ctx);
+}
+
+export interface InstallFomodOptions {
+  name: string;
+  version?: string;
+  source: ModSource;
+  root: string;
+  cfg: FomodConfig;
+  text: string;
+  choices: StepChoice[];
+  from: FomodRecord["from"];
+  /** Reinstall over this mod (same version) instead of adding a new one. */
+  replace?: ModInfo;
+}
+
+/** Resolves the choices, stages the files, classifies them and adds (or replaces) the mod with its FOMOD record. */
+export function installFomod(lib: Library, opts: InstallFomodOptions): { mod: ModInfo; unplaced: string[] } {
+  const ctx: ResolveContext = { activeFiles: activeFiles(lib) };
+  const completed = completeChoices(opts.cfg, opts.root, opts.choices, ctx);
+  const resolved = resolveFomod(opts.cfg, opts.root, completed, ctx);
+  if (resolved.errors.length) throw new Error(`The installer choices cannot be installed:\n${resolved.errors.join("\n")}`);
+  const stage = fs.mkdtempSync(path.join(os.tmpdir(), "edgedeck-fomod-stage-"));
+  try {
+    const skipped = stageFomod(resolved, stage);
+    const c = classify(stage, opts.name);
+    let mod: ModInfo;
+    if (opts.replace) {
+      if (!c.placements.length) throw new Error("Nothing to add: no files could be placed.");
+      replaceModFiles(lib, opts.replace, c.placements);
+      mod = opts.replace;
+    } else {
+      mod = addMod(lib, c.placements, { name: opts.name, version: opts.version, source: opts.source });
+    }
+    mod.fomod = { choices: completed, configHash: configHash(opts.text), structure: structureOf(opts.cfg), from: opts.from };
+    saveMod(lib, mod);
+    return { mod, unplaced: [...c.unplaced, ...skipped] };
+  } finally {
+    fs.rmSync(stage, { recursive: true, force: true });
+  }
 }

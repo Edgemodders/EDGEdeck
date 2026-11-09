@@ -207,6 +207,89 @@ try {
   assert.equal(a.compatible, false);
   assert.deepEqual(a.choices, core.defaultChoices(config, ctx));
 
+  // ---- Install pipeline ----
+  const mk = (p, c = p) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, c); };
+  const nest = path.join(tmp, "arch");
+  mk(path.join(nest, "nested", "TestMod", "FOMOD", "moduleconfig.xml"), "<x/>");
+  assert.equal(core.findFomodRoot(nest), path.join(nest, "nested", "TestMod"));
+  assert.equal(core.findFomodRoot(basicRoot), basicRoot);
+  const plain = path.join(tmp, "plain");
+  mk(path.join(plain, "r6", "a.reds"));
+  assert.equal(core.findFomodRoot(plain), undefined);
+  const deep = path.join(tmp, "deep");
+  mk(path.join(deep, "a", "b", "c", "fomod", "ModuleConfig.xml"), "<x/>");
+  assert.equal(core.findFomodRoot(deep), undefined);
+  mk(path.join(deep, "z", "fomod", "ModuleConfig.xml"), "<x/>");
+  assert.equal(core.findFomodRoot(deep), path.join(deep, "z"));
+
+  const game = path.join(tmp, "game");
+  fs.mkdirSync(path.join(game, "bin", "x64"), { recursive: true });
+  const lib = core.loadLibrary(path.join(tmp, "lib"), game);
+  assert.deepEqual([...core.activeFiles(lib)], []);
+
+  // stage + classify the basic resolve
+  const res = core.resolveFomod(config, basicRoot, [{ step: "Size", group: "Size", plugins: ["Large"] }, { step: "Extras", group: "Extras", plugins: [] }], ctx);
+  const stage = path.join(tmp, "stage");
+  assert.deepEqual(core.stageFomod(res, stage), []);
+  const cl = core.classify(stage, "Test Mod");
+  const got = Object.fromEntries(cl.placements.map((p) => [p.to, p.kind]));
+  assert.equal(got["archive/pc/mod/size.archive"], "archive");
+  assert.equal(got["r6/scripts/Test/core.reds"], "reds");
+
+  // stage guards
+  const bad = (to) => assert.throws(() => core.stageFomod({ files: [{ from: path.join(basicRoot, "core", "core.reds"), to }], flags: {}, visibleSteps: [], errors: [] }, path.join(tmp, "stage2")), /Refusing/);
+  bad("");
+  bad("a/b:stream");
+  bad("C:/x");
+  bad("../x");
+  bad("a/../../x");
+  assert.ok(!fs.existsSync(path.join(tmp, "x")));
+
+  // installFomod: new mod, record, no temp left behind
+  const stages = () => fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("edgedeck-fomod-stage-")).length;
+  const before = stages();
+  const opts = { name: "Test Mod", version: "1.0", source: { type: "folder", path: basicRoot }, root: basicRoot, cfg: config, text, from: "edgedeck",
+    choices: [{ step: "Size", group: "Size", plugins: ["Large"] }] };
+  const inst = core.installFomod(lib, opts);
+  assert.equal(stages(), before);
+  assert.deepEqual(inst.mod.files, ["archive/pc/mod/size.archive", "r6/scripts/Test/core.reds"]);
+  assert.deepEqual(inst.mod.fomod.choices, [{ step: "Size", group: "Size", plugins: ["Large"] }, { step: "Extras", group: "Extras", plugins: [] }]);
+  assert.equal(inst.mod.fomod.configHash, core.configHash(text));
+  assert.equal(inst.mod.fomod.from, "edgedeck");
+  assert.deepEqual(inst.mod.fomod.structure, core.structureOf(config));
+  assert.equal(core.loadLibrary(lib.root, game).mods[0].fomod.configHash, core.configHash(text));
+  assert.ok([...core.activeFiles(lib)].includes("r6/scripts/test/core.reds"));
+
+  // errors in the choices throw and add nothing
+  assert.throws(() => core.installFomod(lib, { ...opts, name: "Other", choices: [{ step: "Size", group: "Size", plugins: ["Nope"] }] }), /no option "Nope"/);
+  assert.equal(lib.mods.length, 1);
+  assert.equal(stages(), before);
+
+  // inferChoices from the installed bytes
+  assert.deepEqual(core.inferChoices(config, basicRoot, lib, inst.mod).find((c) => c.group === "Size").plugins, ["Large"]);
+  const lm = path.join(core.modFolder(lib, inst.mod), "archive", "pc", "mod", "size.archive");
+  fs.copyFileSync(path.join(basicRoot, "size", "small.dat"), lm);
+  const inf = core.inferChoices(config, basicRoot, lib, inst.mod);
+  assert.deepEqual(inf.find((c) => c.group === "Size").plugins, ["Small"]);
+  assert.deepEqual(inf.find((c) => c.group === "Extras").plugins, []);
+
+  // replaceModFiles: drops a file the new placements lack, keeps the id
+  const folder = core.modFolder(lib, inst.mod);
+  fs.writeFileSync(path.join(folder, "r6", "scripts", "Test", "stale.reds"), "x");
+  inst.mod.files.push("r6/scripts/Test/stale.reds");
+  const again = core.installFomod(lib, { ...opts, replace: inst.mod, choices: [{ step: "Size", group: "Size", plugins: ["Small"] }] });
+  assert.equal(again.mod.id, inst.mod.id);
+  assert.equal(lib.mods.length, 1);
+  assert.ok(!fs.existsSync(path.join(folder, "r6", "scripts", "Test", "stale.reds")));
+  assert.deepEqual(again.mod.files, ["archive/pc/mod/size.archive", "r6/scripts/Test/core.reds"]);
+  assert.deepEqual(fs.readFileSync(lm), fs.readFileSync(path.join(basicRoot, "size", "small.dat")));
+
+  // familyForDownload: case and slash insensitive
+  const dl = path.join(tmp, "downloads", "Some Mod-1-0.zip");
+  const m2 = core.addMod(lib, cl.placements, { name: "Dl", source: { type: "nexus", path: dl } });
+  assert.equal(core.familyForDownload(lib, dl.toUpperCase().split(path.sep).join("/")).id, m2.id);
+  assert.equal(core.familyForDownload(lib, path.join(tmp, "other.zip")), undefined);
+
   console.log("fomod tests passed");
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });

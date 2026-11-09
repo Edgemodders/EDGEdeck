@@ -5,6 +5,7 @@
 // on at a time. A Nexus page with several files that are mods of their own (two main files) has a
 // family per file, with `family` set on all but the first (nexusLines.ts).
 
+import * as path from "node:path";
 import { singleRednodeApp } from "./classifier";
 import { placeAbove, saveMod, type Library, type ModInfo } from "./library";
 import { versionNewer } from "./nexus";
@@ -182,4 +183,11 @@ export function familiesWithTwoOn(lib: Library): Family[] {
  */
 export function findSameVersion(lib: Library, modId: number, fileId: number, version?: string, line = `nexus:${modId}`): ModInfo | undefined {
   return lib.mods.find((m) => m.source.modId === modId && (m.source.fileId === fileId || (!!version && m.version === version && familyKey(m) === line)));
+}
+
+/** The mod whose source is this kept download file (path compare, any case, either slash). */
+export function familyForDownload(lib: Library, file: string): ModInfo | undefined {
+  const norm = (p: string): string => path.resolve(p).toLowerCase();
+  const want = norm(file);
+  return lib.mods.find((m) => !!m.source.path && norm(m.source.path) === want);
 }
