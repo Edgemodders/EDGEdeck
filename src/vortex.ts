@@ -244,6 +244,7 @@ export function readVortexChoices(stateDir: string): VortexChoices[] {
     }
     const id = Number(parseStored(rows.get(`${pre}${vortexId}###attributes###modId`)));
     const ver = parseStored(rows.get(`${pre}${vortexId}###attributes###version`));
+    if (!choices.length) continue;
     out.push({ vortexId, modId: Number.isFinite(id) && id > 0 ? id : undefined, version: typeof ver === "string" ? ver : undefined, choices });
   }
   return out;
@@ -260,19 +261,28 @@ export function importVortexChoices(lib: Library, list: VortexChoices[]): { matc
   const skipped: string[] = [];
   const used = new Set<string>();
   const byFolder = new Map(list.map((v) => [v.vortexId, v]));
-  for (const mod of lib.mods) {
-    if (mod.source.type !== "vortex") continue;
-    let v = mod.source.path ? byFolder.get(lastSegment(mod.source.path)) : undefined;
-    if (!v && mod.source.modId) v = list.find((x) => x.modId === mod.source.modId && x.version !== undefined && x.version === mod.version);
-    if (!v) continue;
+  const apply = (mod: ModInfo, v: VortexChoices): void => {
     used.add(v.vortexId);
     if (mod.fomod?.from === "edgedeck") {
       skipped.push(mod.id);
-      continue;
+      return;
     }
     mod.fomod = { choices: v.choices, configHash: "", from: "vortex" };
     saveMod(lib, mod);
     matched.push({ id: mod.id, vortexId: v.vortexId });
+  };
+  const later: ModInfo[] = [];
+  // By folder name first, so the fallback only sees what no folder claimed.
+  for (const mod of lib.mods.filter((m) => m.source.type === "vortex")) {
+    const v = mod.source.path ? byFolder.get(lastSegment(mod.source.path)) : undefined;
+    if (v && !used.has(v.vortexId)) apply(mod, v);
+    else later.push(mod);
+  }
+  // By Nexus mod id and version, only when exactly one unclaimed entry fits: a page with several files at one version is ambiguous.
+  for (const mod of later) {
+    if (!mod.source.modId) continue;
+    const fits = list.filter((x) => !used.has(x.vortexId) && x.modId === mod.source.modId && x.version !== undefined && x.version === mod.version);
+    if (fits.length === 1) apply(mod, fits[0]);
   }
   return { matched, unmatched: list.filter((v) => !used.has(v.vortexId)).map((v) => v.vortexId), skipped };
 }
