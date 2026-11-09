@@ -555,13 +555,21 @@ try {
       await put("Mine-33-1-0-333", "installerChoices###type", JSON.stringify("fomod"));
       await put("Gone-44-1-0-444", "installerChoices###options", opts("A", "A", ["x"]));
       await put("Gone-44-1-0-444", "installerChoices###type", JSON.stringify("fomod"));
+      for (const [id, n] of [["Twin A-77-3-0-1", "A"], ["Twin B-77-3-0-2", "B"]]) {
+        await put(id, "installerChoices###options", opts("S", "S", [n]));
+        await put(id, "installerChoices###type", JSON.stringify("fomod"));
+        await put(id, "modId", JSON.stringify(77));
+        await put(id, "version", JSON.stringify("3.0"));
+      }
+      await put("Empty-88-1-0-8", "installerChoices###options", "[]");
+      await put("Empty-88-1-0-8", "installerChoices###type", JSON.stringify("fomod"));
       await put("Plain-55-1-0-555", "installerChoices###type", JSON.stringify("unknown"));
       await put("Other-66-1-0-666", "installerChoices###options", opts("A", "A", ["x"]));
       await put("Other-66-1-0-666", "installerChoices###type", JSON.stringify("other"));
       await db.close();
 
       const list = core.readVortexChoices(stateDir);
-      assert.deepEqual(list.map((v) => v.vortexId).sort(), ["Gone-44-1-0-444", "Mine-33-1-0-333", "Quux Boots-22-2-0-222", "Zed Cape-11-1-0-111"]);
+      assert.deepEqual(list.map((v) => v.vortexId).sort(), ["Gone-44-1-0-444", "Mine-33-1-0-333", "Quux Boots-22-2-0-222", "Twin A-77-3-0-1", "Twin B-77-3-0-2", "Zed Cape-11-1-0-111"]);
       const quux = list.find((v) => v.vortexId.startsWith("Quux"));
       assert.deepEqual(quux, { vortexId: "Quux Boots-22-2-0-222", modId: 22, version: "2.0", choices: [{ step: "Size", group: "Size", plugins: ["Big", "Wide"] }] });
 
@@ -579,10 +587,19 @@ try {
       mkMod("mine", { type: "vortex", path: "C:\\Staging\\Mine-33-1-0-333" }, { fomod: { choices: [{ step: "A", group: "A", plugins: ["mine"] }], configHash: "h", from: "edgedeck" } });
       mkMod("old-guess", { type: "vortex", path: "C:\\Staging\\Plain-55-1-0-555" }, { fomod: { choices: [], configHash: "", from: "inferred" } });
       mkMod("not-vortex", { type: "folder", path: "C:\\Staging\\Gone-44-1-0-444" });
+      mkMod("twin", { type: "vortex", path: "D:/moved/twin", modId: 77 }, { version: "3.0" });
+      mkMod("empty-one", { type: "vortex", path: "C:\\Staging\\Empty-88-1-0-8" }, { fomod: { choices: [], configHash: "", from: "inferred" } });
+      const modJson = (id) => JSON.parse(fs.readFileSync(path.join(core.modFolder(vlib, { id }), "mod.json"), "utf8"));
+      const before = modJson("zed-cape");
       const r = core.importVortexChoices(vlib, list);
+      const { fomod: _f, ...afterRest } = modJson("zed-cape");
+      const { fomod: _g, ...beforeRest } = before;
+      assert.deepEqual(afterRest, beforeRest, "only fomod changes in mod.json");
+      assert.equal(modJson("twin").fomod, undefined, "two files at one modId and version are ambiguous");
+      assert.deepEqual(modJson("empty-one").fomod, { choices: [], configHash: "", from: "inferred" });
       assert.deepEqual(r.matched.map((m) => m.id).sort(), ["quux-boots", "zed-cape"]);
       assert.deepEqual(r.skipped, ["mine"]);
-      assert.deepEqual(r.unmatched.sort(), ["Gone-44-1-0-444"]);
+      assert.deepEqual(r.unmatched.sort(), ["Gone-44-1-0-444", "Twin A-77-3-0-1", "Twin B-77-3-0-2"]);
       const back = core.loadLibrary(vlib.root, game);
       assert.deepEqual(back.mods.find((m) => m.id === "zed-cape").fomod, { choices: [{ step: "Colour", group: "Colour", plugins: ["Red"] }], configHash: "", from: "vortex" });
       assert.equal(back.mods.find((m) => m.id === "mine").fomod.from, "edgedeck");

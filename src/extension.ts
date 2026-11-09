@@ -3393,7 +3393,6 @@ function offerReview(mod: ModInfo): void {
   });
 }
 
-/** Opens the installer again for an update kept waiting for review (fomod.pending on the family's active mod). */
 /** One-time: gives mods brought over from Vortex the installer choices Vortex kept. Reads Vortex, writes only the library. */
 async function importFomodChoicesCommand(): Promise<void> {
   if (!library) return;
@@ -3421,6 +3420,7 @@ async function importFomodChoicesCommand(): Promise<void> {
   );
 }
 
+/** Opens the installer again for an update kept waiting for review (fomod.pending on the family's active mod). */
 async function reviewFomodCommand(arg?: string | ModNode): Promise<void> {
   if (!library) return;
   let picked = typeof arg === "string" ? library.mods.find((m) => m.id === arg) : modOf(arg ?? tree.selection[0]);
