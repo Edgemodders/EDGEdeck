@@ -65,10 +65,24 @@ export class BridgeClient {
     this.connection = connection;
   }
 
-  stop(): void {
+  /**
+   * Ends the bridge. The promise settles once the process has exited (or after `waitMs`), which is
+   * when Windows lets go of the archives it had open.
+   */
+  stop(waitMs = 5000): Promise<void> {
     this.dispose();
-    this.process?.kill();
+    const child = this.process;
     this.process = undefined;
+    if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+    const exited = new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, waitMs);
+      child.once("exit", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+    child.kill();
+    return exited;
   }
 
   private dispose(): void {

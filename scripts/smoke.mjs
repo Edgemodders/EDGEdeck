@@ -960,14 +960,34 @@ console.log("undo: ok");
       }
     };
     if (fs.existsSync(staging)) sample = findArchive(staging);
+    // Else the smallest mod archive in the game folder (only copied, never changed).
+    const gameMods = core.findGame() ? path.join(core.findGame(), "archive", "pc", "mod") : "";
+    if (!sample && gameMods && fs.existsSync(gameMods)) {
+      sample = fs.readdirSync(gameMods).filter((f) => f.toLowerCase().endsWith(".archive")).map((f) => path.join(gameMods, f)).sort((x, y) => fs.statSync(x).size - fs.statSync(y).size)[0];
+    }
     if (sample) {
-      const r = await b.openMod(sample);
+      // A copy, so the staging folder is only read: deploy replaces such files once the bridge has let go (EDGEdeck #10).
+      const copy = path.join(fs.mkdtempSync(path.join(tmp, "bridge-")), path.basename(sample));
+      fs.copyFileSync(sample, copy);
+      const r = await b.openMod(copy);
       assert.ok(r.files > 0);
       console.log(`bridge openMod ${path.basename(sample)}: ${r.files} resources, first ${r.items[0].name}`);
+      let held = false;
+      try {
+        fs.renameSync(copy, copy + ".moved");
+        fs.renameSync(copy + ".moved", copy);
+      } catch {
+        held = true;
+      }
+      await b.stop();
+      assert.ok(!b.running);
+      fs.renameSync(copy, copy + ".moved");
+      fs.rmSync(copy + ".moved");
+      console.log(`bridge stop: ok (the bridge ${held ? "held the archive until it stopped" : "did not hold the archive"})`);
     } else {
       console.log("bridge openMod: no sample archive found, skipped");
+      await b.stop();
     }
-    b.stop();
   } else {
     console.log("bridge: not found, skipped");
   }
