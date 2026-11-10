@@ -218,6 +218,34 @@ console.log("changes: ok");
   console.log("rebuilt: ok");
 }
 
+// A copy with the same bytes over a hardlinked file (REDnode's swap, EDGEdeck #13): no question, relinked.
+{
+  const gameCopy = path.join(game, "r6", "scripts", "Loose", "Loose.reds");
+  const bytes = fs.readFileSync(gameCopy);
+  fs.rmSync(gameCopy);
+  fs.writeFileSync(gameCopy, bytes);
+  assert.equal(fs.statSync(gameCopy).nlink, 1, "a copy now, not the link");
+  assert.deepEqual(core.detectChanges(game).map((x) => [x.entry.path, x.kind]), [["r6/scripts/Loose/Loose.reds", "copied"]]);
+  const p2 = core.plan(lib, game);
+  assert.deepEqual(p2.add.map((d) => d.rel), ["r6/scripts/Loose/Loose.reds"]);
+  assert.match(core.pendingChanges(lib, game, p2)[0].detail, /same bytes/);
+  const r3 = core.deploy(lib, game);
+  assert.deepEqual(r3.skipped, [], "deploy did not ask");
+  assert.equal(fs.statSync(gameCopy).nlink, 2, "linked again");
+  assert.equal(core.detectChanges(game).length, 0);
+  // Same size, other bytes: still a change, and deploy still asks.
+  const other = Buffer.from(bytes);
+  other[0] ^= 1;
+  fs.rmSync(gameCopy);
+  fs.writeFileSync(gameCopy, other);
+  assert.equal(core.detectChanges(game)[0].kind, "changed");
+  assert.deepEqual(core.deploy(lib, game).skipped, ["r6/scripts/Loose/Loose.reds"]);
+  core.deploy(lib, game, new Map([["r6/scripts/Loose/Loose.reds", "restore"]]));
+  assert.deepEqual(fs.readFileSync(gameCopy), bytes, "the mod's file is back");
+  assert.equal(core.detectChanges(game).length, 0);
+  console.log("same bytes copied over: ok");
+}
+
 // One mod's deploy (REDcode's Install, EDGEdeck #2): its files go in, other mods' changes wait,
 // modlist.txt lists only what is in the game, and the manifest stays true.
 {
