@@ -35,6 +35,17 @@ export function launchTarget(gamePath: string, how: "auto" | "steam" | "exe"): {
   return { kind: "exe", exe: gameExe(gamePath), args: ["-modded"] };
 }
 
+/**
+ * The environment for a program started for the player (Run game's exe route): VS Code's extension
+ * host runs with ELECTRON_RUN_AS_NODE, which the game would pass on to every program it starts, and
+ * an Electron app (REDnode's overlay host) then runs as plain Node and exits (EDGEdeck #12).
+ */
+export function playerEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env = { ...base };
+  for (const k of Object.keys(env)) if (k.toUpperCase() === "ELECTRON_RUN_AS_NODE") delete env[k];
+  return env;
+}
+
 export function isGameFolder(gamePath: string): boolean {
   return !!gamePath && fs.existsSync(gameExe(gamePath));
 }

@@ -928,6 +928,8 @@ console.log("undo: ok");
   assert.deepEqual(core.launchTarget(gogGame, "auto"), { kind: "exe", exe: path.join(gogGame, "bin", "x64", "Cyberpunk2077.exe"), args: ["-modded"] });
   assert.equal(core.launchTarget(steamGame, "exe").kind, "exe");
   assert.equal(core.launchTarget(gogGame, "steam").kind, "steam");
+  const env = core.playerEnv({ ELECTRON_RUN_AS_NODE: "1", Path: "C:\Windows" });
+  assert.deepEqual(env, { Path: "C:\Windows" }, "the game does not inherit ELECTRON_RUN_AS_NODE (EDGEdeck #12)");
   console.log("run game target: ok");
 }
 

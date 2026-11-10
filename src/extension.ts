@@ -24,7 +24,7 @@ import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveGroupInSection, moveInSection, moveSection, placeGroupNextTo, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
 import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
-import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, steamLibraries } from "./game";
+import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, playerEnv, steamLibraries } from "./game";
 import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove";
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveLibrary, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
@@ -2299,7 +2299,7 @@ async function runGameCommand(): Promise<void> {
     return;
   }
   log.appendLine(`Run game: ${target.exe} ${target.args.join(" ")}`);
-  const child = spawn(target.exe, target.args, { cwd: path.dirname(target.exe), detached: true, stdio: "ignore" });
+  const child = spawn(target.exe, target.args, { cwd: path.dirname(target.exe), detached: true, stdio: "ignore", env: playerEnv() });
   child.on("error", (e) => {
     log.appendLine(`Could not start the game: ${e.message}`);
     void vscode.window.showErrorMessage(`EDGEdeck: could not start the game. ${e.message}`);
