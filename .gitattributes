@@ -1,0 +1,3 @@
+# Every change adds a line under Unreleased, so two branches always touch the same spot. Union keeps
+# both sides when git merges them; check the result for group headings run together.
+CHANGELOG.md merge=union

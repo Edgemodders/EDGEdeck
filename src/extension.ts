@@ -16,7 +16,8 @@ import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, lat
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
-import { lineFile, lineName, lineOfFile, newestInLine, otherLineFiles, splitPage } from "./nexusLines";
+import { lineFile, lineName, lineOfFile, newestInLine, onlyLine, otherLineFiles, splitPage } from "./nexusLines";
+import { cleanChoices, PageColumnsKey } from "./pageColumns";
 import { childName, gatherGroups, groupOfFamily, groupToggle, pageGroups, setFamiliesOn, type PageGroup } from "./pageGroups";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrameworks, type FrameworkRelease, type FrameworkSource, type FrameworkState } from "./frameworkGet";
@@ -24,11 +25,12 @@ import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveGroupInSection, moveInSection, moveSection, placeGroupNextTo, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
 import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
-import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, steamLibraries } from "./game";
+import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, playerEnv, steamLibraries } from "./game";
 import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove";
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveLibrary, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
+import { DownloadQueue, downloadsAtOnce, progressText, SpeedMeter } from "./downloads";
 import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
@@ -45,6 +47,10 @@ let status: vscode.StatusBarItem;
 let log: vscode.OutputChannel;
 let sevenZa: string | undefined;
 let extensionRoot = "";
+/** Whether the signed-in Nexus account has Premium, kept at sign-in; undefined until known. */
+const NexusPremiumKey = "edgedeck.nexusPremium";
+/** Nexus downloads, as many at once as the account allows (downloadsAtOnce in downloads.ts says why). */
+const downloadQueue = new DownloadQueue(() => downloadsAtOnce(globalState?.get<boolean>(NexusPremiumKey)));
 let storageDir = "";
 /** The game folder found through Steam, GOG or Epic, looked up once per reload. */
 let detectedGame: string | undefined;
@@ -163,7 +169,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.showLog", () => log.show(true)),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("edgedeck")) {
-        bridge?.stop();
+        void bridge?.stop();
         bridge = undefined;
         reload();
       }
@@ -322,7 +328,7 @@ const api: EDGEdeckApi = {
 };
 
 export function deactivate(): void {
-  bridge?.stop();
+  void bridge?.stop();
 }
 
 function modOf(node: ModNode | undefined): ModInfo | undefined {
@@ -795,9 +801,32 @@ function refresh(): void {
   scanTimer = setTimeout(() => void run(() => scanArchives(false)), 400);
 }
 
+/** More than 0 while EDGEdeck replaces or deletes files the bridge may have open: no scan starts it then. */
+let bridgeHeld = 0;
+
+/**
+ * Runs `fn` with EDGEdeck's REDbridge stopped. The bridge keeps the archives it read open, and a
+ * hardlinked library archive is the game folder's file too, so Windows would refuse to replace or
+ * delete it (EDGEdeck #10). The scan that refresh() queues afterwards starts the bridge again.
+ */
+async function withBridgeStopped<T>(fn: () => PromiseLike<T>): Promise<T> {
+  bridgeHeld++;
+  try {
+    if (bridge?.running) {
+      log.appendLine("REDbridge stopped, so it lets go of the archives it read");
+      await bridge.stop();
+    }
+    bridge = undefined;
+    return await fn();
+  } finally {
+    bridgeHeld--;
+  }
+}
+
 /** EDGEdeck's own REDbridge process, started on first use. */
 async function ensureBridge(): Promise<BridgeClient> {
   if (bridge?.running) return bridge;
+  if (bridgeHeld) throw new Error("REDbridge waits while EDGEdeck changes files; try again in a moment.");
   if (!bridgeExe) throw new Error("This needs REDbridge. Run EDGEdeck: Get REDbridge.");
   bridge = new BridgeClient(bridgeExe, settings().dotnetRoot);
   bridge.start();
@@ -805,7 +834,7 @@ async function ensureBridge(): Promise<BridgeClient> {
   log.appendLine(`REDbridge ${info.version} (WolvenKit ${info.wolvenKit}) at ${bridgeExe}`);
   state.bridgeInfo = `REDbridge ${info.version} (WolvenKit ${info.wolvenKit})`;
   if (compareVersions(info.version, MinBridgeVersion) < 0) {
-    bridge.stop();
+    void bridge.stop();
     bridge = undefined;
     bridgeExe = "";
     throw new Error(`REDbridge ${info.version} is older than ${MinBridgeVersion}, which added archive.openMod. Run npm run update in the REDbridge folder.`);
@@ -897,6 +926,11 @@ async function scanArchives(explicit: boolean): Promise<void> {
   }
   const listings: ArchiveListing[] = [];
   for (const { mod, archive } of wanted) {
+    // A deploy, undo or remove stopped the bridge: leave the last result; the refresh after it scans again.
+    if (bridgeHeld) {
+      scanning = false;
+      return;
+    }
     const file = sourcePath(library, mod, archive);
     if (!fs.existsSync(file)) continue;
     try {
@@ -955,21 +989,29 @@ function editedLoadout(): string | undefined {
 }
 
 /**
- * When a mod last changed on Nexus, in seconds: the later of its installed file's upload and the
- * newest file of its line, both saved by the update check. Before any check, the upload time in a
- * Vortex folder's name (older Vortex: unix time at the end; newer: `2026-11-07T18-59Z`), else when it
- * was added to the library. 0 when nothing says.
+ * When a mod last changed on Nexus, in seconds, and where that date comes from for the cell's
+ * tooltip: the later of its installed file's upload and the newest file of its line, both saved by
+ * the update check. Before any check, the upload time in a Vortex folder's name (older Vortex: unix
+ * time at the end; newer: `2026-11-07T18-59Z`), else when it was added to the library. 0 when
+ * nothing says.
  */
-function updatedAt(mod: ModInfo): number {
-  const t = Math.max(mod.nexus?.fileUploaded ?? 0, mod.nexus?.latestUploaded ?? 0);
-  if (t) return t;
+function updatedAt(mod: ModInfo): { at: number; note: string } {
+  const day = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
+  const latest = mod.nexus?.latestUploaded ?? 0;
+  const mine = mod.nexus?.fileUploaded ?? 0;
+  if (latest || mine) {
+    const at = Math.max(latest, mine);
+    if (mine && latest > mine) return { at, note: `Nexus has a newer file of this mod, uploaded ${day(latest)}; the one you have was uploaded ${day(mine)}` };
+    return { at, note: mine ? `Uploaded to Nexus on ${day(mine)}` : `The newest file of this mod was uploaded to Nexus on ${day(at)}` };
+  }
   const folder = mod.source.type === "vortex" ? path.basename(mod.source.path ?? "") : "";
   const unix = /-(\d{10})$/.exec(folder);
-  if (unix) return Number(unix[1]);
   const iso = /(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})Z/.exec(folder);
-  if (iso) return Date.parse(`${iso[1]}T${iso[2]}:${iso[3]}:00Z`) / 1000;
-  const added = mod.added ? Date.parse(mod.added) / 1000 : 0;
-  return Number.isFinite(added) ? Math.round(added) : 0;
+  const fromVortex = unix ? Number(unix[1]) : iso ? Date.parse(`${iso[1]}T${iso[2]}:${iso[3]}:00Z`) / 1000 : 0;
+  if (fromVortex) return { at: fromVortex, note: `Uploaded to Nexus on ${day(fromVortex)}, as its Vortex folder says; Check updates looks for newer files` };
+  const added = mod.added ? Math.round(Date.parse(mod.added) / 1000) : 0;
+  if (Number.isFinite(added) && added > 0) return { at: added, note: `No date from Nexus: added to the library on ${day(added)}` };
+  return { at: 0, note: "" };
 }
 
 function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo; enabled: boolean }): PageRow {
@@ -986,7 +1028,10 @@ function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo
     framework: mod.kinds.includes("framework"),
     deployed: manifestMods.has(mod.id),
     size: library ? modSize(library, mod).total : 0,
-    updated: updatedAt(mod),
+    ...(() => {
+      const u = updatedAt(mod);
+      return { updated: u.at, updatedNote: u.note };
+    })(),
     needsDeploy: !!p && (p.add.some((d) => d.mod?.id === mod.id) || p.stale.some((e) => e.mod === mod.id)),
     changed: state.changes.some((c) => c.entry.mod === mod.id && c.kind === "changed"),
     conflicts: p ? p.conflicts.filter((c) => c.winner === mod.id || c.losers.includes(mod.id)).length : 0,
@@ -1026,6 +1071,7 @@ async function pageData() {
     activeLoadout: active,
     viewing: pageLoadout,
     collapsed: globalState.get<string[]>(FoldedKey, []),
+    columns: cleanChoices(globalState.get(PageColumnsKey)),
     game: state.version ? `Cyberpunk 2077 ${state.version}` : "game not found",
     library: library?.root ?? s.libraryPath,
     method: state.plan?.method ?? ("link" as const),
@@ -1153,6 +1199,10 @@ async function pageAction(m: PageMessage): Promise<void> {
       return sectionMoveModsCommand(m.section, m.ids ?? []);
     case "sectionRemoveMods":
       return sectionRemoveModsCommand(m.section, m.ids ?? []);
+    case "columns":
+      // The page has already shown or hidden them; kept for next time, outside the library.
+      await globalState.update(PageColumnsKey, cleanChoices(m.columns));
+      return;
     case "fold": {
       // Kept for next time; the page has already folded it, so no re-render.
       const folded = new Set(globalState.get<string[]>(FoldedKey, []));
@@ -1332,7 +1382,9 @@ async function removeEntries(what: string, mods: ModInfo[], rows: string[] = mod
   if (!library || !mods.length) return;
   if (rows.length) await modsPage.gone(rows);
   await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Removing ${what}` }, async (progress) => {
-    for (const m of mods) removeMod(library!, m);
+    await withBridgeStopped(async () => {
+      for (const m of mods) removeMod(library!, m);
+    });
     refresh();
     // refresh() queues the archive scan; run it here instead, so the notification lasts as long as it does.
     clearTimeout(scanTimer);
@@ -1559,13 +1611,19 @@ async function getBridgeCommand(): Promise<void> {
       await installDotnetRuntime((l) => log.appendLine(l));
     }
     let last = 0;
+    let shown = 0;
+    const meter = new SpeedMeter();
     const exe = await installBridge(release, storageDir, sevenZa, (r, t) => {
+      meter.add(r);
+      const now = Date.now();
+      if (now - shown < 500 && (!t || r < t)) return;
+      shown = now;
       const pct = t ? Math.floor((r / t) * 100) : 0;
-      progress.report({ increment: pct - last, message: `downloading ${Math.round(r / 1048576)} of ${mb} MB` });
+      progress.report({ increment: pct - last, message: `downloading ${progressText(r, t, meter.bytesPerSecond)}` });
       last = pct;
     }, (l) => log.appendLine(l));
     bridgeExe = exe;
-    bridge?.stop();
+    await bridge?.stop();
     bridge = undefined;
     const gone = removeOlderBridges(storageDir, release.tag);
     if (gone.length) log.appendLine(`Removed the older REDbridge ${gone.join(", ")}`);
@@ -2264,7 +2322,7 @@ async function moveLibraryCommand(): Promise<void> {
   const to = moveTarget(folder);
   const across = !sameDrive(from, to);
   stopWatching();
-  bridge?.stop();
+  await bridge?.stop();
   bridge = undefined;
   let result: Awaited<ReturnType<typeof moveLibrary>>;
   try {
@@ -2318,7 +2376,7 @@ async function runGameCommand(): Promise<void> {
     return;
   }
   log.appendLine(`Run game: ${target.exe} ${target.args.join(" ")}`);
-  const child = spawn(target.exe, target.args, { cwd: path.dirname(target.exe), detached: true, stdio: "ignore" });
+  const child = spawn(target.exe, target.args, { cwd: path.dirname(target.exe), detached: true, stdio: "ignore", env: playerEnv() });
   child.on("error", (e) => {
     log.appendLine(`Could not start the game: ${e.message}`);
     void vscode.window.showErrorMessage(`EDGEdeck: could not start the game. ${e.message}`);
@@ -2396,7 +2454,7 @@ async function deployNow(only?: ModInfo): Promise<DeployResult | undefined> {
     else if (a === "Put the mod's file back") decisions.set(c.entry.path, "restore");
     else return;
   }
-  const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Deploying", cancellable: false }, async (progress) => {
+  const result = await withBridgeStopped(() => vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Deploying", cancellable: false }, async (progress) => {
     let last = 0;
     try {
       return deploy(
@@ -2415,7 +2473,7 @@ async function deployNow(only?: ModInfo): Promise<DeployResult | undefined> {
       refresh();
       throw lockedFileError(err);
     }
-  });
+  }));
   log.appendLine(`Deployed${only ? ` ${only.name} only` : ""} (${result.method}): ${result.linked} added, ${result.removed} removed, ${result.kept} unchanged, ${result.backedUp} backed up${result.skipped.length ? `, skipped ${result.skipped.join(", ")}` : ""}${result.waiting ? `, ${result.waiting} waiting for other mods` : ""}`);
   let redmodNote = "";
   // REDmod compiles every package in the game at once. One mod's deploy runs it when it changed a
@@ -2536,7 +2594,7 @@ async function undoCommand(): Promise<void> {
   }
   const a = await vscode.window.showWarningMessage(`Remove all ${manifest.files.length} deployed files from the game folder? Your library is not touched.`, { modal: true }, "Undo deploy");
   if (a !== "Undo deploy") return;
-  const result = undo(library, gamePath);
+  const result = await withBridgeStopped(async () => undo(library!, gamePath));
   log.appendLine(`Undo: ${result.removed} removed${result.skipped.length ? `, left alone because they changed: ${result.skipped.join(", ")}` : ""}`);
   refresh();
   void vscode.window.showInformationMessage(`Undo: ${result.removed} files removed.${result.skipped.length ? ` ${result.skipped.length} changed files were left in place; see the log.` : ""}`);
@@ -2651,6 +2709,7 @@ async function nexusClient(ask: boolean): Promise<NexusClient | undefined> {
 }
 
 function signedInToast(name: string, premium: boolean): void {
+  void globalState.update(NexusPremiumKey, premium);
   log.appendLine(`Nexus: signed in as ${name}${premium ? " (Premium)" : ""}`);
   void vscode.window.showInformationMessage(`Nexus: signed in as ${name}${premium ? " (Premium)" : ""}.`);
 }
@@ -2755,6 +2814,7 @@ async function nexusSignOutCommand(): Promise<void> {
   }
   await secrets.delete(NexusTokensSecret);
   await secrets.delete(NexusKeySecret);
+  await globalState.update(NexusPremiumKey, undefined);
   log.appendLine("Nexus: signed out");
   void vscode.window.showInformationMessage(hadKey ? "Signed out of Nexus Mods. The key is gone from secret storage; revoke it on the API Access page if you want it dead." : "Signed out of Nexus Mods. The sign-in is gone from secret storage.");
 }
@@ -2950,11 +3010,6 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
     if (!quiet) void vscode.window.showInformationMessage(`${info.name} ${same.version} is already in the library${r.previous.id === same.id ? "." : " and is now the active version."}`);
     return;
   }
-  const links = await client.downloadLinks(modId, fileId, key, expires).catch((err: Error) => {
-    if (/403|forbidden|premium/i.test(err.message)) throw new PremiumError();
-    throw err;
-  });
-  if (!links.length) throw new Error("Nexus returned no download link.");
   const nxm = { modId, fileId };
   const fileName = file?.file_name ?? `${info.name}-${nxm.modId}-${nxm.fileId}.zip`;
   const dest = path.join(library.root, "downloads", fileName);
@@ -2962,15 +3017,34 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   const have = fs.existsSync(dest) && !!file && Math.abs(fs.statSync(dest).size - file.size_kb * 1024) < 2048;
   if (have) log.appendLine(`${fileName} is already in downloads, not downloading again`);
   else {
-    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Downloading ${info.name}` }, async (progress) => {
-      let last = 0;
-      await download(links[0].URI, dest, (received, total) => {
-        if (!total) return;
-        const pct = Math.floor((received / total) * 100);
-        progress.report({ increment: pct - last, message: `${Math.round(received / 1048576)} of ${Math.round(total / 1048576)} MB` });
-        last = pct;
-      });
-    });
+    await knowPremium(client);
+    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Downloading ${info.name}` }, (progress) =>
+      downloadQueue.run(
+        async () => {
+          // The link is asked for when the file's turn comes, so it cannot go stale in the queue.
+          progress.report({ message: "starting" });
+          if (linkExpired(key, expires)) throw new ExpiredLinkError();
+          const links = await client.downloadLinks(modId, fileId, key, expires).catch((err: Error) => {
+            if (/403|forbidden|premium/i.test(err.message)) throw key ? new ExpiredLinkError() : new PremiumError();
+            throw err;
+          });
+          if (!links.length) throw new Error("Nexus returned no download link.");
+          const meter = new SpeedMeter();
+          let last = 0;
+          let shown = 0;
+          await download(links[0].URI, dest, (received, total) => {
+            meter.add(received);
+            const now = Date.now();
+            if (now - shown < 500 && (!total || received < total)) return;
+            shown = now;
+            const pct = total ? Math.floor((received / total) * 100) : 0;
+            progress.report({ increment: pct - last, message: progressText(received, total, meter.bytesPerSecond) });
+            last = pct;
+          });
+        },
+        (ahead) => progress.report({ message: `waiting: ${ahead} ${ahead === 1 ? "download" : "downloads"} ahead` }),
+      ),
+    );
   }
   log.appendLine(`Downloaded ${fileName} (${info.name} ${file?.version ?? ""}) from Nexus mod ${nxm.modId}, md5 ${md5Of(dest)}`);
   const existing = line.entries[0];
@@ -2992,11 +3066,39 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
 
 /**
  * The newest file Nexus has of a mod: of its own file on the page (nexusLines.ts). Knowing nothing
- * of its file, on a page with no other file in the library, the page's newest main file.
+ * of its file, on a page with no other file in the library, the page's newest main file, and only
+ * when the page offers no other mod: an optional file must not be "updated" to the main one.
  */
 function newestOnPage(lib: Library, mod: ModInfo, files: NexusFiles) {
   const others = otherLineFiles(lib, mod);
-  return mod.source.fileId !== undefined || mod.source.fileTitle || others.length ? newestInLine(files, lineFile(mod), others) : newestFile(files);
+  return mod.source.fileId !== undefined || mod.source.fileTitle || others.length ? newestInLine(files, lineFile(mod), others) : onlyLine(files, newestFile(files));
+}
+
+/** Whether a download key from an nxm link is past its time (Nexus gives about two days). */
+function linkExpired(key: string | undefined, expires: number | undefined): boolean {
+  return !!key && !!expires && expires * 1000 <= Date.now();
+}
+
+/** Nexus refused a link's key: it expired (in the queue, or a link pressed long ago) or was used up. */
+class ExpiredLinkError extends Error {
+  constructor() {
+    super("The download link from Nexus no longer works; links expire after a while. Press Mod manager download on the mod's page again.");
+  }
+}
+
+/**
+ * Finds out once whether the account has Premium, for an account signed in before EDGEdeck kept it
+ * (it is kept at sign-in). Left unknown, which counts as free, when Nexus cannot say.
+ */
+async function knowPremium(client: NexusClient): Promise<void> {
+  if (globalState.get<boolean>(NexusPremiumKey) !== undefined) return;
+  try {
+    const token = await nexusAccessToken();
+    const premium = token ? (tokenUser(token) ?? (await fetchUser(token))).premium : (await client.validate()).is_premium;
+    await globalState.update(NexusPremiumKey, premium);
+  } catch (err) {
+    log.appendLine(`Nexus: could not tell whether the account has Premium (${err instanceof Error ? err.message : String(err)}); downloads run one at a time`);
+  }
 }
 
 class PremiumError extends Error {
@@ -3061,9 +3163,13 @@ async function applyUpdate(fam: Family, target: { fileId: number; version: strin
   }
 }
 
-/** For free Nexus members: opens each file's page, where "Mod manager download" sends the file here. */
+/**
+ * For free Nexus members: opens each file's Mod manager download page. `&nmm=1` is what Nexus's own
+ * "Mod manager download" button links to; without it the page is the manual download, whose file
+ * goes to the browser's downloads instead of to EDGEdeck.
+ */
 async function premiumPages(files: { modId: number; fileId: number }[]): Promise<void> {
-  for (const f of files) void vscode.env.openExternal(vscode.Uri.parse(`${modPageUrl(f.modId)}?tab=files&file_id=${f.fileId}`));
+  for (const f of files) void vscode.env.openExternal(vscode.Uri.parse(`${modPageUrl(f.modId)}?tab=files&file_id=${f.fileId}&nmm=1`));
   const handler = describeHandler(await currentNxmHandler());
   const pages = files.length === 1 ? "The file page is open" : `${files.length} file pages are open`;
   void vscode.window.showInformationMessage(

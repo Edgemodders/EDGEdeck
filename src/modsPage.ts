@@ -3,6 +3,7 @@
 // the library line at the bottom. The sidebar tree is the compact companion of this page.
 
 import * as vscode from "vscode";
+import { columnShown, PageColumns, type ColumnChoices } from "./pageColumns";
 
 export interface PageRow {
   id: string;
@@ -18,8 +19,10 @@ export interface PageRow {
   deployed: boolean;
   /** Bytes in the library for the active version. */
   size: number;
-  /** When the mod last changed on Nexus, in seconds (`updatedAt`); 0 when nothing says. */
+  /** When the mod last changed on Nexus, in seconds (`updatedAt` in extension.ts); 0 when nothing says. */
   updated: number;
+  /** Where that date comes from, for the cell's tooltip. */
+  updatedNote: string;
   needsDeploy: boolean;
   changed: boolean;
   conflicts: number;
@@ -82,6 +85,8 @@ export interface PageData {
   frameworks?: { summary: string; detail: string; warn: boolean; get?: string };
   /** Things not in place yet, each a button. */
   setup: { id: string; label: string; detail: string }[];
+  /** The player's choices from the Columns button (pageColumns.ts); a column not in them starts as its default. */
+  columns: ColumnChoices;
 }
 
 export interface PageMessage {
@@ -89,7 +94,10 @@ export interface PageMessage {
     | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate" | "deployOne"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport"
-    | "groupOn" | "groupMove" | "groupSection" | "groupNexus" | "groupCheck" | "groupRemove" | "placeGroup";
+    | "groupOn" | "groupMove" | "groupSection" | "groupNexus" | "groupCheck" | "groupRemove" | "placeGroup"
+    | "columns";
+  /** columns: every column's on or off, as the Columns list shows it. */
+  columns?: ColumnChoices;
   /** The page group a group action is about. */
   group?: string;
   /** loadoutView: the loadout to show. */
@@ -198,6 +206,10 @@ export function renderPage(d: PageData, csp: string): string {
     .map(([k, label]) => `<button class="chip" data-facet="${k}">${label} <b>${counts.get(k) ?? 0}</b></button>`)
     .join("");
 
+  // A cell across columns covers `fixed` always-shown ones plus every optional one showing; the
+  // script keeps the span right when the player turns columns on or off.
+  const shownCount = PageColumns.filter((c) => columnShown(c, d.columns)).length;
+  const span = (fixed: number) => `colspan="${fixed + shownCount}" data-fixed="${fixed}"`;
   const groupName = new Map(d.sections.flatMap((s) => s.groups.map((g) => [g.key, g.name] as const)));
   const row = (r: PageRow, section: string, first: boolean, last: boolean) => {
     const statusClass = r.changed || r.conflicts ? "warn" : r.needsDeploy ? "pend" : r.deployed && r.enabled ? "ok" : "dim";
@@ -230,14 +242,18 @@ export function renderPage(d: PageData, csp: string): string {
             .map((v) => `<option value='${msg({ action: "activate", id: v.id })}' ${v.active ? "selected" : ""}>${esc(v.version || "(no version)")}</option>`)
             .join("")}${r.update ? `<option value='${msg({ action: "update", id: r.id })}' class="get">Get ${esc(r.update)} from Nexus</option>` : ""}</select>`
         : `<span class="mono">${esc(r.version)}</span>`;
+    // The cells of the columns a player can turn off (pageColumns.ts), by column id.
+    const cells: Record<string, string> = {
+      ver: `<td class="vercell col-ver">${versionCell}</td>`,
+      kind: `<td class="col-kind">${[...r.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>`,
+      size: `<td class="mono size col-size" data-size="${r.size}" title="${r.size.toLocaleString()} bytes in the library">${fmt(r.size)}</td>`,
+      updated: `<td class="mono upd8 col-updated"${r.updatedNote ? ` title="${esc(r.updatedNote)}"` : ""}>${r.updated ? new Date(r.updated * 1000).toISOString().slice(0, 10) : ""}</td>`,
+      status: `<td class="${statusClass} col-status">${r.needsDeploy || r.changed ? `<a class="st" data-msg='${msg({ action: "changes", id: r.id })}' title="What the next deploy does for this mod">${esc(r.status)}</a>` : esc(r.status)}${r.update ? `<a class="upd" data-msg='${msg({ action: "update", id: r.id })}' title="Download ${esc(r.update)} from Nexus and put it in this mod's place">update ${esc(r.update)} available</a>` : ""}</td>`,
+    };
     return `<tr draggable="true" data-id="${esc(r.id)}" data-group="${esc(section)}"${r.group ? ` data-pg="${esc(r.group)}"` : ""} data-facets="${facetsOf(r).join(" ")}" data-text="${esc(text)}" data-size="${r.size}" data-updated="${r.updated}" class="${r.enabled ? "" : "offrow"}">
 <td class="chk"><input type="checkbox" ${r.enabled ? "checked" : ""} data-msg='${msg({ action: "toggle", id: r.id })}' title="${r.enabled ? "Turn off" : "Turn on"}"></td>
 <td class="name${r.group ? " child" : ""}"><a data-msg='${msg({ action: "details", id: r.id })}'>${esc(r.name)}</a></td>
-<td class="vercell">${versionCell}</td>
-<td>${[...r.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>
-<td class="mono size" data-size="${r.size}" title="${r.size.toLocaleString()} bytes in the library">${fmt(r.size)}</td>
-<td class="mono upd8"${r.updated ? ` title="When this mod's file, or the newest file of its line, was uploaded to Nexus"` : ""}>${r.updated ? new Date(r.updated * 1000).toISOString().slice(0, 10) : ""}</td>
-<td class="${statusClass}">${r.needsDeploy || r.changed ? `<a class="st" data-msg='${msg({ action: "changes", id: r.id })}' title="What the next deploy does for this mod">${esc(r.status)}</a>` : esc(r.status)}${r.update ? `<a class="upd" data-msg='${msg({ action: "update", id: r.id })}' title="Download ${esc(r.update)} from Nexus and put it in this mod's place">update ${esc(r.update)} available</a>` : ""}</td>
+${PageColumns.map((c) => cells[c.id]).join("\n")}
 <td class="acts">${buttons.map((b) => `<button class="ico ${b.cls ?? ""}" data-msg='${msg(b.m)}' title="${esc(b.title)}" aria-label="${esc(b.title)}" ${b.off ? "disabled" : ""}>${icon(b.icon)}</button>`).join("")}</td>
 </tr>`;
   };
@@ -268,7 +284,7 @@ export function renderPage(d: PageData, csp: string): string {
     const box = s.rows.length
       ? `<input type="checkbox" class="all" data-section="${esc(s.name)}" ${all ? "checked" : ""} data-some="${some ? 1 : 0}" title="${all ? "Turn off" : "Turn on"} every mod in ${esc(s.name)}">`
       : "";
-    return `<tr class="group ${d.collapsed.includes(s.name) ? "folded" : ""}" data-groupfor="${esc(s.name)}"><td class="chk">${box}</td><td colspan="7"><div class="gline"><button class="fold" data-fold="${esc(s.name)}" aria-expanded="${d.collapsed.includes(s.name) ? "false" : "true"}" title="Fold or unfold ${esc(s.name)}">${icon("fold")}<span class="glabel">${esc(s.name)}</span></button> <span class="dim">${s.rows.length}, ${n} on, ${fmt(s.rows.reduce((t, r) => t + r.size, 0))}</span>${note(s)}<span class="spacer"></span>${bulk}${tools ? `<span class="gsep"></span>${tools}` : ""}</div></td></tr>`;
+    return `<tr class="group ${d.collapsed.includes(s.name) ? "folded" : ""}" data-groupfor="${esc(s.name)}"><td class="chk">${box}</td><td ${span(2)}><div class="gline"><button class="fold" data-fold="${esc(s.name)}" aria-expanded="${d.collapsed.includes(s.name) ? "false" : "true"}" title="Fold or unfold ${esc(s.name)}">${icon("fold")}<span class="glabel">${esc(s.name)}</span></button> <span class="dim">${s.rows.length}, ${n} on, ${fmt(s.rows.reduce((t, r) => t + r.size, 0))}</span>${note(s)}<span class="spacer"></span>${bulk}${tools ? `<span class="gsep"></span>${tools}` : ""}</div></td></tr>`;
   };
   // A page group's own row: its box, its name, and buttons in the same slots as a mod row's.
   const pageGroupRow = (g: PageGroupRow, rows: PageRow[], section: string, first: boolean, last: boolean) => {
@@ -295,7 +311,7 @@ export function renderPage(d: PageData, csp: string): string {
     const size = fmt(rows.reduce((t, r) => t + r.size, 0));
     return `<tr class="pghead ${folded ? "folded" : ""} ${g.on ? "" : "offrow"}" draggable="true" data-pg="${esc(g.key)}" data-group="${esc(section)}">
 <td class="chk"><input type="checkbox" class="pgall" data-pg="${esc(g.key)}" ${g.on ? "checked" : ""} data-some="${some ? 1 : 0}" title="${esc(title)}"></td>
-<td colspan="6"><div class="gline"><button class="fold pgfold" data-fold="${esc(g.key)}" aria-expanded="${folded ? "false" : "true"}" title="Fold or unfold the files of ${esc(g.name)}">${icon("fold")}<span class="pglabel">${esc(g.name)}</span></button> <span class="dim">${g.files} files from one Nexus page, ${g.on} on, ${size}</span></div></td>
+<td ${span(1)}><div class="gline"><button class="fold pgfold" data-fold="${esc(g.key)}" aria-expanded="${folded ? "false" : "true"}" title="Fold or unfold the files of ${esc(g.name)}">${icon("fold")}<span class="pglabel">${esc(g.name)}</span></button> <span class="dim">${g.files} files from one Nexus page, ${g.on} on, ${size}</span></div></td>
 <td class="acts">${buttons.map((b) => `<button class="ico ${b.cls ?? ""}" data-msg='${msg(b.m)}' title="${esc(b.title)}" aria-label="${esc(b.title)}" ${b.off ? "disabled" : ""}>${icon(b.icon)}</button>`).join("")}</td>
 </tr>`;
   };
@@ -318,7 +334,7 @@ export function renderPage(d: PageData, csp: string): string {
       .join("");
   };
   const body = d.sections
-    .map((s) => groupRow(s) + (s.rows.length ? sectionBody(s) : `<tr class="hint" data-hintfor="${esc(s.name)}"><td></td><td colspan="7">Empty. Drag mods here, or use a mod's section button.</td></tr>`))
+    .map((s) => groupRow(s) + (s.rows.length ? sectionBody(s) : `<tr class="hint" data-hintfor="${esc(s.name)}"><td></td><td ${span(2)}>Empty. Drag mods here, or use a mod's section button.</td></tr>`))
     .join("");
 
   return `<!doctype html><html><head><meta charset="utf-8">
@@ -396,6 +412,11 @@ input[type=checkbox] { accent-color: var(--yellow); width: 15px; height: 15px; c
 .empty { padding: 24px 8px; color: var(--dim); }
 .setup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; color: var(--dim); }
 .note { border: 1px solid var(--yellow); color: var(--yellow); padding: 8px 12px; margin-bottom: 12px; }
+.colpick { position: relative; } #cols.active { color: var(--yellow); border-color: var(--yellow); }
+.colmenu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 200px; padding: 6px 0; background: var(--vscode-menu-background, var(--vscode-editor-background, #14161d)); color: var(--vscode-menu-foreground, var(--fg)); border: 1px solid var(--vscode-menu-border, var(--line)); box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
+.colmenu label { display: flex; align-items: center; gap: 8px; padding: 4px 12px; cursor: pointer; white-space: nowrap; } .colmenu label:hover { color: var(--yellow); }
+.colmenu .colnote { padding: 6px 12px 2px; color: var(--dim); font-size: 11px; border-top: 1px solid var(--line); margin-top: 4px; }
+${PageColumns.map((c) => `table.hide-${c.id} .col-${c.id} { display: none; }`).join("\n")}
 </style></head><body>
 <div class="top">
   <h1>EDGE<span>deck</span><small>${esc(d.game)}</small></h1>
@@ -446,11 +467,16 @@ ${d.viewing !== d.activeLoadout ? `<div class="editing">Editing the loadout <b>$
   ${chips}
   <span class="sep">|</span>
   <button class="chip" id="bysize" title="Biggest mods first, across every section">Largest first</button>
-  <button class="chip" id="bydate" title="Most recently updated mods first, across every section">Newest update first</button>
+  <button class="chip" id="bydate" title="Mods updated on Nexus most recently first, across every section">Newest update first</button>
   <span class="spacer"></span>
+  ${d.rows.length ? `<span class="colpick"><button id="cols" title="Choose which columns the list shows">Columns</button><div class="colmenu" id="colmenu" hidden>${PageColumns.map((c) => `<label><input type="checkbox" data-col="${c.id}" ${columnShown(c, d.columns) ? "checked" : ""}> ${esc(c.label)}</label>`).join("")}<div class="colnote">The box, the name and the buttons always show.</div></div></span>` : ""}
   <button data-msg='${msg({ action: "newSection" })}' title="A section of your own to group mods in">+ Section</button>
 </div>
-${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</th><th>Ver</th><th>Kind</th><th class="size">Size</th><th class="upd8">Updated</th><th title="${d.viewing !== d.activeLoadout ? `What the game has, from the active loadout ${esc(d.activeLoadout)}` : ""}">Status${d.viewing !== d.activeLoadout ? ` <span class="stfor">in ${esc(d.activeLoadout)}</span>` : ""}</th><th class="acts">Actions</th></tr></thead><tbody id="rows">${body}</tbody></table><div class="empty" id="none" hidden>No mod matches.</div>` : `<div class="empty">No mods yet. Press + Add mod, or import from Vortex from the Mods view menu.</div>`}
+${d.rows.length ? `<table class="mods ${PageColumns.filter((c) => !columnShown(c, d.columns)).map((c) => `hide-${c.id}`).join(" ")}"><thead><tr><th class="chk" data-col="chk"></th><th data-col="name">Mod</th>${PageColumns.map((c) =>
+    c.id === "status"
+      ? `<th class="col-status" data-col="status" title="${d.viewing !== d.activeLoadout ? `What the game has, from the active loadout ${esc(d.activeLoadout)}` : ""}">Status${d.viewing !== d.activeLoadout ? ` <span class="stfor">in ${esc(d.activeLoadout)}</span>` : ""}</th>`
+      : `<th class="col-${c.id}${c.id === "size" ? " size" : ""}" data-col="${c.id}">${esc(c.heading)}</th>`,
+  ).join("")}<th class="acts" data-col="acts">Actions</th></tr></thead><tbody id="rows">${body}</tbody></table><div class="empty" id="none" hidden>No mod matches.</div>` : `<div class="empty">No mods yet. Press + Add mod, or import from Vortex from the Mods view menu.</div>`}
 <div class="foot">
   <span>Library: <a data-msg='${msg({ action: "library" })}'>${esc(d.library)}</a> (${d.method === "link" ? "same drive as the game: hardlinks" : `other drive: copies. <a data-msg='${msg({ action: "moveLibrary" })}'>Move library...</a>`})</span>
   <span>Last deploy: ${d.lastDeploy ? esc(d.lastDeploy) : "never"}</span>
@@ -503,7 +529,7 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
       g.classList.toggle("folded", !filtering && folded.has(g.dataset.groupfor));
     }
     for (const h of document.querySelectorAll("tr.hint")) h.hidden = sorted() || filtering || folded.has(h.dataset.hintfor);
-    for (const c of document.querySelectorAll(".chip")) c.classList.toggle("active", c.dataset.facet === state.facet);
+    for (const c of document.querySelectorAll(".chip[data-facet]")) c.classList.toggle("active", c.dataset.facet === state.facet);
     const none = document.getElementById("none"); if (none) none.hidden = shown > 0;
     const upd = document.getElementById("updall");
     if (upd) {
@@ -527,8 +553,8 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
   });
   if (q) { q.value = state.q; q.addEventListener("input", () => { state.q = q.value; apply(); }); }
   for (const c of document.querySelectorAll(".chip[data-facet]")) c.addEventListener("click", () => { state.facet = c.dataset.facet; apply(); });
-  document.getElementById("bysize").addEventListener("click", () => { state.bySize = !state.bySize; if (state.bySize) state.byDate = false; order(); apply(); });
-  document.getElementById("bydate").addEventListener("click", () => { state.byDate = !state.byDate; if (state.byDate) state.bySize = false; order(); apply(); });
+  document.getElementById("bysize").addEventListener("click", () => { state.bySize = !state.bySize; if (state.bySize) state.byDate = false; order(); apply(); columns(); });
+  document.getElementById("bydate").addEventListener("click", () => { state.byDate = !state.byDate; if (state.byDate) state.bySize = false; order(); apply(); columns(); });
   order();
   // A section's bulk buttons act on the rows of that section the search and filter leave showing.
   for (const b of document.querySelectorAll("button[data-bulk]")) b.addEventListener("click", () => {
@@ -612,38 +638,76 @@ ${d.rows.length ? `<table class="mods"><thead><tr><th class="chk"></th><th>Mod</
     });
   }
 
-  // Column widths: drag the edge of a heading; double-click it to go back to automatic widths.
-  // Status takes whatever room is left, so the table always fills the page.
+  // Columns the player turns on or off (pageColumns.ts); one a sort orders by shows while that sort is on.
+  const COLS = ${JSON.stringify(PageColumns.map((c) => ({ id: c.id, on: c.on, sort: c.sort ?? null })))};
+  const choices = Object.assign({}, ${JSON.stringify(d.columns).replace(/</g, "\\u003c")});
+  const chosen = (c) => (typeof choices[c.id] === "boolean" ? choices[c.id] : c.on);
+  const showing = (c) => (c.sort && state[c.sort]) || chosen(c);
   const table = document.querySelector("table.mods");
-  if (table) {
-    const ths = [...table.querySelectorAll("thead th")];
-    const flex = ths.findIndex((t) => t.textContent.startsWith("Status"));
-    const widths = () => {
-      const w = state.widths;
-      const ok = Array.isArray(w) && w.length === ths.length;
-      table.classList.toggle("fixed", ok);
-      ths.forEach((t, i) => (t.style.width = ok && i !== flex ? w[i] + "px" : ""));
-      table.style.minWidth = ok ? w.reduce((n, x, i) => n + (i === flex ? 120 : x), 0) + "px" : "";
-    };
-    ths.forEach((th, i) => {
-      if (i === 0 || i >= flex) return;
+  const ths = () => [...table.querySelectorAll("thead th")].filter((t) => getComputedStyle(t).display !== "none");
+  // Status takes whatever room is left, so the table always fills the page; the name does while Status is off.
+  const flexId = () => (ths().some((t) => t.dataset.col === "status") ? "status" : "name");
+  // Column widths, kept by column: drag the edge of a heading; double-click it for automatic widths.
+  function widths() {
+    if (!state.widths || typeof state.widths !== "object" || Array.isArray(state.widths)) state.widths = null;
+    const w = state.widths;
+    const flex = flexId();
+    // A column shown since the widths were set keeps the width it has now.
+    if (w) for (const t of ths()) if (t.dataset.col !== flex && !(w[t.dataset.col] > 0)) w[t.dataset.col] = Math.max(36, Math.round(t.getBoundingClientRect().width));
+    table.classList.toggle("fixed", !!w);
+    for (const t of table.querySelectorAll("thead th")) t.style.width = w && t.dataset.col !== flex && w[t.dataset.col] ? w[t.dataset.col] + "px" : "";
+    let min = 0;
+    for (const t of ths()) min += t.dataset.col === flex ? 120 : w ? w[t.dataset.col] : 0;
+    table.style.minWidth = w ? min + "px" : "";
+  }
+  function grips() {
+    for (const g of table.querySelectorAll(".grip")) g.remove();
+    const flex = flexId();
+    for (const th of ths()) {
+      const id = th.dataset.col;
+      if (id === "chk" || id === "acts" || id === flex) continue;
       const g = document.createElement("span");
       g.className = "grip"; g.title = "Drag to resize; double-click for automatic widths";
       th.appendChild(g);
       g.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        if (!(Array.isArray(state.widths) && state.widths.length === ths.length)) state.widths = ths.map((t) => Math.round(t.getBoundingClientRect().width));
+        if (!state.widths) { state.widths = {}; for (const t of ths()) state.widths[t.dataset.col] = Math.round(t.getBoundingClientRect().width); }
         widths();
-        const x0 = e.clientX, w0 = state.widths[i];
+        const x0 = e.clientX, w0 = state.widths[id];
         g.classList.add("on");
-        const move = (ev) => { state.widths[i] = Math.max(36, Math.round(w0 + ev.clientX - x0)); widths(); };
+        const move = (ev) => { state.widths[id] = Math.max(36, Math.round(w0 + ev.clientX - x0)); widths(); };
         const up = () => { g.classList.remove("on"); document.removeEventListener("mousemove", move); document.removeEventListener("mouseup", up); vscode.setState(state); };
         document.addEventListener("mousemove", move); document.addEventListener("mouseup", up);
       });
       g.addEventListener("dblclick", () => { state.widths = null; widths(); vscode.setState(state); });
-    });
-    widths();
+    }
   }
+  function columns() {
+    if (!table) return;
+    let n = 0;
+    for (const c of COLS) { const on = showing(c); table.classList.toggle("hide-" + c.id, !on); if (on) n++; }
+    for (const td of document.querySelectorAll("td[data-fixed]")) td.colSpan = Number(td.dataset.fixed) + n;
+    for (const box of document.querySelectorAll("#colmenu input[data-col]")) {
+      const c = COLS.find((x) => x.id === box.dataset.col);
+      box.checked = chosen(c);
+      box.parentElement.title = c.sort && state[c.sort] && !chosen(c) ? "Shown while the list is sorted by it" : "";
+    }
+    widths(); grips();
+  }
+  const colsBtn = document.getElementById("cols"), colMenu = document.getElementById("colmenu");
+  if (colsBtn && colMenu) {
+    const close = () => { colMenu.hidden = true; colsBtn.classList.remove("active"); };
+    colsBtn.addEventListener("click", (e) => { e.stopPropagation(); colMenu.hidden = !colMenu.hidden; colsBtn.classList.toggle("active", !colMenu.hidden); });
+    colMenu.addEventListener("click", (e) => e.stopPropagation());
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    for (const box of colMenu.querySelectorAll("input[data-col]")) box.addEventListener("change", () => {
+      choices[box.dataset.col] = box.checked;
+      columns();
+      post({ action: "columns", columns: choices });
+    });
+  }
+  columns();
   for (const s of document.querySelectorAll("select.ver")) s.addEventListener("change", () => { if (s.value) vscode.postMessage(JSON.parse(s.value)); });
   // Rows the extension is removing go at once; a page group's row goes with its last file.
   window.addEventListener("message", (e) => {

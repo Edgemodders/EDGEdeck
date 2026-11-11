@@ -99,6 +99,21 @@ export function guessName(folder: string): string | undefined {
 }
 
 /**
+ * The name, Nexus id and version in a Vortex staging folder's name, for both ways Vortex names them:
+ * - older Vortex: `Name-<id>-<version with dashes>-<unix time>` (`Codeware-7780-1-20-5-1777845006`);
+ * - newer Vortex: `Name <id> <version> <upload time> <hash>`
+ *   (`Flushing Etiquette 27902 3.3.2 2026-11-07T18-59Z D2ZS2n36j`).
+ * Versions may hold letters (`1-0-1a`, `r10`, `1.6-beta`). Undefined for any other name.
+ */
+export function parseVortexFolder(folder: string): { name: string; modId: number; version: string } | undefined {
+  const spaced = /^(.+) (\d+) (\S+) \d{4}-\d{2}-\d{2}T\d{2}-\d{2}Z \S+$/.exec(folder);
+  if (spaced) return { name: spaced[1], modId: Number(spaced[2]), version: spaced[3] };
+  const dashed = /^(.*?)-(\d+)-(.+)-(\d{10})$/.exec(folder);
+  if (dashed) return { name: dashed[1], modId: Number(dashed[2]), version: dashed[3].replace(/-/g, ".") };
+  return undefined;
+}
+
+/**
  * Lists Vortex's mods for this game. `gamePath` is used to read which ones are deployed and to find
  * the staging folder; `staging` overrides the search (a folder the user named).
  */
@@ -123,13 +138,13 @@ export function listVortexMods(gamePath: string, staging?: string): VortexMod[] 
     const files = countFiles(folder);
     if (files === 0) continue;
     if (fs.existsSync(path.join(folder, "collection.json")) && files === 1) continue;
-    const m = /^(.*?)-(\d+)-([\d-]+)-(\d{10})$/.exec(entry.name);
+    const m = parseVortexFolder(entry.name);
     const guid = /^[0-9a-f]{2}_[0-9a-f]{2}_[0-9a-f]{2}_[0-9a-f-]{36}$/i.test(entry.name);
     mods.push({
       folder,
-      name: (m ? m[1] : guid ? guessName(folder) ?? entry.name : entry.name).replace(/\.(zip|7z|rar)$/i, ""),
-      version: m ? m[3].replace(/-/g, ".") : "",
-      modId: m ? Number(m[2]) : undefined,
+      name: (m ? m.name : guid ? guessName(folder) ?? entry.name : entry.name).replace(/\.(zip|7z|rar)$/i, ""),
+      version: m?.version ?? "",
+      modId: m?.modId,
       deployed: deployed.has(entry.name),
       files,
     });

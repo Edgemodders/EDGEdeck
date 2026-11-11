@@ -117,7 +117,7 @@ footer li { margin-bottom: 3px; letter-spacing: 0; text-transform: none; }
 <body>
 
 <div class="bar"><div class="wrap">
-  <a class="home" href="./"><span class="dot"></span><b>EDGEDECK</b> / DESIGN DOC / DRAFT 0.5</a>
+  <a class="home" href="./"><span class="dot"></span><b>EDGEDECK</b> / DESIGN DOC / DRAFT 0.6</a>
   <span>VS CODE EXTENSION &middot; CYBERPUNK 2077 ONLY</span>
   <nav>
     <a href="#goal">Goal</a><a href="#game">The game</a><a href="#vortex">Vortex</a><a href="#ui">UI</a><a href="#arch">Architecture</a><a href="#kinds">Mod kinds</a><a href="#conflicts">Conflicts</a><a href="#nexus">Nexus</a><a href="#loop">REDcode loop</a><a href="#risks">Risks</a><a href="#next">Next</a><a href="#roadmap">Roadmap</a>
@@ -127,7 +127,7 @@ footer li { margin-bottom: 3px; letter-spacing: 0; text-transform: none; }
 <div class="wrap">
 
 <header class="hero">
-  <div class="eyebrow">// Design draft 0.5, status 2026-11-02</div>
+  <div class="eyebrow">// Design draft 0.6, status 2026-11-10</div>
   <h1>EDGE<span>deck</span></h1>
   <p class="lede">A mod manager for Cyberpunk 2077 that lives inside REDcode and VS Code. One list of mods, four verbs, no jargon. It keeps a library of mods outside the game folder, deploys the ones you turn on, and shows you the conflicts Vortex cannot see because it can read inside the archives.</p>
   <div class="meta">
@@ -241,6 +241,7 @@ footer li { margin-bottom: 3px; letter-spacing: 0; text-transform: none; }
     <li><strong>Status</strong> is one short phrase in plain words: deployed, off, not deployed yet, update available, 1 conflict, needs RED4ext, file changed in game folder.</li>
     <li><strong>Kind chips</strong> say what is inside, so a user learns the ecosystem by looking at the list.</li>
     <li><strong>A Nexus page with several files</strong> (two main files, an optional patch) is one row named after the page, with a row per file under it. Each file is a mod of its own: its own versions, its own box, its own place in the order. The page's box turns every file off and remembers which were on; ticking it again turns those back on, or all of them when none were. It shows a dash while only some are on. The page and its files sit in one section and move as one; the files move only among themselves. A page with one file in the library is a plain row, as before. Agreed with the owner 2026-11-02, after a user's second main file arrived as a "version" of the first.</li>
+    <li><strong>Columns</strong> (on the EDGEdeck page): a Columns button in the page's toolbar opens a list with a box per column, so each player keeps the page as wide as they need. The box, the mod's name and its action buttons always show; Ver, Kind, Size, Status and any later column can be turned off. The columns there today start on; a new column starts off, so adding one never crowds the page. The choice is kept across restarts, outside the library, like folded sections. Sorting by a column (Newest update first) shows that column while the sort is on. Agreed with the owner 2026-11-10, when a contributor proposed an Updated column.</li>
     <li><strong>Detail panel</strong> (on select): description and Nexus page, version and update, the files it deploys and where, conflicts with the winner marked, load order position with up and down buttons, its REDmod info if any, Remove.</li>
   </ul>
   <h3>Plain words</h3>

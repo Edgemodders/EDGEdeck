@@ -1,0 +1,51 @@
+# Checks every pull request and every push to main: typecheck, build and smoke, then packages a
+# .vsix and keeps it as the run's artifact, to install and try a pull request by hand on any PC.
+#
+# The pull_request trigger runs a contributor's code with a read-only token and no secrets; never use
+# pull_request_target here. GitHub asks a maintainer to approve the first run of a new contributor.
+# Not a required check on main: the owner pushes straight to main (CLAUDE.md, Conventions).
+# The UI test (npm run test:ui) is not run here; run it locally before merging.
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request replaces a run still going.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run smoke
+
+      - name: Package
+        run: |
+          version=$(node -p "require('./package.json').version")
+          npx vsce package --no-dependencies --target win32-x64 --readme-path docs/marketplace.md --out "dist/edgedeck-${version}-${GITHUB_SHA::7}.vsix"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: edgedeck-vsix
+          path: dist/*.vsix
+          retention-days: 14
