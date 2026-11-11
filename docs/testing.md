@@ -162,11 +162,55 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 23 | **Downloads one at a time, speed shown** (#9) | 11-10 | Free account: press Mod manager download on three files quickly. **Expect:** the first shows "12 of 70 MB · 1.4 MB/s · 42 s left"; the others "waiting: 1 download ahead" and "2 downloads ahead" until their turn. Premium account: all start at once. Signing out and in again (free or Premium) changes which. |
-| 24 | **Vortex imports: names, ids and each file its own update** (#6, #8) | 11-10 | Import from a Vortex staging folder with newer-style folders (`Name 12345 1.2.0 2026-...Z hash`) and a page with a main and an optional file. **Expect:** clean names, Open on Nexus Mods works, and Check updates splits the page's files into rows of their own; Update all offers no file of another line. |
-| 25 | **Free account update pages** (#5) | 11-10 | Free account, a mod with an update: press its update. **Expect:** the file's page opens at the Mod manager download, and the file comes back to EDGEdeck through the nxm link. Note which button the page shows. |
-| 26 | **Columns button** | 11-10 | On the EDGEdeck page, press **Columns** and untick Size and Status. **Expect:** both go at once; section and page rows still span the whole table. Close and reopen the page, and reload the window: still hidden. Press Largest first: Size shows while it is on. Drag a column's edge, then tick Status again: the dragged width stays. Tick everything back. |
-| 27 | **Newest update first** (#7) | 11-10 | Press Check updates, then **Newest update first**. **Expect:** one list across the sections, newest Nexus upload on top, with an Updated column while it is on; dragging does nothing. Hover a date: the tooltip says whether it is from Nexus, from the Vortex folder's name or the day the mod was added, and names your file's date when Nexus has a newer one. Press it again: sections back, Updated hidden unless ticked under Columns. Largest first and Newest update first turn each other off. |
+| 23 | **Downloads one at a time, speed shown** (#9) | 11-10 | See **Tests 23 to 27, step by step** below, test 23. |
+| 24 | **Vortex imports: names, ids and each file its own update** (#6, #8) | 11-10 | See **Tests 23 to 27, step by step** below, test 24. |
+| 25 | **Free account update pages** (#5) | 11-10 | See **Tests 23 to 27, step by step** below, test 25. |
+| 26 | **Columns button** | 11-10 | See **Tests 23 to 27, step by step** below, test 26. |
+| 27 | **Newest update first** (#7) | 11-10 | See **Tests 23 to 27, step by step** below, test 27. |
+
+### Tests 23 to 27, step by step
+
+All five use the test build in **every** VS Code window (the Checks run's `.vsix`, **Extensions > ... > Install from VSIX**, then reload each window). The log is **View > Output > EDGEdeck**.
+
+**23. Downloads one at a time, speed shown** (a free and a Premium Nexus account)
+
+1. Command Palette: **EDGEdeck: Nexus: sign out**, then **EDGEdeck: Nexus: sign in** with the **free** account. The Set up strip must not show "Handle Nexus download links"; if it does, press it.
+2. On Nexus, open three mods you don't have, each in its own tab, and press **Mod manager download** on a file in each, one right after the other. Pick files of a few MB or more, so they take a while.
+3. **Expect:** the first notification shows `starting`, then `12 of 70 MB · 1.4 MB/s · 42 s left`; the second shows `waiting: 1 download ahead`, the third `waiting: 2 downloads ahead`, and each moves up as the one before finishes. The log has a `Downloaded ...` line for each.
+4. Sign out, sign in with the **Premium** account, and do step 2 again with three other files. **Expect:** all three start at once; no `waiting` line.
+5. Remove the six test mods afterwards.
+
+**24. Vortex imports** (on a PC with Vortex and its mods)
+
+1. In Vortex, install a page's main file and one of its optional files, for example -KS- UV Texture Framework (mod 3783): **1. UV Framework** and an optional such as **Nanarc's Arm Tattoo Overlays**. If the EDGEdeck library already has them from earlier tests, remove them there first.
+2. Look in Vortex's staging folder (Vortex: **Settings > Mods > Mod Staging Folder**): newer Vortex names folders like `UV Framework 3783 4.1 2026-11-07T18-59Z abc123`.
+3. In EDGEdeck: **EDGEdeck: Import from Vortex**, and tick those mods. **Expect** in the pick list: clean names (no date or hash), the version in grey, and `Nexus 3783` in each line's details.
+4. On the EDGEdeck page, **Expect:** each row has its version and an active **Open on Nexus** button (the arrow icon).
+5. Press **Check updates**. **Expect:** a row **-KS- UV Texture Framework** with the two files under it, each a mod of its own; neither is offered the other's file as an update, and neither is turned off.
+
+**25. Free account update pages** (free Nexus account)
+
+1. Sign in with the free account (as in 23.1).
+2. Get a mod with an update waiting: on a mod's Nexus page, **Files > Old files**, press **Mod manager download** on an older file. Then press **Check updates**. **Expect:** its row shows `update <version> available`.
+3. Press the row's **Update** button (the arrow over a line). **Expect:** the browser opens that file on Nexus at the slow **Mod manager download** (not the manual download), and a message in VS Code says to press it.
+4. Let the countdown finish (press the button if asked). **Expect:** the file comes to EDGEdeck through the nxm link, downloads, and takes the old version's place; the old version stays in the Ver list, off.
+5. Note the name of the button the Nexus page showed, so the message's wording can be checked.
+
+**26. Columns button**
+
+1. Open the EDGEdeck page. **Columns** is at the right, above the table, next to **+ Section**. Hover each name in its list and each column heading: a 2 to 5 word tooltip.
+2. Untick **Size** and **Status**. **Expect:** both columns go at once, and section rows and page rows still reach across the whole table.
+3. Close the page and open it again, then **Developer: Reload Window**. **Expect:** still hidden.
+4. Press **Largest first**. **Expect:** Size shows while it is on; in the Columns list Size stays unticked, with the tooltip "Shown while sorted". Press it again.
+5. Hover a heading's right edge until a yellow line shows, and drag it wider. Tick **Status** again. **Expect:** the dragged width stays. Double-click the edge to go back to automatic widths.
+6. Tick everything back on.
+
+**27. Newest update first**
+
+1. Press **Check updates** (signed in), so the mods have their Nexus dates.
+2. Press **Newest update first**. **Expect:** the button lights up; one list without sections, the latest Nexus upload on top; an **Updated** column with dates; dragging a row does nothing.
+3. Hover a few dates. **Expect** one of: `Nexus upload date`, `Yours is from <date>` (Nexus has a newer file than yours), `From the Vortex folder`, or `Date added, not Nexus`.
+4. Press **Largest first**. **Expect:** it lights up and Newest update first goes off. Press it again: sections back, Updated hidden (unless ticked under **Columns**).
 
 ### Test 22, step by step
 
