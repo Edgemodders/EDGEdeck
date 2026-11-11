@@ -65,6 +65,7 @@ Simplicity with a friendly and obvious UI. Rules that follow from it:
 ## Conventions
 
 - Commit straight to `main` and push, in small logical commits. Agree the plan in chat first. PRs only for large or risky changes.
+- **Pull requests from contributors (agreed with the owner 2026-11-10):** `.github/workflows/checks.yml` runs typecheck, build and smoke on every PR and every push to main (`windows-latest`, the `pull_request` trigger: no secrets for fork code; never `pull_request_target`) and keeps a `.vsix` artifact for hand tests; not a required check, so direct pushes to main still work. The UI test is not in it; run `npm run test:ui` locally before merging a PR that touches the extension. `CONTRIBUTING.md` and `.github/pull_request_template.md` list the rules a review checks. Merge locally: `git fetch origin pull/<n>/head:refs/pr/<n>`, `git merge --no-ff refs/pr/<n>`, test, push; GitHub then marks the PR merged. `CHANGELOG.md` merges with `merge=union` (`.gitattributes`): check the result for group headings run together. Running a contributor's code on the owner's PC needs the owner's go-ahead (given 2026-11-10 for #5, #6, #8 and #9).
 - Git identity is set per repo to `CyberbuildsAI` with the GitHub no-reply email. Never change the global identity.
 - Two machines push to this repo: `git fetch` and `git rebase origin/main` before every push, after committing.
 - Record every tool install in `docs/dev-setup.md`, with versions and exact commands.
