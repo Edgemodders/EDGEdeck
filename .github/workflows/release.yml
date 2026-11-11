@@ -180,15 +180,12 @@ jobs:
           # ./ matters: "dist/npm" alone reads as a GitHub repository.
           npm publish ./dist/npm --provenance --access public
 
-      # Makes the tag too (--target: this commit). RELEASE_TOKEN, an Edgemodders organisation secret
-      # (a fine-grained token: Contents and Workflows read and write): the workflow's own token got a
-      # 403 here at 0.31.0, likely because the commit's history changes files in .github/workflows.
+      # Makes the tag too (--target: this commit).
       - name: GitHub release
         if: env.RELEASE == 'true'
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -z "${GH_TOKEN}" ]; then echo "::error::RELEASE_TOKEN is not set"; exit 1; fi
           if gh release view "${TAG}" >/dev/null 2>&1; then
             echo "Release ${TAG} already exists; adding the Nexus zip if it is missing"
             gh release upload "${TAG}" "dist/EDGEdeck-${VERSION}-nexus.zip" --clobber
