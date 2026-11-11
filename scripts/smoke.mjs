@@ -1264,6 +1264,52 @@ console.log("undo: ok");
     assert.equal(core.downloadsAtOnce(false), 1, "a free account: one at a time");
     assert.equal(core.downloadsAtOnce(undefined), 1, "not known yet counts as free");
     assert.equal(core.downloadsAtOnce(true), 0, "Premium: no limit");
+    // Cancel while waiting: the file leaves the queue, the ones behind it move up.
+    {
+      const q2 = new core.DownloadQueue(() => 1);
+      let let1;
+      const ran = [];
+      const first = q2.run(() => new Promise((r) => { ran.push("a"); let1 = r; }));
+      const stop = new AbortController();
+      const told = [];
+      const cancelled = q2.run(async () => { ran.push("b"); }, undefined, stop.signal);
+      const third = q2.run(async () => { ran.push("c"); }, (ahead) => told.push(ahead));
+      await Promise.resolve();
+      assert.equal(q2.queued, 2);
+      stop.abort();
+      await assert.rejects(cancelled, (e) => e instanceof core.DownloadCancelled, "a waiting download that is cancelled rejects with DownloadCancelled");
+      assert.equal(q2.queued, 1, "and leaves the queue");
+      assert.equal(told.at(-1), 1, "the one behind it moves up");
+      let1();
+      await Promise.all([first, third]);
+      assert.deepEqual(ran, ["a", "c"], "the cancelled one never runs");
+      await assert.rejects(q2.run(async () => 1, undefined, AbortSignal.abort()), (e) => e instanceof core.DownloadCancelled, "cancelled before it starts");
+    }
+    // Cancel while downloading: the transfer stops and the part written so far is deleted.
+    {
+      const http = await import("node:http");
+      const server = http.createServer((req, res) => {
+        res.writeHead(200, { "content-length": String(1 << 20) });
+        res.write(Buffer.alloc(64 * 1024));
+        const t = setInterval(() => res.write(Buffer.alloc(1024)), 50);
+        res.on("close", () => clearInterval(t));
+      });
+      await new Promise((r) => server.listen(0, "127.0.0.1", r));
+      const url = `http://127.0.0.1:${server.address().port}/file.zip`;
+      const dest = path.join(tmp, "cancel-me.zip");
+      const stop = new AbortController();
+      let seen = 0;
+      await assert.rejects(
+        core.download(url, dest, (received) => { seen = received; if (received >= 64 * 1024) stop.abort(); }, stop.signal),
+        (e) => e instanceof core.DownloadCancelled,
+        "a running download that is cancelled rejects with DownloadCancelled",
+      );
+      assert.ok(seen >= 64 * 1024, "it had started");
+      assert.equal(fs.existsSync(dest), false, "the part written so far is gone");
+      server.closeAllConnections?.();
+      await new Promise((r) => server.close(r));
+    }
+    console.log("download cancel: ok");
   }
   const newest = core.newestFile({ files: [
     { file_id: 1, name: "old", version: "1.0", category_name: "OLD_VERSION", is_primary: false, uploaded_timestamp: 1 },

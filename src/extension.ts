@@ -30,7 +30,7 @@ import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove"
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveLibrary, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
-import { DownloadQueue, downloadsAtOnce, progressText, SpeedMeter } from "./downloads";
+import { DownloadCancelled, DownloadQueue, downloadsAtOnce, progressText, SpeedMeter } from "./downloads";
 import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
@@ -426,6 +426,7 @@ async function run(fn: () => Promise<void> | void): Promise<void> {
   try {
     await fn();
   } catch (err) {
+    if (err instanceof DownloadCancelled) return; // The player pressed Cancel; the log has a line.
     const message = err instanceof Error ? err.message : String(err);
     log.appendLine(`Error: ${message}`);
     void vscode.window.showErrorMessage(`EDGEdeck: ${message}`, "Show log").then((a) => a && log.show(true));
@@ -3018,33 +3019,43 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   if (have) log.appendLine(`${fileName} is already in downloads, not downloading again`);
   else {
     await knowPremium(client);
-    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Downloading ${info.name}` }, (progress) =>
-      downloadQueue.run(
-        async () => {
-          // The link is asked for when the file's turn comes, so it cannot go stale in the queue.
-          progress.report({ message: "starting" });
-          if (linkExpired(key, expires)) throw new ExpiredLinkError();
-          const links = await client.downloadLinks(modId, fileId, key, expires).catch((err: Error) => {
-            if (/403|forbidden|premium/i.test(err.message)) throw key ? new ExpiredLinkError() : new PremiumError();
-            throw err;
-          });
-          if (!links.length) throw new Error("Nexus returned no download link.");
-          const meter = new SpeedMeter();
-          let last = 0;
-          let shown = 0;
-          await download(links[0].URI, dest, (received, total) => {
-            meter.add(received);
-            const now = Date.now();
-            if (now - shown < 500 && (!total || received < total)) return;
-            shown = now;
-            const pct = total ? Math.floor((received / total) * 100) : 0;
-            progress.report({ increment: pct - last, message: progressText(received, total, meter.bytesPerSecond) });
-            last = pct;
-          });
-        },
-        (ahead) => progress.report({ message: `waiting: ${ahead} ${ahead === 1 ? "download" : "downloads"} ahead` }),
-      ),
-    );
+    try {
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Downloading ${info.name}`, cancellable: true }, (progress, token) => {
+        // Cancel: a waiting file leaves the queue, a running one stops and its part is deleted.
+        const stop = new AbortController();
+        token.onCancellationRequested(() => stop.abort());
+        return downloadQueue.run(
+          async () => {
+            // The link is asked for when the file's turn comes, so it cannot go stale in the queue.
+            progress.report({ message: "starting" });
+            if (linkExpired(key, expires)) throw new ExpiredLinkError();
+            const links = await client.downloadLinks(modId, fileId, key, expires).catch((err: Error) => {
+              if (/403|forbidden|premium/i.test(err.message)) throw key ? new ExpiredLinkError() : new PremiumError();
+              throw err;
+            });
+            if (!links.length) throw new Error("Nexus returned no download link.");
+            const meter = new SpeedMeter();
+            let last = 0;
+            let shown = 0;
+            if (stop.signal.aborted) throw new DownloadCancelled();
+            await download(links[0].URI, dest, (received, total) => {
+              meter.add(received);
+              const now = Date.now();
+              if (now - shown < 500 && (!total || received < total)) return;
+              shown = now;
+              const pct = total ? Math.floor((received / total) * 100) : 0;
+              progress.report({ increment: pct - last, message: progressText(received, total, meter.bytesPerSecond) });
+              last = pct;
+            }, stop.signal);
+          },
+          (ahead) => progress.report({ message: `waiting: ${ahead} ${ahead === 1 ? "download" : "downloads"} ahead` }),
+          stop.signal,
+        );
+      });
+    } catch (err) {
+      if (err instanceof DownloadCancelled) log.appendLine(`Download cancelled: ${fileName} (${info.name})`);
+      throw err;
+    }
   }
   log.appendLine(`Downloaded ${fileName} (${info.name} ${file?.version ?? ""}) from Nexus mod ${nxm.modId}, md5 ${md5Of(dest)}`);
   const existing = line.entries[0];
@@ -3225,6 +3236,7 @@ async function updateAllCommand(ids?: string[]): Promise<void> {
         const now = families(library!).find((f) => f.key === fam.key)?.active;
         updated.push(`${fam.name} ${now?.version ?? fam.update!.version}`);
       } catch (err) {
+        if (err instanceof DownloadCancelled) continue; // Skipped by the player; the others go on.
         log.appendLine(`Update all: ${fam.name}: ${err instanceof Error ? err.message : String(err)}`);
         failed.push(fam.name);
       }

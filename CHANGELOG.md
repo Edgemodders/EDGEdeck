@@ -14,6 +14,7 @@ How to keep it:
 
 **New**
 
+- A Nexus download's notification has a Cancel button. A file still waiting for its turn leaves the queue; one downloading stops, and the part already downloaded is deleted. In Update all, a cancelled file is skipped and the others go on.
 - **Newest update first.** A button next to Largest first on the EDGEdeck page lists every mod by when it last got a new file on Nexus, newest on top, across the sections; like Largest first, it holds dragging until you turn it off. While it is on, the page shows an Updated column with the date; turn that column on for good with the Columns button. The dates come from Nexus at the update check; before the first check, a mod imported from Vortex shows the date in its Vortex folder's name, and any other mod the day it was added. The date's tooltip says which. Thanks to abldvd (https://github.com/Edgemodders/EDGEdeck/pull/7).
 - The EDGEdeck page has a Columns button: tick the columns you want to see (Version, Kind, Size, Status) and the others step aside. The mod's box, its name and its buttons always show. EDGEdeck remembers the choice, and a column you sort by (Largest first) shows while that sort is on. Column widths you drag are now kept for each column, so turning one off or on keeps the others' widths.
 - A Nexus download's notification shows its speed and the time left, as in "12 of 70 MB · 1.4 MB/s · 42 s left". Getting REDbridge shows them too.

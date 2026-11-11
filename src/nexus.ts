@@ -4,6 +4,7 @@
 // https://help.nexusmods.com/article/114-api-acceptable-use-policy
 
 import * as crypto from "node:crypto";
+import { DownloadCancelled } from "./downloads";
 import fs from "./fsx";
 
 export const NexusGame = "cyberpunk2077";
@@ -183,13 +184,25 @@ export function modPageUrl(modId: number): string {
 }
 
 /** Downloads a file to disk, reporting progress in bytes. */
-export async function download(url: string, dest: string, progress?: (received: number, total: number) => void): Promise<void> {
-  const res = await fetch(url);
+/**
+ * Downloads `url` into `dest`. `signal` stops it: the part already written is deleted and the call
+ * rejects with DownloadCancelled. A download that fails partway deletes its part too.
+ */
+export async function download(url: string, dest: string, progress?: (received: number, total: number) => void, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) throw new DownloadCancelled();
+  let res: Response;
+  try {
+    res = await fetch(url, { signal });
+  } catch (err) {
+    if (signal?.aborted) throw new DownloadCancelled();
+    throw err;
+  }
   if (!res.ok || !res.body) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
   const total = Number(res.headers.get("content-length")) || 0;
   const out = fs.createWriteStream(dest);
   let received = 0;
   const reader = res.body.getReader();
+  let complete = false;
   try {
     for (;;) {
       const { done, value } = await reader.read();
@@ -198,7 +211,13 @@ export async function download(url: string, dest: string, progress?: (received: 
       if (!out.write(value)) await new Promise<void>((r) => out.once("drain", () => r()));
       progress?.(received, total);
     }
+    complete = true;
+  } catch (err) {
+    if (signal?.aborted) throw new DownloadCancelled();
+    throw err;
   } finally {
     await new Promise<void>((r) => out.end(() => r()));
+    // A part of a file is no use to anyone; EDGEdeck wrote it, so it goes.
+    if (!complete) fs.rmSync(dest, { force: true });
   }
 }

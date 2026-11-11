@@ -163,11 +163,12 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 24 | **Vortex imports: names, ids and each file its own update** (#6, #8) | 11-10 | See **Tests 23 to 27, step by step** below, test 24. |
-| 26 | **Columns button** | 11-10 | See **Tests 23 to 27, step by step** below, test 26. |
-| 27 | **Newest update first** (#7) | 11-10 | See **Tests 23 to 27, step by step** below, test 27. |
+| 24 | **Vortex imports: names, ids and each file its own update** (#6, #8) | 11-10 | See **Tests 23 to 28, step by step** below, test 24. |
+| 26 | **Columns button** | 11-10 | See **Tests 23 to 28, step by step** below, test 26. |
+| 27 | **Newest update first** (#7) | 11-10 | See **Tests 23 to 28, step by step** below, test 27. |
+| 28 | **Cancel a download** | 11-10 | See **Tests 23 to 28, step by step** below, test 28. |
 
-### Tests 23 to 27, step by step
+### Tests 23 to 28, step by step
 
 **Free accounts are not hand-tested by the owner:** the owner's account is Premium, and Nexus's terms allow one account per person. What only a free account shows is covered this way: one download at a time and its `waiting: ... ahead` line (#9) by the smoke test's queue checks and abldvd's own use on a free account (PR #9); the update page that opens at the Mod manager download (#5) by abldvd's hand test on 0.30.0 (PR #5), merged unchanged. A free account's queued notifications, and the expired-link message, have not been seen for this build.
 
@@ -180,13 +181,16 @@ The four below use the test build in **every** VS Code window (the Checks run's 
 3. **Expect:** all three start at once, with no `waiting` line, and each notification shows its progress as `12 of 70 MB · 1.4 MB/s · 42 s left`. The log has a `Downloaded ...` line for each.
 4. Remove the three test mods afterwards.
 
-**24. Vortex imports** (on a PC with Vortex and its mods)
+**24. Vortex imports** (on a PC with Vortex)
 
-1. In Vortex, install a page's main file and one of its optional files, for example -KS- UV Texture Framework (mod 3783): **1. UV Framework** and an optional such as **Nanarc's Arm Tattoo Overlays**. If the EDGEdeck library already has them from earlier tests, remove them there first.
-2. Look in Vortex's staging folder (Vortex: **Settings > Mods > Mod Staging Folder**): newer Vortex names folders like `UV Framework 3783 4.1 2026-11-07T18-59Z abc123`.
-3. In EDGEdeck: **EDGEdeck: Import from Vortex**, and tick those mods. **Expect** in the pick list: clean names (no date or hash), the version in grey, and `Nexus 3783` in each line's details.
-4. On the EDGEdeck page, **Expect:** each row has its version and an active **Open on Nexus** button (the arrow icon).
-5. Press **Check updates**. **Expect:** a row **-KS- UV Texture Framework** with the two files under it, each a mod of its own; neither is offered the other's file as an update, and neither is turned off.
+Before you start: in Vortex, **Settings > Mods**, turn off **Enable mods when installed** and **Deploy mods when enabled**, and don't press Deploy in Vortex during the test (a Vortex deploy writes `vortex.deployment.json`, and EDGEdeck then stops deploying until you purge in Vortex). Remove any -KS- UV Texture Framework files EDGEdeck has from tests 16 to 19 (the page row's **Remove from Library**).
+
+1. On https://www.nexusmods.com/cyberpunk2077/mods/3783?tab=files, use **Manual download** (Mod manager download goes to EDGEdeck now) for **1. UV Framework** and **Nanarc's Arm Tattoo Overlays**. The zips have newer-style names such as `UV Framework 3783 4.1 2026-...Z abc123.zip`.
+2. Drag both zips onto Vortex's **Mods** tab and install them; leave them disabled. In Vortex's staging folder (**Settings > Mods > Mod Staging Folder**) each has a folder named like its zip.
+3. In VS Code: **EDGEdeck: Import from Vortex** (point it at that folder if it asks), and tick the two. **Expect** in the list: clean names (`UV Framework`, no id, date or hash), the version beside each, and `Nexus 3783 · ... files · will be off` under each.
+4. On the EDGEdeck page, **expect** both to have a version and an active **Open on Nexus** button (the arrow icon). They may show as one mod with two versions; step 5 is what fixes that.
+5. Press **Check updates**. **Expect:** a row **-KS- UV Texture Framework** with **UV Framework** and **Nanarc's Arm Tattoo Overlays** under it as two mods, each with its own box; neither is offered the other's file as an update, and neither is turned off. The log has `Nexus mod 3783 has files that are mods of their own; now separate: ...`.
+6. Clean up: remove both in EDGEdeck and in Vortex; turn Vortex's two settings back on if you use them.
 
 **26. Columns button**
 
@@ -203,6 +207,12 @@ The four below use the test build in **every** VS Code window (the Checks run's 
 2. Press **Newest update first**. **Expect:** the button lights up; one list without sections, the latest Nexus upload on top; an **Updated** column with dates; dragging a row does nothing.
 3. Hover a few dates. **Expect** one of: `Nexus upload date`, `Yours is from <date>` (Nexus has a newer file than yours), `From the Vortex folder`, or `Date added, not Nexus`.
 4. Press **Largest first**. **Expect:** it lights up and Newest update first goes off. Press it again: sections back, Updated hidden (unless ticked under **Columns**).
+
+**28. Cancel a download** (Premium)
+
+1. On Nexus, press **Mod manager download** on a large file (a few hundred MB) of a mod you don't have.
+2. While it downloads, press **Cancel** on its notification. **Expect:** the notification goes; no error message; the log says `Download cancelled: <file> (<mod>)`; nothing new in the library; the file is not in the library's `downloads` folder (the page footer's "kept downloads" link).
+3. Press **Mod manager download** on the same file again and let it finish. **Expect:** it downloads from the start and is added as usual. Remove it afterwards.
 
 ### Test 22, step by step
 

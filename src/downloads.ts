@@ -49,6 +49,14 @@ function timeLeft(seconds: number): string {
   return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
 }
 
+/** A download the player cancelled, waiting or under way: not an error to show. */
+export class DownloadCancelled extends Error {
+  constructor() {
+    super("Download cancelled");
+    this.name = "DownloadCancelled";
+  }
+}
+
 /**
  * How many Nexus downloads run at once: one for a free account, whose speed cap is the whole
  * account's, no limit (0) for Premium, which has none. An account not known yet counts as free.
@@ -72,12 +80,26 @@ export class DownloadQueue {
     return this.waiting.length;
   }
 
-  /** Runs `job` when its turn comes. While it waits, `onWait` hears how many jobs are ahead of it. */
-  async run<T>(job: () => Promise<T>, onWait?: (ahead: number) => void): Promise<T> {
+  /**
+   * Runs `job` when its turn comes. While it waits, `onWait` hears how many jobs are ahead of it.
+   * `signal` cancels it: while it waits, it leaves the queue and the run rejects with DownloadCancelled;
+   * once it runs, the job itself has to stop on the signal.
+   */
+  async run<T>(job: () => Promise<T>, onWait?: (ahead: number) => void, signal?: AbortSignal): Promise<T> {
+    if (signal?.aborted) throw new DownloadCancelled();
     if (this.full()) {
       // The job that ends hands its slot over: pump() counts this one as running before go().
-      await new Promise<void>((go) => {
-        this.waiting.push({ go, tell: onWait });
+      await new Promise<void>((go, fail) => {
+        const entry = { go: () => { signal?.removeEventListener("abort", leave); go(); }, tell: onWait };
+        const leave = () => {
+          const i = this.waiting.indexOf(entry);
+          if (i < 0) return;
+          this.waiting.splice(i, 1);
+          this.waiting.forEach((w, k) => w.tell?.(this.running + k));
+          fail(new DownloadCancelled());
+        };
+        signal?.addEventListener("abort", leave, { once: true });
+        this.waiting.push(entry);
         onWait?.(this.running + this.waiting.length - 1);
       });
     } else this.running++;
