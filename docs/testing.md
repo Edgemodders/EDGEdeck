@@ -155,6 +155,7 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 20: **same bytes copied over a deployed file** (#13), after REDcode's Pack and Play | **Passed**, as written |
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 21: **Run game, exe route** (#12), REDnode's overlay on F10 | **Passed**, as written |
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 22: **deploy with REDbridge running** (#10), parts A, B and C | **Passed.** The first run of A used ArchiveXL, whose archive sits under `red4ext/plugins`, which the scanner does not read, so REDbridge did not start again after the deploy; that is right (the scan reuses what it read and starts REDbridge only for an unread archive in `archive/pc/mod`), and the steps were corrected to say so |
+| 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 23: **downloads at once on Premium, speed shown** (#9) | **Passed.** Led to a Cancel button on the download notifications (asked for by the owner the same day) |
 
 ## Waiting for a hand test
 
@@ -162,7 +163,6 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 23 | **Downloads at once on Premium, speed shown** (#9) | 11-10 | See **Tests 23 to 27, step by step** below, test 23. |
 | 24 | **Vortex imports: names, ids and each file its own update** (#6, #8) | 11-10 | See **Tests 23 to 27, step by step** below, test 24. |
 | 26 | **Columns button** | 11-10 | See **Tests 23 to 27, step by step** below, test 26. |
 | 27 | **Newest update first** (#7) | 11-10 | See **Tests 23 to 27, step by step** below, test 27. |
