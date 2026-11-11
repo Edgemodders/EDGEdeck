@@ -170,13 +170,13 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 
 ### Test 22, step by step
 
-What it checks: before a deploy, an undo or a remove, EDGEdeck stops its own REDbridge (the archive scanner) and waits for it to exit, so it cannot hold an archive Windows needs to replace. The next conflict scan starts it again. On the reporter's PC the scanner held `WeaponCharms.archive` and the deploy stopped with "in use, so Windows would not change it". The hold may not happen on every PC, so the test also checks the stop and the restart in the log.
+What it checks: before a deploy, an undo or a remove, EDGEdeck stops its own REDbridge (the archive scanner) and waits for it to exit, so it cannot hold an archive Windows needs to replace. It starts again only when the conflict scan meets an archive in `archive/pc/mod` it has not read yet; for archives it has read, the scan uses what it saved, and REDbridge stays off until it is needed. `REDbridge stopped` appears only when it was running. On the reporter's PC the scanner held `WeaponCharms.archive` and the deploy stopped with "in use, so Windows would not change it". The hold may not happen on every PC, so the test also checks the stop and the restart in the log.
 
 **Before you start**
 
 - The game is closed, and EDGEdeck (not Vortex) manages the game folder.
 - REDbridge is installed: the EDGEdeck page's footer shows a green dot and `REDbridge 0.12...`. If it says "No REDbridge", use **Get REDbridge** there first.
-- A mod with an `.archive` file that has **two versions** in the library (its Ver cell is a list), deployed. That is the reported case: the old version's archive, hardlinked into the game, gets replaced. Any mod you updated through EDGEdeck will do.
+- A mod with an `.archive` file in `archive/pc/mod` (its Kind shows `archive`) that has **two versions** in the library (its Ver cell is a list), deployed. That is the reported case: the old version's archive, hardlinked into the game, gets replaced. Frameworks such as ArchiveXL keep their archive under `red4ext/plugins`, which the scanner does not read, so they do not cover it. If no such mod has two versions, do B and C.
 - Open the log: **View > Output**, then pick **EDGEdeck** in the list at the right of the panel.
 - Optional: Task Manager, **Details** tab, sorted by name, to watch `REDbridge.exe`.
 
@@ -184,22 +184,22 @@ What it checks: before a deploy, an undo or a remove, EDGEdeck stops its own RED
 
 1. Open the EDGEdeck page and wait a few seconds. **Expect** in the log: `REDbridge 0.12... (WolvenKit ...) at ...`, then `Archive scan: <n> archives, ...`. `REDbridge.exe` is in Task Manager.
 2. In the mod's Ver list, pick its other version. Press **Deploy**.
-3. **Expect:** the deploy finishes with its usual message, and no "in use, so Windows would not change it" error. In the log, in this order: `REDbridge stopped, so it lets go of the archives it read`, then `Deployed (link): ...`, then a moment later `REDbridge 0.12...` and `Archive scan: ...` again. In Task Manager, `REDbridge.exe` goes away during the deploy and comes back after it.
-4. Pick the first version again and deploy. **Expect** the same.
+3. **Expect:** the deploy finishes with its usual message, and no "in use, so Windows would not change it" error. In the log, in this order: `REDbridge stopped, so it lets go of the archives it read`, then `Deployed (link): ...`, then `Archive scan: ...`. The version you picked has an archive the scanner has not read, so `REDbridge 0.12...` comes just before that scan line, and in Task Manager `REDbridge.exe` goes away during the deploy and comes back after it.
+4. Pick the first version again and deploy. **Expect** the same, except that REDbridge may stay off: the scanner has read both versions' archives now.
 
 **B. Turn a mod off and deploy**
 
 1. Untick a deployed mod with an `.archive` file and press **Deploy**.
-2. **Expect** the same as A3: no error, the three log lines in that order.
+2. **Expect:** no error; `REDbridge stopped, ...` if REDbridge was running, then `Deployed (link): ...` and `Archive scan: ...`. REDbridge stays off here: the scan has nothing new to read.
 3. Tick it again and deploy.
 
 **C. Remove a mod**
 
 1. Add any small mod with an `.archive` file (a spare download is fine) and wait for `Archive scan: ...` in the log, so the scanner has read it.
 2. Press its **Remove from Library** button and confirm.
-3. **Expect:** no error; its row goes at once; the log shows `REDbridge stopped, so it lets go of the archives it read`, then `Removed ...`, then the scan again. Its folder is gone from the library's `library` folder.
+3. **Expect:** no error; its row goes at once; the log shows `REDbridge stopped, so it lets go of the archives it read`, then `Removed ...`, then the scan again. Its folder is gone from the library's `library` folder. (Step 1 is where REDbridge starts again: the new mod's archive is one it has not read, so `REDbridge 0.12...` comes before that scan.)
 
-**Passed** when A, B and C give no "in use" error and the log shows the stop before each change and the scan after it. **If an "in use" error appears:** note the file it names, whether `REDbridge.exe` was in Task Manager at that moment, and copy the EDGEdeck log from the step before.
+**Passed** when A, B and C give no "in use" error, the log shows `REDbridge stopped` before each change made while REDbridge was running, and REDbridge starts again whenever the scan has a new archive to read. **If an "in use" error appears:** note the file it names, whether `REDbridge.exe` was in Task Manager at that moment, and copy the EDGEdeck log from the step before.
 
 ### Tests 16 to 18, step by step
 
