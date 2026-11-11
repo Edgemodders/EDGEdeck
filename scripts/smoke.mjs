@@ -1202,6 +1202,46 @@ console.log("undo: ok");
   assert.equal(core.versionNewer("1.20.3", "1.20.3"), false);
   assert.equal(core.versionNewer("1.9", "1.10"), false);
   assert.equal(core.versionNewer("2.0", ""), false);
+  {
+    // Downloads: the speed over the last seconds, the notification's line, one file at a time.
+    let t = 0;
+    const meter = new core.SpeedMeter(5000, () => t);
+    meter.add(0);
+    assert.equal(meter.bytesPerSecond, 0);
+    for (t = 1000; t <= 10000; t += 1000) meter.add(t * 2048);
+    assert.equal(Math.round(meter.bytesPerSecond), 2048 * 1000);
+    assert.equal(core.progressText(12 * 1048576, 70 * 1048576, 1.4 * 1048576), "12 of 70 MB · 1.4 MB/s · 42 s left");
+    assert.equal(core.progressText(512 * 1024, 4 * 1048576, 0), "0.5 of 4.0 MB");
+    assert.equal(core.progressText(1048576, 600 * 1048576, 300 * 1024), "1.0 of 600 MB · 300 KB/s · 34 min 05 s left");
+    let limit = 1;
+    const q = new core.DownloadQueue(() => limit);
+    const order = [];
+    const waits = [];
+    let release;
+    const first = q.run(() => new Promise((r) => { order.push("a"); release = r; }));
+    const second = q.run(async () => { order.push("b"); }, (ahead) => waits.push(`b${ahead}`));
+    const third = q.run(async () => { order.push("c"); }, (ahead) => waits.push(`c${ahead}`));
+    await Promise.resolve();
+    assert.deepEqual(order, ["a"]);
+    assert.equal(q.queued, 2);
+    release();
+    await Promise.all([first, second, third]);
+    assert.deepEqual(order, ["a", "b", "c"]);
+    assert.deepEqual(waits.slice(0, 2), ["b1", "c2"]);
+    assert.ok(waits.includes("c1"));
+    limit = 0;
+    const many = [];
+    const all = [1, 2, 3].map((n) => q.run(() => new Promise((r) => { many.push(n); setTimeout(r, 5); })));
+    await Promise.resolve();
+    assert.deepEqual(many, [1, 2, 3]);
+    await Promise.all(all);
+    await assert.rejects(q.run(async () => { throw new Error("boom"); }), /boom/);
+    limit = 1;
+    assert.equal(await q.run(async () => 7), 7);
+    assert.equal(core.downloadsAtOnce(false), 1, "a free account: one at a time");
+    assert.equal(core.downloadsAtOnce(undefined), 1, "not known yet counts as free");
+    assert.equal(core.downloadsAtOnce(true), 0, "Premium: no limit");
+  }
   const newest = core.newestFile({ files: [
     { file_id: 1, name: "old", version: "1.0", category_name: "OLD_VERSION", is_primary: false, uploaded_timestamp: 1 },
     { file_id: 2, name: "main", version: "1.1", category_name: "MAIN", is_primary: true, uploaded_timestamp: 2 },

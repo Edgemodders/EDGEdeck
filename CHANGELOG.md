@@ -12,6 +12,14 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- A Nexus download's notification shows its speed and the time left, as in "12 of 70 MB · 1.4 MB/s · 42 s left". Getting REDbridge shows them too.
+
+**Changed**
+
+- Nexus downloads run one at a time; the others say "waiting: 2 downloads ahead" until their turn. Nexus caps a free account's speed for the whole account (3 MB/s, 1.5 MB/s with an ad blocker), so files downloading at once only shared it. A Premium account has no cap, so its downloads still run all at once.
+
 **Fixed**
 
 - Deploy no longer asks "Keep the changed file, or put the mod's file back?" about a file that was replaced by a copy with the same bytes, as REDcode's Pack and Play does when it swaps an archive into the running game. EDGEdeck now compares the bytes and quietly puts its own file back; a file whose bytes really changed is still asked about. https://github.com/Edgemodders/EDGEdeck/issues/13

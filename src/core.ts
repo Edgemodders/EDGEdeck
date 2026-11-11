@@ -4,6 +4,7 @@ export * from "./bridgeInstall";
 export * from "./classifier";
 export * from "./conflicts";
 export * from "./deploy";
+export * from "./downloads";
 export * from "./extract";
 export * from "./families";
 export * from "./nexusLines";
