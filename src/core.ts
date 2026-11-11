@@ -9,6 +9,7 @@ export * from "./extract";
 export * from "./families";
 export * from "./nexusLines";
 export * from "./pageGroups";
+export * from "./pageColumns";
 export * from "./frameworks";
 export * from "./frameworkGet";
 export * from "./game";

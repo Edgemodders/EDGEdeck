@@ -17,6 +17,7 @@ import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
 import { lineFile, lineName, lineOfFile, newestInLine, onlyLine, otherLineFiles, splitPage } from "./nexusLines";
+import { cleanChoices, PageColumnsKey } from "./pageColumns";
 import { childName, gatherGroups, groupOfFamily, groupToggle, pageGroups, setFamiliesOn, type PageGroup } from "./pageGroups";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrameworks, type FrameworkRelease, type FrameworkSource, type FrameworkState } from "./frameworkGet";
@@ -1040,6 +1041,7 @@ async function pageData() {
     activeLoadout: active,
     viewing: pageLoadout,
     collapsed: globalState.get<string[]>(FoldedKey, []),
+    columns: cleanChoices(globalState.get(PageColumnsKey)),
     game: state.version ? `Cyberpunk 2077 ${state.version}` : "game not found",
     library: library?.root ?? s.libraryPath,
     method: state.plan?.method ?? ("link" as const),
@@ -1167,6 +1169,10 @@ async function pageAction(m: PageMessage): Promise<void> {
       return sectionMoveModsCommand(m.section, m.ids ?? []);
     case "sectionRemoveMods":
       return sectionRemoveModsCommand(m.section, m.ids ?? []);
+    case "columns":
+      // The page has already shown or hidden them; kept for next time, outside the library.
+      await globalState.update(PageColumnsKey, cleanChoices(m.columns));
+      return;
     case "fold": {
       // Kept for next time; the page has already folded it, so no re-render.
       const folded = new Set(globalState.get<string[]>(FoldedKey, []));

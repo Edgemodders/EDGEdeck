@@ -781,6 +781,23 @@ console.log("changes: ok");
   console.log("page groups: ok");
 }
 
+// The page's columns: the player's choice, else the column's default; a sort shows its column.
+{
+  const ids = core.PageColumns.map((c) => c.id);
+  assert.deepEqual(ids, ["ver", "kind", "size", "status"], "the columns from before the Columns button, in order");
+  assert.ok(core.PageColumns.every((c) => c.on), "and they all start on");
+  assert.equal(new Set(ids).size, ids.length, "ids are unique: they are kept in the player's choices");
+  assert.deepEqual(core.shownColumns({}), ids, "a player who never chose sees them all");
+  assert.deepEqual(core.shownColumns({ size: false, status: false }), ["ver", "kind"]);
+  assert.deepEqual(core.shownColumns({ size: false }, { bySize: true }), ["ver", "kind", "size", "status"], "Largest first shows Size while it is on");
+  const later = { id: "later", heading: "Later", label: "Later", on: false };
+  assert.equal(core.columnShown(later, {}), false, "a new column starts off");
+  assert.equal(core.columnShown(later, { later: true }), true, "until the player turns it on");
+  assert.deepEqual(core.cleanChoices({ size: false, status: "no", bogus: true }), { size: false }, "only known columns, only true or false");
+  assert.deepEqual(core.cleanChoices(undefined), {});
+  console.log("page columns: ok");
+}
+
 // Loadouts: save the current set, change things, load it back.
 {
   const file = core.saveLoadout(lib, "smoke", "2.31");
