@@ -3071,9 +3071,13 @@ async function applyUpdate(fam: Family, target: { fileId: number; version: strin
   }
 }
 
-/** For free Nexus members: opens each file's page, where "Mod manager download" sends the file here. */
+/**
+ * For free Nexus members: opens each file's Mod manager download page. `&nmm=1` is what Nexus's own
+ * "Mod manager download" button links to; without it the page is the manual download, whose file
+ * goes to the browser's downloads instead of to EDGEdeck.
+ */
 async function premiumPages(files: { modId: number; fileId: number }[]): Promise<void> {
-  for (const f of files) void vscode.env.openExternal(vscode.Uri.parse(`${modPageUrl(f.modId)}?tab=files&file_id=${f.fileId}`));
+  for (const f of files) void vscode.env.openExternal(vscode.Uri.parse(`${modPageUrl(f.modId)}?tab=files&file_id=${f.fileId}&nmm=1`));
   const handler = describeHandler(await currentNxmHandler());
   const pages = files.length === 1 ? "The file page is open" : `${files.length} file pages are open`;
   void vscode.window.showInformationMessage(
