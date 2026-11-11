@@ -1001,16 +1001,16 @@ function updatedAt(mod: ModInfo): { at: number; note: string } {
   const mine = mod.nexus?.fileUploaded ?? 0;
   if (latest || mine) {
     const at = Math.max(latest, mine);
-    if (mine && latest > mine) return { at, note: `Nexus has a newer file of this mod, uploaded ${day(latest)}; the one you have was uploaded ${day(mine)}` };
-    return { at, note: mine ? `Uploaded to Nexus on ${day(mine)}` : `The newest file of this mod was uploaded to Nexus on ${day(at)}` };
+    if (mine && latest > mine) return { at, note: `Yours is from ${day(mine)}` };
+    return { at, note: mine ? "Nexus upload date" : "Newest file on Nexus" };
   }
   const folder = mod.source.type === "vortex" ? path.basename(mod.source.path ?? "") : "";
   const unix = /-(\d{10})$/.exec(folder);
   const iso = /(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})Z/.exec(folder);
   const fromVortex = unix ? Number(unix[1]) : iso ? Date.parse(`${iso[1]}T${iso[2]}:${iso[3]}:00Z`) / 1000 : 0;
-  if (fromVortex) return { at: fromVortex, note: `Uploaded to Nexus on ${day(fromVortex)}, as its Vortex folder says; Check updates looks for newer files` };
+  if (fromVortex) return { at: fromVortex, note: "From the Vortex folder" };
   const added = mod.added ? Math.round(Date.parse(mod.added) / 1000) : 0;
-  if (Number.isFinite(added) && added > 0) return { at: added, note: `No date from Nexus: added to the library on ${day(added)}` };
+  if (Number.isFinite(added) && added > 0) return { at: added, note: "Date added, not Nexus" };
   return { at: 0, note: "" };
 }
 

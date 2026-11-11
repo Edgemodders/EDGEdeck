@@ -787,6 +787,10 @@ console.log("changes: ok");
   assert.deepEqual(ids, ["ver", "kind", "size", "updated", "status"], "in order");
   assert.deepEqual(core.PageColumns.filter((c) => c.on).map((c) => c.id), ["ver", "kind", "size", "status"], "the columns from before the Columns button start on, Updated off");
   assert.equal(new Set(ids).size, ids.length, "ids are unique: they are kept in the player's choices");
+  for (const c of core.PageColumns) {
+    const words = c.tip.split(/\s+/).length;
+    assert.ok(c.label && words >= 2 && words <= 5, `${c.id}: a name, and a tooltip of 2 to 5 words ("${c.tip}")`);
+  }
   assert.deepEqual(core.shownColumns({}), ["ver", "kind", "size", "status"], "a player who never chose sees what they saw before");
   assert.deepEqual(core.shownColumns({}, { byDate: true }), ids, "Newest update first shows Updated while it is on");
   assert.deepEqual(core.shownColumns({ size: false, status: false }), ["ver", "kind"]);

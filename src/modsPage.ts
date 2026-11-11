@@ -467,15 +467,15 @@ ${d.viewing !== d.activeLoadout ? `<div class="editing">Editing the loadout <b>$
   ${chips}
   <span class="sep">|</span>
   <button class="chip" id="bysize" title="Biggest mods first, across every section">Largest first</button>
-  <button class="chip" id="bydate" title="Mods updated on Nexus most recently first, across every section">Newest update first</button>
+  <button class="chip" id="bydate" title="Latest Nexus uploads first">Newest update first</button>
   <span class="spacer"></span>
-  ${d.rows.length ? `<span class="colpick"><button id="cols" title="Choose which columns the list shows">Columns</button><div class="colmenu" id="colmenu" hidden>${PageColumns.map((c) => `<label><input type="checkbox" data-col="${c.id}" ${columnShown(c, d.columns) ? "checked" : ""}> ${esc(c.label)}</label>`).join("")}<div class="colnote">The box, the name and the buttons always show.</div></div></span>` : ""}
+  ${d.rows.length ? `<span class="colpick"><button id="cols" title="Show or hide columns">Columns</button><div class="colmenu" id="colmenu" hidden>${PageColumns.map((c) => `<label title="${esc(c.tip)}"><input type="checkbox" data-col="${c.id}" ${columnShown(c, d.columns) ? "checked" : ""}> ${esc(c.label)}</label>`).join("")}<div class="colnote">The box, the name and the buttons always show.</div></div></span>` : ""}
   <button data-msg='${msg({ action: "newSection" })}' title="A section of your own to group mods in">+ Section</button>
 </div>
 ${d.rows.length ? `<table class="mods ${PageColumns.filter((c) => !columnShown(c, d.columns)).map((c) => `hide-${c.id}`).join(" ")}"><thead><tr><th class="chk" data-col="chk"></th><th data-col="name">Mod</th>${PageColumns.map((c) =>
     c.id === "status"
-      ? `<th class="col-status" data-col="status" title="${d.viewing !== d.activeLoadout ? `What the game has, from the active loadout ${esc(d.activeLoadout)}` : ""}">Status${d.viewing !== d.activeLoadout ? ` <span class="stfor">in ${esc(d.activeLoadout)}</span>` : ""}</th>`
-      : `<th class="col-${c.id}${c.id === "size" ? " size" : ""}" data-col="${c.id}">${esc(c.heading)}</th>`,
+      ? `<th class="col-status" data-col="status" title="${esc(c.tip)}">Status${d.viewing !== d.activeLoadout ? ` <span class="stfor">in ${esc(d.activeLoadout)}</span>` : ""}</th>`
+      : `<th class="col-${c.id}${c.id === "size" ? " size" : ""}" data-col="${c.id}" title="${esc(c.tip)}">${esc(c.heading)}</th>`,
   ).join("")}<th class="acts" data-col="acts">Actions</th></tr></thead><tbody id="rows">${body}</tbody></table><div class="empty" id="none" hidden>No mod matches.</div>` : `<div class="empty">No mods yet. Press + Add mod, or import from Vortex from the Mods view menu.</div>`}
 <div class="foot">
   <span>Library: <a data-msg='${msg({ action: "library" })}'>${esc(d.library)}</a> (${d.method === "link" ? "same drive as the game: hardlinks" : `other drive: copies. <a data-msg='${msg({ action: "moveLibrary" })}'>Move library...</a>`})</span>
@@ -639,7 +639,7 @@ ${d.rows.length ? `<table class="mods ${PageColumns.filter((c) => !columnShown(c
   }
 
   // Columns the player turns on or off (pageColumns.ts); one a sort orders by shows while that sort is on.
-  const COLS = ${JSON.stringify(PageColumns.map((c) => ({ id: c.id, on: c.on, sort: c.sort ?? null })))};
+  const COLS = ${JSON.stringify(PageColumns.map((c) => ({ id: c.id, on: c.on, sort: c.sort ?? null, tip: c.tip }))).replace(/</g, "\\u003c")};
   const choices = Object.assign({}, ${JSON.stringify(d.columns).replace(/</g, "\\u003c")});
   const chosen = (c) => (typeof choices[c.id] === "boolean" ? choices[c.id] : c.on);
   const showing = (c) => (c.sort && state[c.sort]) || chosen(c);
@@ -690,7 +690,7 @@ ${d.rows.length ? `<table class="mods ${PageColumns.filter((c) => !columnShown(c
     for (const box of document.querySelectorAll("#colmenu input[data-col]")) {
       const c = COLS.find((x) => x.id === box.dataset.col);
       box.checked = chosen(c);
-      box.parentElement.title = c.sort && state[c.sort] && !chosen(c) ? "Shown while the list is sorted by it" : "";
+      box.parentElement.title = c.sort && state[c.sort] && !chosen(c) ? "Shown while sorted" : c.tip;
     }
     widths(); grips();
   }

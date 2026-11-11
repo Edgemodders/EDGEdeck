@@ -16,6 +16,8 @@ export interface PageColumn {
   heading: string;
   /** The name in the Columns list, in plain words. */
   label: string;
+  /** The tooltip on its name in the Columns list and over the column: 2 to 5 words (the owner's rule). */
+  tip: string;
   /** Shown for a player who never chose. */
   on: boolean;
   /** The page's sort that orders by this column: the column shows while that sort is on. */
@@ -24,11 +26,11 @@ export interface PageColumn {
 
 /** The columns between the mod's name and its actions, in order. */
 export const PageColumns: PageColumn[] = [
-  { id: "ver", heading: "Ver", label: "Version", on: true },
-  { id: "kind", heading: "Kind", label: "Kind", on: true },
-  { id: "size", heading: "Size", label: "Size", on: true, sort: "bySize" },
-  { id: "updated", heading: "Updated", label: "Updated on Nexus", on: false, sort: "byDate" },
-  { id: "status", heading: "Status", label: "Status", on: true },
+  { id: "ver", heading: "Ver", label: "Version", tip: "Version in use", on: true },
+  { id: "kind", heading: "Kind", label: "Kind", tip: "What's inside the mod", on: true },
+  { id: "size", heading: "Size", label: "Size", tip: "Space in the library", on: true, sort: "bySize" },
+  { id: "updated", heading: "Updated", label: "Updated", tip: "Latest upload on Nexus", on: false, sort: "byDate" },
+  { id: "status", heading: "Status", label: "Status", tip: "Deploy state and conflicts", on: true },
 ];
 
 /** The player's choices, by column id; a column missing from them starts as its `on` says. */
