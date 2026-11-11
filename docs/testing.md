@@ -152,6 +152,8 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 11-02 | `main` after 0.29.4 (for 0.30.0) | Not recorded | Waiting tests 17 and 18: **each file of a page is a mod of its own**, **the page's row** | **Passed.** Led to a Remove from Library button on the page's row (test 19), and every remove tooltip reads "from Library" |
 | 11-02 | `main` after 0.29.4 (for 0.30.0) | Not recorded | Waiting test 19: **remove a whole page** | **Passed** on the second run. The first run removed the files but left the rows about 10 seconds with no sign of work (a full reload after every remove); fixed the same day: the rows leave on confirm and a notification shows during the conflict check |
 | 11-08 | `main` after 0.30.0 (for 0.30.1) | PC | **Hide mods that are off**, the Mods view's title bar eye | **Passed.** |
+| 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 20: **same bytes copied over a deployed file** (#13), after REDcode's Pack and Play | **Passed**, as written |
+| 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 21: **Run game, exe route** (#12), REDnode's overlay on F10 | **Passed**, as written |
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 22: **deploy with REDbridge running** (#10), parts A, B and C | **Passed.** The first run of A used ArchiveXL, whose archive sits under `red4ext/plugins`, which the scanner does not read, so REDbridge did not start again after the deploy; that is right (the scan reuses what it read and starts REDbridge only for an unread archive in `archive/pc/mod`), and the steps were corrected to say so |
 
 ## Waiting for a hand test
@@ -160,8 +162,6 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 20 | **Same bytes copied over a deployed file** (#13) | 11-10 | In REDcode, Pack and Play a project EDGEdeck installed, while the game runs. Quit the game, then deploy (or REDcode's Uninstall). **Expect:** no "changed in the game folder" question; the pending changes say "copied over in the game folder with the same bytes". Then copy a different file over a deployed one by hand and deploy: the question still comes. |
-| 21 | **Run game, exe route** (#12) | 11-10 | Set `edgedeck.launch` to `exe`, press Run game, then F10 in the game. **Expect:** REDnode's launcher and apps, not only a cursor. Set it back afterwards. |
 | 23 | **Downloads one at a time, speed shown** (#9) | 11-10 | Free account: press Mod manager download on three files quickly. **Expect:** the first shows "12 of 70 MB · 1.4 MB/s · 42 s left"; the others "waiting: 1 download ahead" and "2 downloads ahead" until their turn. Premium account: all start at once. Signing out and in again (free or Premium) changes which. |
 | 24 | **Vortex imports: names, ids and each file its own update** (#6, #8) | 11-10 | Import from a Vortex staging folder with newer-style folders (`Name 12345 1.2.0 2026-...Z hash`) and a page with a main and an optional file. **Expect:** clean names, Open on Nexus Mods works, and Check updates splits the page's files into rows of their own; Update all offers no file of another line. |
 | 25 | **Free account update pages** (#5) | 11-10 | Free account, a mod with an update: press its update. **Expect:** the file's page opens at the Mod manager download, and the file comes back to EDGEdeck through the nxm link. Note which button the page shows. |
