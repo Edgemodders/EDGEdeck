@@ -28,6 +28,8 @@ export interface ModInfo {
   kinds: ModKind[];
   enabled: boolean;
   added: string;
+  /** When its files were last replaced in place (a project re-synced or installed again), ISO time; the page's Updated column. */
+  updated?: string;
   source: ModSource;
   /** Paths under the game folder, forward slashes, in no particular order. */
   files: string[];
@@ -47,10 +49,6 @@ export interface ModInfo {
     checked: string;
     author?: string;
     summary?: string;
-    /** When the installed file was uploaded to Nexus, in seconds; 0 when Nexus no longer lists it. */
-    fileUploaded?: number;
-    /** When the newest file of its line was uploaded to Nexus, in seconds. */
-    latestUploaded?: number;
   };
 }
 

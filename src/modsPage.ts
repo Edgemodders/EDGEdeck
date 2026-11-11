@@ -19,10 +19,10 @@ export interface PageRow {
   deployed: boolean;
   /** Bytes in the library for the active version. */
   size: number;
-  /** When the mod last changed on Nexus, in seconds (`updatedAt` in extension.ts); 0 when nothing says. */
+  /** When the mod first came into the library (its oldest version), in seconds; 0 when unknown. */
+  added: number;
+  /** When the version in use came into the library or last had its files replaced, in seconds; 0 when unknown. */
   updated: number;
-  /** Where that date comes from, for the cell's tooltip. */
-  updatedNote: string;
   needsDeploy: boolean;
   changed: boolean;
   conflicts: number;
@@ -194,6 +194,13 @@ const FacetLabels: [string, string][] = [
   ["update", "Update available"],
 ];
 
+/** A time in seconds as YYYY-MM-DD in local time; empty for 0. */
+const day = (t: number): string => {
+  if (!t) return "";
+  const d = new Date(t * 1000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 const fmt = (n: number): string => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(n >= 10 * (1 << 30) ? 0 : 1)} GB` : n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(n >= 10 * (1 << 20) ? 0 : 1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
 
 /** The page's HTML from its data; exported so a check can render it without a webview. */
@@ -247,7 +254,8 @@ export function renderPage(d: PageData, csp: string): string {
       ver: `<td class="vercell col-ver">${versionCell}</td>`,
       kind: `<td class="col-kind">${[...r.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>`,
       size: `<td class="mono size col-size" data-size="${r.size}" title="${r.size.toLocaleString()} bytes in the library">${fmt(r.size)}</td>`,
-      updated: `<td class="mono upd8 col-updated"${r.updatedNote ? ` title="${esc(r.updatedNote)}"` : ""}>${r.updated ? new Date(r.updated * 1000).toISOString().slice(0, 10) : ""}</td>`,
+      added: `<td class="mono upd8 col-added">${day(r.added)}</td>`,
+      updated: `<td class="mono upd8 col-updated">${day(r.updated)}</td>`,
       status: `<td class="${statusClass} col-status">${r.needsDeploy || r.changed ? `<a class="st" data-msg='${msg({ action: "changes", id: r.id })}' title="What the next deploy does for this mod">${esc(r.status)}</a>` : esc(r.status)}${r.update ? `<a class="upd" data-msg='${msg({ action: "update", id: r.id })}' title="Download ${esc(r.update)} from Nexus and put it in this mod's place">update ${esc(r.update)} available</a>` : ""}</td>`,
     };
     return `<tr draggable="true" data-id="${esc(r.id)}" data-group="${esc(section)}"${r.group ? ` data-pg="${esc(r.group)}"` : ""} data-facets="${facetsOf(r).join(" ")}" data-text="${esc(text)}" data-size="${r.size}" data-updated="${r.updated}" class="${r.enabled ? "" : "offrow"}">
@@ -467,7 +475,7 @@ ${d.viewing !== d.activeLoadout ? `<div class="editing">Editing the loadout <b>$
   ${chips}
   <span class="sep">|</span>
   <button class="chip" id="bysize" title="Biggest mods first, across every section">Largest first</button>
-  <button class="chip" id="bydate" title="Latest Nexus uploads first">Newest update first</button>
+  <button class="chip" id="bydate" title="Latest updates first">Newest update first</button>
   <span class="spacer"></span>
   ${d.rows.length ? `<span class="colpick"><button id="cols" title="Show or hide columns">Columns</button><div class="colmenu" id="colmenu" hidden>${PageColumns.map((c) => `<label title="${esc(c.tip)}"><input type="checkbox" data-col="${c.id}" ${columnShown(c, d.columns) ? "checked" : ""}> ${esc(c.label)}</label>`).join("")}<div class="colnote">The box, the name and the buttons always show.</div></div></span>` : ""}
   <button data-msg='${msg({ action: "newSection" })}' title="A section of your own to group mods in">+ Section</button>

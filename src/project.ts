@@ -144,6 +144,7 @@ export function syncProjects(lib: Library): ModInfo[] {
     mod.files = [...keep].sort();
     mod.kinds = c.kinds;
     mod.packedList = state.list;
+    mod.updated = new Date().toISOString();
     saveMod(lib, mod);
     refreshed.push(mod);
   }
@@ -240,6 +241,7 @@ export function installProject(lib: Library, projectFile: string, beside?: { mod
   existing.files = [...keep].sort();
   existing.kinds = c.kinds;
   existing.packedList = packedState(packedFolder(projectFile)).list;
+  existing.updated = new Date().toISOString();
   // On, in the place of whichever version of its family was on.
   activateVersion(lib, existing);
   existing.enabled = true;

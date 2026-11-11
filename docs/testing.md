@@ -165,7 +165,7 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 | # | Test | Since | Steps |
 |---|---|---|---|
 | 26 | **Columns button** | 11-10 | See **Tests 23 to 28, step by step** below, test 26. |
-| 27 | **Newest update first** (#7) | 11-10 | See **Tests 23 to 28, step by step** below, test 27. |
+| 27 | **Added, Updated and Newest update first** (#7) | 11-10 | See **Tests 23 to 28, step by step** below, test 27. |
 | 28 | **Cancel a download** | 11-10 | See **Tests 23 to 28, step by step** below, test 28. |
 | 29 | **A download over 2 GB** | 11-10 | See **Tests 23 to 28, step by step** below, test 29. |
 
@@ -202,12 +202,12 @@ Before you start: in Vortex, **Settings > Mods**, turn off **Enable mods when in
 5. Hover a heading's right edge until a yellow line shows, and drag it wider. Tick **Status** again. **Expect:** the dragged width stays. Double-click the edge to go back to automatic widths.
 6. Tick everything back on.
 
-**27. Newest update first**
+**27. Added, Updated and Newest update first**
 
-1. Press **Check updates** (signed in), so the mods have their Nexus dates.
-2. Press **Newest update first**. **Expect:** the button lights up; one list without sections, the latest Nexus upload on top; an **Updated** column with dates; dragging a row does nothing.
-3. Hover a few dates. **Expect** one of: `Nexus upload date`, `Yours is from <date>` (Nexus has a newer file than yours), `From the Vortex folder`, or `Date added, not Nexus`.
-4. Press **Largest first**. **Expect:** it lights up and Newest update first goes off. Press it again: sections back, Updated hidden (unless ticked under **Columns**).
+1. Under **Columns**, tick **Added** and **Updated**. **Expect:** two date columns. Hover their headings: `First added to the library` and `Last updated in the library`. A mod with one version shows the same date in both; one you updated (another version in its Ver list) shows a later Updated.
+2. In a REDcode project that EDGEdeck installed, pack it again (or **Install through EDGEdeck**). **Expect:** that mod's Updated becomes today; Added stays.
+3. Untick both. Press **Newest update first**. **Expect:** the button lights up; one list without sections, the latest Updated on top; the Updated column shows while it is on; dragging a row does nothing.
+4. Press **Largest first**. **Expect:** it lights up and Newest update first goes off. Press it again: sections back, both date columns hidden.
 
 **28. Cancel a download** (Premium)
 

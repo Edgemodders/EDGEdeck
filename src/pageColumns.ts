@@ -29,7 +29,8 @@ export const PageColumns: PageColumn[] = [
   { id: "ver", heading: "Ver", label: "Version", tip: "Version in use", on: true },
   { id: "kind", heading: "Kind", label: "Kind", tip: "What's inside the mod", on: true },
   { id: "size", heading: "Size", label: "Size", tip: "Space in the library", on: true, sort: "bySize" },
-  { id: "updated", heading: "Updated", label: "Updated", tip: "Latest upload on Nexus", on: false, sort: "byDate" },
+  { id: "added", heading: "Added", label: "Added", tip: "First added to the library", on: false },
+  { id: "updated", heading: "Updated", label: "Updated", tip: "Last updated in the library", on: false, sort: "byDate" },
   { id: "status", heading: "Status", label: "Status", tip: "Deploy state and conflicts", on: true },
 ];
 

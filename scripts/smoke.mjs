@@ -298,6 +298,7 @@ console.log("changes: ok");
   write(path.join(proj, "packed", "archive", "pc", "mod", "TestMod.archive"), "v2");
   write(path.join(proj, "packed", "r6", "tweaks", "TestMod", "x.yaml"), "y");
   const synced = core.syncProjects(lib);
+  assert.ok(synced.length && synced.every((m) => m.updated && Date.parse(m.updated) > Date.parse(m.added) - 1000), "a re-synced project's mod records when it was updated");
   assert.deepEqual(synced.map((m) => m.id), ["test-mod"]);
   assert.deepEqual(pm.files, ["archive/pc/mod/TestMod.archive", "r6/tweaks/TestMod/x.yaml"]);
   assert.equal(fs.readFileSync(path.join(libRoot, "library", "test-mod", "archive", "pc", "mod", "TestMod.archive"), "utf8"), "v2");
@@ -784,18 +785,18 @@ console.log("changes: ok");
 // The page's columns: the player's choice, else the column's default; a sort shows its column.
 {
   const ids = core.PageColumns.map((c) => c.id);
-  assert.deepEqual(ids, ["ver", "kind", "size", "updated", "status"], "in order");
-  assert.deepEqual(core.PageColumns.filter((c) => c.on).map((c) => c.id), ["ver", "kind", "size", "status"], "the columns from before the Columns button start on, Updated off");
+  assert.deepEqual(ids, ["ver", "kind", "size", "added", "updated", "status"], "in order");
+  assert.deepEqual(core.PageColumns.filter((c) => c.on).map((c) => c.id), ["ver", "kind", "size", "status"], "the columns from before the Columns button start on, Added and Updated off");
   assert.equal(new Set(ids).size, ids.length, "ids are unique: they are kept in the player's choices");
   for (const c of core.PageColumns) {
     const words = c.tip.split(/\s+/).length;
     assert.ok(c.label && words >= 2 && words <= 5, `${c.id}: a name, and a tooltip of 2 to 5 words ("${c.tip}")`);
   }
   assert.deepEqual(core.shownColumns({}), ["ver", "kind", "size", "status"], "a player who never chose sees what they saw before");
-  assert.deepEqual(core.shownColumns({}, { byDate: true }), ids, "Newest update first shows Updated while it is on");
+  assert.deepEqual(core.shownColumns({}, { byDate: true }), ["ver", "kind", "size", "updated", "status"], "Newest update first shows Updated while it is on");
   assert.deepEqual(core.shownColumns({ size: false, status: false }), ["ver", "kind"]);
   assert.deepEqual(core.shownColumns({ size: false }, { bySize: true }), ["ver", "kind", "size", "status"], "Largest first shows Size while it is on");
-  assert.deepEqual(core.shownColumns({ updated: true, kind: false }), ["ver", "size", "updated", "status"]);
+  assert.deepEqual(core.shownColumns({ added: true, updated: true, kind: false }), ["ver", "size", "added", "updated", "status"]);
   const later = { id: "later", heading: "Later", label: "Later", on: false };
   assert.equal(core.columnShown(later, {}), false, "a new column starts off");
   assert.equal(core.columnShown(later, { later: true }), true, "until the player turns it on");
