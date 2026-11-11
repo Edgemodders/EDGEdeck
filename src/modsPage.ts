@@ -19,6 +19,10 @@ export interface PageRow {
   deployed: boolean;
   /** Bytes in the library for the active version. */
   size: number;
+  /** When the mod last changed on Nexus, in seconds (`updatedAt` in extension.ts); 0 when nothing says. */
+  updated: number;
+  /** Where that date comes from, for the cell's tooltip. */
+  updatedNote: string;
   needsDeploy: boolean;
   changed: boolean;
   conflicts: number;
@@ -243,9 +247,10 @@ export function renderPage(d: PageData, csp: string): string {
       ver: `<td class="vercell col-ver">${versionCell}</td>`,
       kind: `<td class="col-kind">${[...r.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>`,
       size: `<td class="mono size col-size" data-size="${r.size}" title="${r.size.toLocaleString()} bytes in the library">${fmt(r.size)}</td>`,
+      updated: `<td class="mono upd8 col-updated"${r.updatedNote ? ` title="${esc(r.updatedNote)}"` : ""}>${r.updated ? new Date(r.updated * 1000).toISOString().slice(0, 10) : ""}</td>`,
       status: `<td class="${statusClass} col-status">${r.needsDeploy || r.changed ? `<a class="st" data-msg='${msg({ action: "changes", id: r.id })}' title="What the next deploy does for this mod">${esc(r.status)}</a>` : esc(r.status)}${r.update ? `<a class="upd" data-msg='${msg({ action: "update", id: r.id })}' title="Download ${esc(r.update)} from Nexus and put it in this mod's place">update ${esc(r.update)} available</a>` : ""}</td>`,
     };
-    return `<tr draggable="true" data-id="${esc(r.id)}" data-group="${esc(section)}"${r.group ? ` data-pg="${esc(r.group)}"` : ""} data-facets="${facetsOf(r).join(" ")}" data-text="${esc(text)}" data-size="${r.size}" class="${r.enabled ? "" : "offrow"}">
+    return `<tr draggable="true" data-id="${esc(r.id)}" data-group="${esc(section)}"${r.group ? ` data-pg="${esc(r.group)}"` : ""} data-facets="${facetsOf(r).join(" ")}" data-text="${esc(text)}" data-size="${r.size}" data-updated="${r.updated}" class="${r.enabled ? "" : "offrow"}">
 <td class="chk"><input type="checkbox" ${r.enabled ? "checked" : ""} data-msg='${msg({ action: "toggle", id: r.id })}' title="${r.enabled ? "Turn off" : "Turn on"}"></td>
 <td class="name${r.group ? " child" : ""}"><a data-msg='${msg({ action: "details", id: r.id })}'>${esc(r.name)}</a></td>
 ${PageColumns.map((c) => cells[c.id]).join("\n")}
@@ -361,7 +366,7 @@ tr.offrow td.name a, tr.offrow td.mono { color: var(--dim); }
 .mono { font-family: var(--vscode-editor-font-family); font-size: 12px; } .dim { color: var(--dim); } .ok { color: var(--green); } .warn { color: var(--yellow); } .pend { color: var(--cyan); }
 a.st { color: inherit; cursor: pointer; } a.st:hover { text-decoration: underline; }
 a.changes { color: var(--yellow); cursor: pointer; font-size: 12px; } a.changes:hover { text-decoration: underline; }
-td.size { text-align: right; white-space: nowrap; } th.size { text-align: right; }
+td.size { text-align: right; white-space: nowrap; } td.upd8 { white-space: nowrap; } th.size { text-align: right; }
 .sep { color: var(--line); margin: 0 4px; }
 .upd { display: block; color: var(--yellow); font-size: 12px; cursor: pointer; } .upd:hover { text-decoration: underline; }
 select.ver { font-family: var(--vscode-editor-font-family); font-size: 12px; color: var(--fg); background: var(--vscode-dropdown-background, var(--bg)); border: 1px solid var(--vscode-dropdown-border, var(--line)); padding: 2px 6px; cursor: pointer; }
@@ -462,6 +467,7 @@ ${d.viewing !== d.activeLoadout ? `<div class="editing">Editing the loadout <b>$
   ${chips}
   <span class="sep">|</span>
   <button class="chip" id="bysize" title="Biggest mods first, across every section">Largest first</button>
+  <button class="chip" id="bydate" title="Mods updated on Nexus most recently first, across every section">Newest update first</button>
   <span class="spacer"></span>
   ${d.rows.length ? `<span class="colpick"><button id="cols" title="Choose which columns the list shows">Columns</button><div class="colmenu" id="colmenu" hidden>${PageColumns.map((c) => `<label><input type="checkbox" data-col="${c.id}" ${columnShown(c, d.columns) ? "checked" : ""}> ${esc(c.label)}</label>`).join("")}<div class="colnote">The box, the name and the buttons always show.</div></div></span>` : ""}
   <button data-msg='${msg({ action: "newSection" })}' title="A section of your own to group mods in">+ Section</button>
@@ -479,20 +485,24 @@ ${d.rows.length ? `<table class="mods ${PageColumns.filter((c) => !columnShown(c
 </div>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
-  const state = Object.assign({ q: "", facet: "all", bySize: false, widths: null }, vscode.getState() || {});
+  const state = Object.assign({ q: "", facet: "all", bySize: false, byDate: false, widths: null }, vscode.getState() || {});
+  // Largest first or Newest update first: one flat list across the sections, no dragging.
+  const sorted = () => state.bySize || state.byDate;
   const post = (m) => vscode.postMessage(m);
   const tbody = document.getElementById("rows");
   const original = tbody ? [...tbody.children] : [];
   function order() {
     if (!tbody) return;
-    if (state.bySize) {
-      const rs = [...tbody.querySelectorAll("tr[data-size]")].sort((a, b) => Number(b.dataset.size) - Number(a.dataset.size));
+    if (sorted()) {
+      const key = state.byDate ? "updated" : "size";
+      const rs = [...tbody.querySelectorAll("tr[data-size]")].sort((a, b) => Number(b.dataset[key]) - Number(a.dataset[key]));
       for (const g of tbody.querySelectorAll("tr.group, tr.pghead")) g.remove();
       for (const r of rs) tbody.appendChild(r);
     } else {
       tbody.replaceChildren(...original);
     }
     document.getElementById("bysize").classList.toggle("active", state.bySize);
+    document.getElementById("bydate").classList.toggle("active", state.byDate);
   }
   const q = document.getElementById("q");
   const rows = [...document.querySelectorAll("tr[data-facets]")];
@@ -508,18 +518,18 @@ ${d.rows.length ? `<table class="mods ${PageColumns.filter((c) => !columnShown(c
       r.dataset.match = ok ? "1" : ""; if (ok) shown++;
     }
     const filtering = !!needle || state.facet !== "all";
-    for (const r of rows) r.hidden = !r.dataset.match || (!filtering && !state.bySize && (folded.has(r.dataset.group) || (!!r.dataset.pg && folded.has(r.dataset.pg))));
+    for (const r of rows) r.hidden = !r.dataset.match || (!filtering && !sorted() && (folded.has(r.dataset.group) || (!!r.dataset.pg && folded.has(r.dataset.pg))));
     // A page group's row shows while any of its files does, and folds like a section.
     for (const p of pgs) {
-      p.hidden = state.bySize || (filtering ? !rows.some((r) => r.dataset.match && r.dataset.pg === p.dataset.pg) : folded.has(p.dataset.group));
+      p.hidden = sorted() || (filtering ? !rows.some((r) => r.dataset.match && r.dataset.pg === p.dataset.pg) : folded.has(p.dataset.group));
       p.classList.toggle("folded", !filtering && folded.has(p.dataset.pg));
     }
     for (const g of groups) {
-      g.hidden = state.bySize || (filtering && !rows.some((r) => r.dataset.match && r.dataset.group === g.dataset.groupfor));
+      g.hidden = sorted() || (filtering && !rows.some((r) => r.dataset.match && r.dataset.group === g.dataset.groupfor));
       g.classList.toggle("folded", !filtering && folded.has(g.dataset.groupfor));
     }
-    for (const h of document.querySelectorAll("tr.hint")) h.hidden = state.bySize || filtering || folded.has(h.dataset.hintfor);
-    for (const c of document.querySelectorAll(".chip")) c.classList.toggle("active", c.dataset.facet === state.facet);
+    for (const h of document.querySelectorAll("tr.hint")) h.hidden = sorted() || filtering || folded.has(h.dataset.hintfor);
+    for (const c of document.querySelectorAll(".chip[data-facet]")) c.classList.toggle("active", c.dataset.facet === state.facet);
     const none = document.getElementById("none"); if (none) none.hidden = shown > 0;
     const upd = document.getElementById("updall");
     if (upd) {
@@ -543,7 +553,8 @@ ${d.rows.length ? `<table class="mods ${PageColumns.filter((c) => !columnShown(c
   });
   if (q) { q.value = state.q; q.addEventListener("input", () => { state.q = q.value; apply(); }); }
   for (const c of document.querySelectorAll(".chip[data-facet]")) c.addEventListener("click", () => { state.facet = c.dataset.facet; apply(); });
-  document.getElementById("bysize").addEventListener("click", () => { state.bySize = !state.bySize; order(); apply(); columns(); });
+  document.getElementById("bysize").addEventListener("click", () => { state.bySize = !state.bySize; if (state.bySize) state.byDate = false; order(); apply(); columns(); });
+  document.getElementById("bydate").addEventListener("click", () => { state.byDate = !state.byDate; if (state.byDate) state.bySize = false; order(); apply(); columns(); });
   order();
   // A section's bulk buttons act on the rows of that section the search and filter leave showing.
   for (const b of document.querySelectorAll("button[data-bulk]")) b.addEventListener("click", () => {
@@ -579,7 +590,7 @@ ${d.rows.length ? `<table class="mods ${PageColumns.filter((c) => !columnShown(c
   const unmark = () => { for (const e of document.querySelectorAll(".dropabove, .dropbelow, .dropin")) e.classList.remove("dropabove", "dropbelow", "dropin"); };
   for (const r of rows) {
     r.addEventListener("dragstart", (e) => {
-      if (state.bySize) { e.preventDefault(); return; }
+      if (sorted()) { e.preventDefault(); return; }
       dragId = r.dataset.id; dragPg = r.dataset.pg || ""; dragGroup = null; r.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", r.dataset.id);
     });
@@ -599,7 +610,7 @@ ${d.rows.length ? `<table class="mods ${PageColumns.filter((c) => !columnShown(c
   }
   for (const p of pgs) {
     p.addEventListener("dragstart", (e) => {
-      if (state.bySize) { e.preventDefault(); return; }
+      if (sorted()) { e.preventDefault(); return; }
       dragGroup = p.dataset.pg; dragId = null; dragPg = ""; p.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", p.dataset.pg);
     });

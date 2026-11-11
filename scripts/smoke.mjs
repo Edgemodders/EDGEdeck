@@ -784,12 +784,14 @@ console.log("changes: ok");
 // The page's columns: the player's choice, else the column's default; a sort shows its column.
 {
   const ids = core.PageColumns.map((c) => c.id);
-  assert.deepEqual(ids, ["ver", "kind", "size", "status"], "the columns from before the Columns button, in order");
-  assert.ok(core.PageColumns.every((c) => c.on), "and they all start on");
+  assert.deepEqual(ids, ["ver", "kind", "size", "updated", "status"], "in order");
+  assert.deepEqual(core.PageColumns.filter((c) => c.on).map((c) => c.id), ["ver", "kind", "size", "status"], "the columns from before the Columns button start on, Updated off");
   assert.equal(new Set(ids).size, ids.length, "ids are unique: they are kept in the player's choices");
-  assert.deepEqual(core.shownColumns({}), ids, "a player who never chose sees them all");
+  assert.deepEqual(core.shownColumns({}), ["ver", "kind", "size", "status"], "a player who never chose sees what they saw before");
+  assert.deepEqual(core.shownColumns({}, { byDate: true }), ids, "Newest update first shows Updated while it is on");
   assert.deepEqual(core.shownColumns({ size: false, status: false }), ["ver", "kind"]);
   assert.deepEqual(core.shownColumns({ size: false }, { bySize: true }), ["ver", "kind", "size", "status"], "Largest first shows Size while it is on");
+  assert.deepEqual(core.shownColumns({ updated: true, kind: false }), ["ver", "size", "updated", "status"]);
   const later = { id: "later", heading: "Later", label: "Later", on: false };
   assert.equal(core.columnShown(later, {}), false, "a new column starts off");
   assert.equal(core.columnShown(later, { later: true }), true, "until the player turns it on");

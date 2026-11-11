@@ -6,6 +6,9 @@
 
 export const PageColumnsKey = "edgedeck.pageColumns";
 
+/** The page's sorts, by the webview state's flag that turns each on. */
+export type Sort = "bySize" | "byDate";
+
 export interface PageColumn {
   /** Kept in the player's choices and used as the cell's class (`col-<id>`): never rename one. */
   id: string;
@@ -16,7 +19,7 @@ export interface PageColumn {
   /** Shown for a player who never chose. */
   on: boolean;
   /** The page's sort that orders by this column: the column shows while that sort is on. */
-  sort?: "bySize";
+  sort?: Sort;
 }
 
 /** The columns between the mod's name and its actions, in order. */
@@ -24,6 +27,7 @@ export const PageColumns: PageColumn[] = [
   { id: "ver", heading: "Ver", label: "Version", on: true },
   { id: "kind", heading: "Kind", label: "Kind", on: true },
   { id: "size", heading: "Size", label: "Size", on: true, sort: "bySize" },
+  { id: "updated", heading: "Updated", label: "Updated on Nexus", on: false, sort: "byDate" },
   { id: "status", heading: "Status", label: "Status", on: true },
 ];
 
@@ -31,13 +35,13 @@ export const PageColumns: PageColumn[] = [
 export type ColumnChoices = Record<string, boolean>;
 
 /** Whether a column shows: the player's choice, else its default; always while its sort is on. */
-export function columnShown(col: PageColumn, choices: ColumnChoices, sorts: { bySize?: boolean } = {}): boolean {
+export function columnShown(col: PageColumn, choices: ColumnChoices, sorts: Partial<Record<Sort, boolean>> = {}): boolean {
   if (col.sort && sorts[col.sort]) return true;
   return choices[col.id] ?? col.on;
 }
 
 /** The ids of the columns that show, in order. */
-export function shownColumns(choices: ColumnChoices, sorts: { bySize?: boolean } = {}): string[] {
+export function shownColumns(choices: ColumnChoices, sorts: Partial<Record<Sort, boolean>> = {}): string[] {
   return PageColumns.filter((c) => columnShown(c, choices, sorts)).map((c) => c.id);
 }
 

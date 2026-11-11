@@ -988,6 +988,32 @@ function editedLoadout(): string | undefined {
   return library && pageLoadout && pageLoadout !== activeLoadout(library, state.version) ? pageLoadout : undefined;
 }
 
+/**
+ * When a mod last changed on Nexus, in seconds, and where that date comes from for the cell's
+ * tooltip: the later of its installed file's upload and the newest file of its line, both saved by
+ * the update check. Before any check, the upload time in a Vortex folder's name (older Vortex: unix
+ * time at the end; newer: `2026-11-07T18-59Z`), else when it was added to the library. 0 when
+ * nothing says.
+ */
+function updatedAt(mod: ModInfo): { at: number; note: string } {
+  const day = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
+  const latest = mod.nexus?.latestUploaded ?? 0;
+  const mine = mod.nexus?.fileUploaded ?? 0;
+  if (latest || mine) {
+    const at = Math.max(latest, mine);
+    if (mine && latest > mine) return { at, note: `Nexus has a newer file of this mod, uploaded ${day(latest)}; the one you have was uploaded ${day(mine)}` };
+    return { at, note: mine ? `Uploaded to Nexus on ${day(mine)}` : `The newest file of this mod was uploaded to Nexus on ${day(at)}` };
+  }
+  const folder = mod.source.type === "vortex" ? path.basename(mod.source.path ?? "") : "";
+  const unix = /-(\d{10})$/.exec(folder);
+  const iso = /(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})Z/.exec(folder);
+  const fromVortex = unix ? Number(unix[1]) : iso ? Date.parse(`${iso[1]}T${iso[2]}:${iso[3]}:00Z`) / 1000 : 0;
+  if (fromVortex) return { at: fromVortex, note: `Uploaded to Nexus on ${day(fromVortex)}, as its Vortex folder says; Check updates looks for newer files` };
+  const added = mod.added ? Math.round(Date.parse(mod.added) / 1000) : 0;
+  if (Number.isFinite(added) && added > 0) return { at: added, note: `No date from Nexus: added to the library on ${day(added)}` };
+  return { at: 0, note: "" };
+}
+
 function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo; enabled: boolean }): PageRow {
   const p = state.plan;
   const mod = viewed?.mod ?? fam.active;
@@ -1002,6 +1028,10 @@ function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo
     framework: mod.kinds.includes("framework"),
     deployed: manifestMods.has(mod.id),
     size: library ? modSize(library, mod).total : 0,
+    ...(() => {
+      const u = updatedAt(mod);
+      return { updated: u.at, updatedNote: u.note };
+    })(),
     needsDeploy: !!p && (p.add.some((d) => d.mod?.id === mod.id) || p.stale.some((e) => e.mod === mod.id)),
     changed: state.changes.some((c) => c.entry.mod === mod.id && c.kind === "changed"),
     conflicts: p ? p.conflicts.filter((c) => c.winner === mod.id || c.losers.includes(mod.id)).length : 0,
@@ -2882,6 +2912,8 @@ async function checkUpdatesCommand(quiet: boolean, only?: ModInfo[]): Promise<vo
           latestVersion: newest?.version ?? "",
           latestFileId: newest?.file_id ?? 0,
           latestFileName: newest?.file_name ?? "",
+          latestUploaded: newest?.uploaded_timestamp ?? 0,
+          fileUploaded: files.files.find((f) => f.file_id === mod.source.fileId)?.uploaded_timestamp ?? mod.nexus?.fileUploaded ?? 0,
           checked: new Date().toISOString(),
           author: info?.author ?? mod.nexus?.author,
           summary: info?.summary ?? mod.nexus?.summary,

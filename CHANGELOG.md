@@ -14,6 +14,7 @@ How to keep it:
 
 **New**
 
+- **Newest update first.** A button next to Largest first on the EDGEdeck page lists every mod by when it last got a new file on Nexus, newest on top, across the sections; like Largest first, it holds dragging until you turn it off. While it is on, the page shows an Updated column with the date; turn that column on for good with the Columns button. The dates come from Nexus at the update check; before the first check, a mod imported from Vortex shows the date in its Vortex folder's name, and any other mod the day it was added. The date's tooltip says which. Thanks to abldvd (https://github.com/Edgemodders/EDGEdeck/pull/7).
 - The EDGEdeck page has a Columns button: tick the columns you want to see (Version, Kind, Size, Status) and the others step aside. The mod's box, its name and its buttons always show. EDGEdeck remembers the choice, and a column you sort by (Largest first) shows while that sort is on. Column widths you drag are now kept for each column, so turning one off or on keeps the others' widths.
 - A Nexus download's notification shows its speed and the time left, as in "12 of 70 MB · 1.4 MB/s · 42 s left". Getting REDbridge shows them too.
 
@@ -23,6 +24,7 @@ How to keep it:
 
 **Fixed**
 
+- Largest first on the EDGEdeck page now shows as pressed while it is on. It worked, but its button never lit up.
 - Deploy no longer asks "Keep the changed file, or put the mod's file back?" about a file that was replaced by a copy with the same bytes, as REDcode's Pack and Play does when it swaps an archive into the running game. EDGEdeck now compares the bytes and quietly puts its own file back; a file whose bytes really changed is still asked about. https://github.com/Edgemodders/EDGEdeck/issues/13
 - Run game with the launch setting on `exe` no longer stops REDnode's overlay from opening: the game no longer inherits a VS Code setting (`ELECTRON_RUN_AS_NODE`) that made REDnode 0.58.0 and older close its overlay at once, leaving F10 with only a cursor. https://github.com/Edgemodders/EDGEdeck/issues/12
 - A deploy no longer stops partway with "in use, so Windows would not change it" because of EDGEdeck's own archive scanner. Before a deploy, an undo or a remove, EDGEdeck now stops its REDbridge and waits for it to exit, so it lets go of the archives it read. The next conflict scan starts it again. https://github.com/Edgemodders/EDGEdeck/issues/10

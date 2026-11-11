@@ -38,7 +38,20 @@ export interface ModInfo {
   /** For a project's mod: a hash of the file list its packed folder had at the last sync, so a removed or renamed file re-syncs it too. */
   packedList?: string;
   /** What Nexus last said about this mod, when it has a mod id. */
-  nexus?: { name: string; version: string; latestVersion: string; latestFileId: number; latestFileName: string; checked: string; author?: string; summary?: string };
+  nexus?: {
+    name: string;
+    version: string;
+    latestVersion: string;
+    latestFileId: number;
+    latestFileName: string;
+    checked: string;
+    author?: string;
+    summary?: string;
+    /** When the installed file was uploaded to Nexus, in seconds; 0 when Nexus no longer lists it. */
+    fileUploaded?: number;
+    /** When the newest file of its line was uploaded to Nexus, in seconds. */
+    latestUploaded?: number;
+  };
 }
 
 /** `library.json` at the library root. */
