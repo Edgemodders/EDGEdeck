@@ -1,5 +1,5 @@
 # Run by hand (Actions > Verify publish tokens > Run workflow, or gh workflow run verify-tokens.yml)
-# to check the Marketplace and Open VSX tokens without publishing anything.
+# to check the Marketplace, Open VSX and GitHub release tokens without publishing anything.
 name: Verify publish tokens
 
 on:
@@ -26,3 +26,10 @@ jobs:
         run: |
           if [ -z "${OVSX_PAT}" ]; then echo "::warning::OVSX_PAT is not set yet"; exit 0; fi
           npx --yes ovsx verify-pat edgemodders --pat "${OVSX_PAT}"
+
+      - name: GitHub release token
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then echo "::error::RELEASE_TOKEN is not set"; exit 1; fi
+          gh api "repos/${GITHUB_REPOSITORY}" --jq '"RELEASE_TOKEN reaches " + .full_name'
