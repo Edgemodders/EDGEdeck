@@ -12,11 +12,13 @@ How to keep it:
 
 ## Unreleased
 
+## 0.31.0 (2026-11-10)
+
 **New**
 
 - A Nexus download's notification has a Cancel button. A file still waiting for its turn leaves the queue; one downloading stops, and the part already downloaded is deleted. In Update all, a cancelled file is skipped and the others go on.
-- **Added and Updated columns, and Newest update first.** Under the page's Columns button, Added is when a mod first came into the library and Updated when the version in use came in (or a project's files were last synced). A Newest update first button next to Largest first lists every mod by Updated, newest on top, across the sections; like Largest first, it holds dragging until you turn it off. To see only the mods with a newer file on Nexus, use the Update available filter after Check updates. Thanks to abldvd (https://github.com/Edgemodders/EDGEdeck/pull/7).
 - The EDGEdeck page has a Columns button: tick the columns you want to see (Version, Kind, Size, Status) and the others step aside. The mod's box, its name and its buttons always show. EDGEdeck remembers the choice, and a column you sort by (Largest first) shows while that sort is on. Column widths you drag are now kept for each column, so turning one off or on keeps the others' widths.
+- **Added and Updated columns, and Newest update first.** Under the page's Columns button, Added is when a mod first came into the library and Updated when the version in use came in (or a project's files were last synced). A Newest update first button next to Largest first lists every mod by Updated, newest on top, across the sections; like Largest first, it holds dragging until you turn it off. To see only the mods with a newer file on Nexus, use the Update available filter after Check updates. Thanks to abldvd (https://github.com/Edgemodders/EDGEdeck/pull/7).
 - A Nexus download's notification shows its speed and the time left, as in "12 of 70 MB · 1.4 MB/s · 42 s left". Getting REDbridge shows them too.
 
 **Changed**
