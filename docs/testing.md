@@ -161,12 +161,45 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 |---|---|---|---|
 | 20 | **Same bytes copied over a deployed file** (#13) | 11-10 | In REDcode, Pack and Play a project EDGEdeck installed, while the game runs. Quit the game, then deploy (or REDcode's Uninstall). **Expect:** no "changed in the game folder" question; the pending changes say "copied over in the game folder with the same bytes". Then copy a different file over a deployed one by hand and deploy: the question still comes. |
 | 21 | **Run game, exe route** (#12) | 11-10 | Set `edgedeck.launch` to `exe`, press Run game, then F10 in the game. **Expect:** REDnode's launcher and apps, not only a cursor. Set it back afterwards. |
-| 22 | **Deploy with REDbridge running** (#10) | 11-10 | Let the conflict scan run (REDbridge listed in the page's footer), turn a mod with an archive off, deploy. **Expect:** no "in use" error; the EDGEdeck log says "REDbridge stopped, so it lets go of the archives it read", and the scan runs again afterwards. Remove a mod with an archive: no error either. |
+| 22 | **Deploy with REDbridge running** (#10) | 11-10 | See **Test 22, step by step** below. |
 | 23 | **Downloads one at a time, speed shown** (#9) | 11-10 | Free account: press Mod manager download on three files quickly. **Expect:** the first shows "12 of 70 MB · 1.4 MB/s · 42 s left"; the others "waiting: 1 download ahead" and "2 downloads ahead" until their turn. Premium account: all start at once. Signing out and in again (free or Premium) changes which. |
 | 24 | **Vortex imports: names, ids and each file its own update** (#6, #8) | 11-10 | Import from a Vortex staging folder with newer-style folders (`Name 12345 1.2.0 2026-...Z hash`) and a page with a main and an optional file. **Expect:** clean names, Open on Nexus Mods works, and Check updates splits the page's files into rows of their own; Update all offers no file of another line. |
 | 25 | **Free account update pages** (#5) | 11-10 | Free account, a mod with an update: press its update. **Expect:** the file's page opens at the Mod manager download, and the file comes back to EDGEdeck through the nxm link. Note which button the page shows. |
 | 26 | **Columns button** | 11-10 | On the EDGEdeck page, press **Columns** and untick Size and Status. **Expect:** both go at once; section and page rows still span the whole table. Close and reopen the page, and reload the window: still hidden. Press Largest first: Size shows while it is on. Drag a column's edge, then tick Status again: the dragged width stays. Tick everything back. |
 | 27 | **Newest update first** (#7) | 11-10 | Press Check updates, then **Newest update first**. **Expect:** one list across the sections, newest Nexus upload on top, with an Updated column while it is on; dragging does nothing. Hover a date: the tooltip says whether it is from Nexus, from the Vortex folder's name or the day the mod was added, and names your file's date when Nexus has a newer one. Press it again: sections back, Updated hidden unless ticked under Columns. Largest first and Newest update first turn each other off. |
+
+### Test 22, step by step
+
+What it checks: before a deploy, an undo or a remove, EDGEdeck stops its own REDbridge (the archive scanner) and waits for it to exit, so it cannot hold an archive Windows needs to replace. The next conflict scan starts it again. On the reporter's PC the scanner held `WeaponCharms.archive` and the deploy stopped with "in use, so Windows would not change it". The hold may not happen on every PC, so the test also checks the stop and the restart in the log.
+
+**Before you start**
+
+- The game is closed, and EDGEdeck (not Vortex) manages the game folder.
+- REDbridge is installed: the EDGEdeck page's footer shows a green dot and `REDbridge 0.12...`. If it says "No REDbridge", use **Get REDbridge** there first.
+- A mod with an `.archive` file that has **two versions** in the library (its Ver cell is a list), deployed. That is the reported case: the old version's archive, hardlinked into the game, gets replaced. Any mod you updated through EDGEdeck will do.
+- Open the log: **View > Output**, then pick **EDGEdeck** in the list at the right of the panel.
+- Optional: Task Manager, **Details** tab, sorted by name, to watch `REDbridge.exe`.
+
+**A. Switch versions and deploy (the reported case)**
+
+1. Open the EDGEdeck page and wait a few seconds. **Expect** in the log: `REDbridge 0.12... (WolvenKit ...) at ...`, then `Archive scan: <n> archives, ...`. `REDbridge.exe` is in Task Manager.
+2. In the mod's Ver list, pick its other version. Press **Deploy**.
+3. **Expect:** the deploy finishes with its usual message, and no "in use, so Windows would not change it" error. In the log, in this order: `REDbridge stopped, so it lets go of the archives it read`, then `Deployed (link): ...`, then a moment later `REDbridge 0.12...` and `Archive scan: ...` again. In Task Manager, `REDbridge.exe` goes away during the deploy and comes back after it.
+4. Pick the first version again and deploy. **Expect** the same.
+
+**B. Turn a mod off and deploy**
+
+1. Untick a deployed mod with an `.archive` file and press **Deploy**.
+2. **Expect** the same as A3: no error, the three log lines in that order.
+3. Tick it again and deploy.
+
+**C. Remove a mod**
+
+1. Add any small mod with an `.archive` file (a spare download is fine) and wait for `Archive scan: ...` in the log, so the scanner has read it.
+2. Press its **Remove from Library** button and confirm.
+3. **Expect:** no error; its row goes at once; the log shows `REDbridge stopped, so it lets go of the archives it read`, then `Removed ...`, then the scan again. Its folder is gone from the library's `library` folder.
+
+**Passed** when A, B and C give no "in use" error and the log shows the stop before each change and the scan after it. **If an "in use" error appears:** note the file it names, whether `REDbridge.exe` was in Task Manager at that moment, and copy the EDGEdeck log from the step before.
 
 ### Tests 16 to 18, step by step
 
