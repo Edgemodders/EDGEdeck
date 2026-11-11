@@ -1238,6 +1238,9 @@ console.log("undo: ok");
     await assert.rejects(q.run(async () => { throw new Error("boom"); }), /boom/);
     limit = 1;
     assert.equal(await q.run(async () => 7), 7);
+    assert.equal(core.downloadsAtOnce(false), 1, "a free account: one at a time");
+    assert.equal(core.downloadsAtOnce(undefined), 1, "not known yet counts as free");
+    assert.equal(core.downloadsAtOnce(true), 0, "Premium: no limit");
   }
   const newest = core.newestFile({ files: [
     { file_id: 1, name: "old", version: "1.0", category_name: "OLD_VERSION", is_primary: false, uploaded_timestamp: 1 },

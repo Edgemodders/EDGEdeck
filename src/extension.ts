@@ -29,7 +29,7 @@ import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove"
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveLibrary, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
-import { DownloadQueue, progressText, SpeedMeter } from "./downloads";
+import { DownloadQueue, downloadsAtOnce, progressText, SpeedMeter } from "./downloads";
 import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
@@ -46,8 +46,10 @@ let status: vscode.StatusBarItem;
 let log: vscode.OutputChannel;
 let sevenZa: string | undefined;
 let extensionRoot = "";
-/** Nexus downloads, `edgedeck.nexusDownloadsAtOnce` at a time (downloads.ts says why one by default). */
-const downloadQueue = new DownloadQueue(() => vscode.workspace.getConfiguration("edgedeck").get<number>("nexusDownloadsAtOnce", 1));
+/** Whether the signed-in Nexus account has Premium, kept at sign-in; undefined until known. */
+const NexusPremiumKey = "edgedeck.nexusPremium";
+/** Nexus downloads, as many at once as the account allows (downloadsAtOnce in downloads.ts says why). */
+const downloadQueue = new DownloadQueue(() => downloadsAtOnce(globalState?.get<boolean>(NexusPremiumKey)));
 let storageDir = "";
 /** The game folder found through Steam, GOG or Epic, looked up once per reload. */
 let detectedGame: string | undefined;
@@ -1578,7 +1580,7 @@ async function getBridgeCommand(): Promise<void> {
     const exe = await installBridge(release, storageDir, sevenZa, (r, t) => {
       meter.add(r);
       const now = Date.now();
-      if (now - shown < 500 && r < t) return;
+      if (now - shown < 500 && (!t || r < t)) return;
       shown = now;
       const pct = t ? Math.floor((r / t) * 100) : 0;
       progress.report({ increment: pct - last, message: `downloading ${progressText(r, t, meter.bytesPerSecond)}` });
@@ -2671,6 +2673,7 @@ async function nexusClient(ask: boolean): Promise<NexusClient | undefined> {
 }
 
 function signedInToast(name: string, premium: boolean): void {
+  void globalState.update(NexusPremiumKey, premium);
   log.appendLine(`Nexus: signed in as ${name}${premium ? " (Premium)" : ""}`);
   void vscode.window.showInformationMessage(`Nexus: signed in as ${name}${premium ? " (Premium)" : ""}.`);
 }
@@ -2775,6 +2778,7 @@ async function nexusSignOutCommand(): Promise<void> {
   }
   await secrets.delete(NexusTokensSecret);
   await secrets.delete(NexusKeySecret);
+  await globalState.update(NexusPremiumKey, undefined);
   log.appendLine("Nexus: signed out");
   void vscode.window.showInformationMessage(hadKey ? "Signed out of Nexus Mods. The key is gone from secret storage; revoke it on the API Access page if you want it dead." : "Signed out of Nexus Mods. The sign-in is gone from secret storage.");
 }
@@ -2975,13 +2979,15 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   const have = fs.existsSync(dest) && !!file && Math.abs(fs.statSync(dest).size - file.size_kb * 1024) < 2048;
   if (have) log.appendLine(`${fileName} is already in downloads, not downloading again`);
   else {
+    await knowPremium(client);
     await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Downloading ${info.name}` }, (progress) =>
       downloadQueue.run(
         async () => {
           // The link is asked for when the file's turn comes, so it cannot go stale in the queue.
           progress.report({ message: "starting" });
+          if (linkExpired(key, expires)) throw new ExpiredLinkError();
           const links = await client.downloadLinks(modId, fileId, key, expires).catch((err: Error) => {
-            if (/403|forbidden|premium/i.test(err.message)) throw new PremiumError();
+            if (/403|forbidden|premium/i.test(err.message)) throw key ? new ExpiredLinkError() : new PremiumError();
             throw err;
           });
           if (!links.length) throw new Error("Nexus returned no download link.");
@@ -2991,7 +2997,7 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
           await download(links[0].URI, dest, (received, total) => {
             meter.add(received);
             const now = Date.now();
-            if (now - shown < 500 && received < total) return;
+            if (now - shown < 500 && (!total || received < total)) return;
             shown = now;
             const pct = total ? Math.floor((received / total) * 100) : 0;
             progress.report({ increment: pct - last, message: progressText(received, total, meter.bytesPerSecond) });
@@ -3028,6 +3034,33 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
 function newestOnPage(lib: Library, mod: ModInfo, files: NexusFiles) {
   const others = otherLineFiles(lib, mod);
   return mod.source.fileId !== undefined || mod.source.fileTitle || others.length ? newestInLine(files, lineFile(mod), others) : onlyLine(files, newestFile(files));
+}
+
+/** Whether a download key from an nxm link is past its time (Nexus gives about two days). */
+function linkExpired(key: string | undefined, expires: number | undefined): boolean {
+  return !!key && !!expires && expires * 1000 <= Date.now();
+}
+
+/** Nexus refused a link's key: it expired (in the queue, or a link pressed long ago) or was used up. */
+class ExpiredLinkError extends Error {
+  constructor() {
+    super("The download link from Nexus no longer works; links expire after a while. Press Mod manager download on the mod's page again.");
+  }
+}
+
+/**
+ * Finds out once whether the account has Premium, for an account signed in before EDGEdeck kept it
+ * (it is kept at sign-in). Left unknown, which counts as free, when Nexus cannot say.
+ */
+async function knowPremium(client: NexusClient): Promise<void> {
+  if (globalState.get<boolean>(NexusPremiumKey) !== undefined) return;
+  try {
+    const token = await nexusAccessToken();
+    const premium = token ? (tokenUser(token) ?? (await fetchUser(token))).premium : (await client.validate()).is_premium;
+    await globalState.update(NexusPremiumKey, premium);
+  } catch (err) {
+    log.appendLine(`Nexus: could not tell whether the account has Premium (${err instanceof Error ? err.message : String(err)}); downloads run one at a time`);
+  }
 }
 
 class PremiumError extends Error {

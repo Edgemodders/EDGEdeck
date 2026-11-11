@@ -50,6 +50,14 @@ function timeLeft(seconds: number): string {
 }
 
 /**
+ * How many Nexus downloads run at once: one for a free account, whose speed cap is the whole
+ * account's, no limit (0) for Premium, which has none. An account not known yet counts as free.
+ */
+export function downloadsAtOnce(premium: boolean | undefined): number {
+  return premium ? 0 : 1;
+}
+
+/**
  * Runs at most `limit()` jobs at once, in the order they came; the others wait. `limit()` is read
  * each time a job starts or ends, so a changed setting applies from the next one. 0 or less: no limit.
  */

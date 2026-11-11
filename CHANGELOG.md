@@ -18,7 +18,7 @@ How to keep it:
 
 **Changed**
 
-- Nexus downloads run one at a time; the others say "waiting: 2 downloads ahead" until their turn. Nexus caps a free account's speed for the whole account (3 MB/s, 1.5 MB/s with an ad blocker), so files downloading at once only shared it. The setting `edgedeck.nexusDownloadsAtOnce` changes the number; 0 means no limit, for Premium.
+- Nexus downloads run one at a time; the others say "waiting: 2 downloads ahead" until their turn. Nexus caps a free account's speed for the whole account (3 MB/s, 1.5 MB/s with an ad blocker), so files downloading at once only shared it. A Premium account has no cap, so its downloads still run all at once.
 
 **Fixed**
 
