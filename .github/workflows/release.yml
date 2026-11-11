@@ -8,7 +8,8 @@
 #                                               CHANGELOG.md has no section for it, or if README.md's
 #                                               status line and status badge do not name it
 #                                               (tools/release/readme-check.mjs)
-#   npm run release                             the same as ticking the box, from a terminal
+#   npm run release                             the same as ticking both boxes, from a terminal:
+#                                               every release updates Nexus too (owner, 2026-11-10)
 #   ... and "Update Nexus Mods" ticked          also, after the GitHub release, uploads the Nexus zip
 #                                               to the page as the main file's new version (the old
 #                                               one archived, Mod Manager Download off: an extension,
@@ -45,9 +46,9 @@ on:
         type: boolean
         default: false
       nexus:
-        description: Update Nexus Mods (with Make a release) - upload the Nexus zip, its changelog and the page's description
+        description: Update Nexus Mods (with Make a release) - upload the Nexus zip, its changelog and the page's description. Always with a release
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: write
