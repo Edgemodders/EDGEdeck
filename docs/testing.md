@@ -157,6 +157,10 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 22: **deploy with REDbridge running** (#10), parts A, B and C | **Passed.** The first run of A used ArchiveXL, whose archive sits under `red4ext/plugins`, which the scanner does not read, so REDbridge did not start again after the deploy; that is right (the scan reuses what it read and starts REDbridge only for an unread archive in `archive/pc/mod`), and the steps were corrected to say so |
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 23: **downloads at once on Premium, speed shown** (#9) | **Passed.** Led to a Cancel button on the download notifications (asked for by the owner the same day) |
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 24: **Vortex imports** (#6, #8), page 3783 | **Passed**, as written. A 12 GB download through EDGEdeck the same day ended in "File size (13308317994) is greater than 2 GiB": the MD5 for the log read the whole file at once; fixed the same day |
+| 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 26: **Columns button** | **Passed**, as written |
+| 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 27: **Added, Updated and Newest update first** (#7) | **Passed**, as written. The first run of 27 had REDcode in a window still on the Marketplace 0.30.1, so the project kept its old Updated date; with the test build installed in every window it passed |
+| 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 28: **Cancel a download** | **Passed**, as written |
+| 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 29: **A download over 2 GB**, the 12 GB file from 11-10 | **Passed**, as written. Downloading the same file twice showed two "opening" notifications for one zip; led to one download (and one add) per file at a time |
 
 ## Waiting for a hand test
 
@@ -164,10 +168,14 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 26 | **Columns button** | 11-10 | See **Tests 23 to 28, step by step** below, test 26. |
-| 27 | **Added, Updated and Newest update first** (#7) | 11-10 | See **Tests 23 to 28, step by step** below, test 27. |
-| 28 | **Cancel a download** | 11-10 | See **Tests 23 to 28, step by step** below, test 28. |
-| 29 | **A download over 2 GB** | 11-10 | See **Tests 23 to 28, step by step** below, test 29. |
+| 30 | **The same thing twice** | 11-10 | See **Test 30, step by step** below. |
+
+### Test 30, step by step
+
+1. On Nexus, press **Mod manager download** on a large file of a mod you don't have, then press it again at once. **Expect:** one "Downloading" notification and a notice `That file is already downloading.`; one "Opening" notification when it finishes; the mod added once. Remove it afterwards.
+2. On the EDGEdeck page, with changes waiting, double-click **Deploy**. **Expect:** one deploy, and `A deploy is already under way.` if the second click landed while it ran.
+3. Double-click **Run game**. **Expect:** one game starts; `The game is already starting.`
+4. Press **Check updates** twice quickly. **Expect:** one check; `Already checking for updates.`
 
 ### Tests 23 to 28, step by step
 

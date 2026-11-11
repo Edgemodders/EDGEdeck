@@ -1330,6 +1330,35 @@ console.log("undo: ok");
       await new Promise((r) => server.close(r));
     }
     console.log("download cancel: ok");
+    // One at a time: the same work started again while it runs is turned away with a notice.
+    {
+      const release = {};
+      const ran = [];
+      const lines = [];
+      const fetchFile = core.single((modId, fileId) => `nexus:${modId}:${fileId}`, "That file is already downloading.", (modId, fileId) => new Promise((r) => { ran.push(`${modId}:${fileId}`); release[`${modId}:${fileId}`] = r; }), { log: (l) => lines.push(l) });
+      const first = fetchFile(1, 2);
+      await assert.rejects(fetchFile(1, 2), (e) => e instanceof core.AlreadyUnderWay && e.message === "That file is already downloading.", "the same file twice: the second is turned away");
+      assert.match(lines[0], /Not starting it again/);
+      const other = fetchFile(1, 3);
+      assert.deepEqual(ran, ["1:2", "1:3"], "another file of the same page still runs");
+      release["1:2"]();
+      release["1:3"]();
+      await first;
+      await other;
+      const again = fetchFile(1, 2);
+      assert.deepEqual(ran, ["1:2", "1:3", "1:2"], "once it is done, the same file can run again");
+      release["1:2"]();
+      await again;
+      const check = core.single("check", "Already checking.", async () => { await new Promise((r) => setTimeout(r, 20)); return "done"; }, { silent: (quiet) => quiet });
+      const running = check(false);
+      assert.equal(await check(true), undefined, "a quiet background call returns without a notice");
+      await assert.rejects(check(false), (e) => e instanceof core.AlreadyUnderWay);
+      assert.equal(await running, "done");
+      const failing = core.single("fails", "Busy.", async () => { throw new Error("boom"); });
+      await assert.rejects(failing(), /boom/);
+      await assert.rejects(failing(), /boom/, "a failure frees the key too");
+    }
+    console.log("one at a time: ok");
   }
   const newest = core.newestFile({ files: [
     { file_id: 1, name: "old", version: "1.0", category_name: "OLD_VERSION", is_primary: false, uploaded_timestamp: 1 },

@@ -31,6 +31,7 @@ import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary,
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
 import { md5OfFile } from "./fileBytes";
+import { AlreadyUnderWay, single as singleBase, type SingleOptions } from "./single";
 import { DownloadCancelled, DownloadQueue, downloadsAtOnce, progressText, SpeedMeter } from "./downloads";
 import { download, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
@@ -423,10 +424,19 @@ function settings(): { gamePath: string; libraryPath: string; bridgePath: string
   };
 }
 
+/** `single` (single.ts) with the log: one at a time per key; a second start gets a short notice. */
+function single<A extends unknown[], R>(key: Parameters<typeof singleBase>[0], what: Parameters<typeof singleBase>[1], fn: (...args: A) => Promise<R>, opts: SingleOptions = {}): (...args: A) => Promise<R> {
+  return singleBase(key, what, fn, { ...opts, log: (line) => log.appendLine(line) });
+}
+
 async function run(fn: () => Promise<void> | void): Promise<void> {
   try {
     await fn();
   } catch (err) {
+    if (err instanceof AlreadyUnderWay) {
+      void vscode.window.showInformationMessage(err.message);
+      return;
+    }
     if (err instanceof DownloadCancelled) return; // The player pressed Cancel; the log has a line.
     const message = err instanceof Error ? err.message : String(err);
     log.appendLine(`Error: ${message}`);
@@ -1576,11 +1586,14 @@ async function pickGameCommand(): Promise<void> {
 
 // ---- REDbridge -----------------------------------------------------------------------------------
 
+/** getBridgeCommand, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const getBridgeCommand = single("bridge", "REDbridge is already being fetched.", getBridgeCommandWork);
+
 /**
  * Fetches the latest REDbridge release into EDGEdeck's storage folder, and the .NET 10 runtime
  * per user if the machine has none. One question, then it is done.
  */
-async function getBridgeCommand(): Promise<void> {
+async function getBridgeCommandWork(): Promise<void> {
   const release = await latestBridgeRelease();
   const already = installedBridge(storageDir);
   const have = already ? path.basename(path.dirname(already)).replace(/^v/, "") : undefined;
@@ -1828,8 +1841,11 @@ async function addModCommand(): Promise<void> {
   for (const uri of picked) await addFrom(uri.fsPath);
 }
 
+/** addFrom, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const addFrom = single((source: string) => `add:${path.resolve(source).toLowerCase()}`, (source: string) => `${path.basename(source)} is already being added.`, addFromWork);
+
 /** Adds one file or folder: extract if needed, classify, ask about options, copy into the library. */
-async function addFrom(source: string, preset?: { name: string; version: string; source: ModSource; quiet?: boolean; family?: string }): Promise<ModInfo | undefined> {
+async function addFromWork(source: string, preset?: { name: string; version: string; source: ModSource; quiet?: boolean; family?: string }): Promise<ModInfo | undefined> {
   if (!library) return;
   const isFile = fs.statSync(source).isFile();
   let name = preset?.name ?? cleanName(path.basename(source, isFile ? path.extname(source) : ""));
@@ -2073,7 +2089,10 @@ async function loadLoadoutCommand(): Promise<void> {
 /** More mods than this in one Vortex import asks first. */
 const VortexConfirmOver = 20;
 
-async function importVortexCommand(): Promise<void> {
+/** importVortexCommand, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const importVortexCommand = single("vortex", "Already importing from Vortex.", importVortexCommandWork);
+
+async function importVortexCommandWork(): Promise<void> {
   if (!library) return;
   let mods = listVortexMods(settings().gamePath, settings().vortexStaging || undefined);
   if (!mods.length) {
@@ -2190,8 +2209,11 @@ function frameworksStep(): SetupStep & { done: boolean } {
   };
 }
 
+/** getFrameworksCommand, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const getFrameworksCommand = single("frameworks", "The frameworks are already being fetched.", getFrameworksCommandWork);
+
 /** "Get the frameworks": one pick, missing and outdated ones ticked, then download and add each. */
-async function getFrameworksCommand(): Promise<void> {
+async function getFrameworksCommandWork(): Promise<void> {
   if (!library) throw new Error("The library is not open.");
   const states = await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: "Asking GitHub for the frameworks' newest releases" },
@@ -2271,8 +2293,11 @@ function libraryDriveStep(): SetupStep & { done: boolean } {
   };
 }
 
+/** moveLibraryCommand, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const moveLibraryCommand = single("moveLibrary", "The library is already moving.", moveLibraryCommandWork);
+
 /** "Move library...": pick a folder, move the library there, point the setting at it. */
-async function moveLibraryCommand(): Promise<void> {
+async function moveLibraryCommandWork(): Promise<void> {
   if (!library) throw new Error("The library is not open.");
   if (gameRunning()) {
     void vscode.window.showWarningMessage("Close Cyberpunk 2077 first: it keeps the deployed files open, and they are the library's files too.");
@@ -2344,7 +2369,10 @@ async function moveLibraryCommand(): Promise<void> {
   }
 }
 
-async function runGameCommand(): Promise<void> {
+/** runGameCommand, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const runGameCommand = single("runGame", "The game is already starting.", runGameCommandWork, { holdMs: 15000 });
+
+async function runGameCommandWork(): Promise<void> {
   const { gamePath } = settings();
   if (!isGameFolder(gamePath)) {
     const a = await vscode.window.showWarningMessage("EDGEdeck does not know where the game is.", "Pick the game folder");
@@ -2394,12 +2422,15 @@ function lockedFileError(err: unknown): Error {
   return new Error(`${file ? path.basename(file) : "A file"} in the game folder is in use, so Windows would not change it. Close the game (or the program that has it open) and deploy again. What this deploy finished is kept; the rest is still waiting.${file ? ` (${file})` : ""}`);
 }
 
+/** deployNow, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const deployNow = single("gameFolder", "A deploy is already under way.", deployNowWork);
+
 /**
  * EDGEdeck: Deploy, for the command and the API: asks about changed files, deploys, reports.
  * With `only`, deploys that one mod's changes (the API's deployMod): its questions are about its own
  * paths, and other mods' changes keep waiting. Undefined when refused or cancelled.
  */
-async function deployNow(only?: ModInfo): Promise<DeployResult | undefined> {
+async function deployNowWork(only?: ModInfo): Promise<DeployResult | undefined> {
   if (!library) return;
   const { gamePath } = settings();
   if (!(await gameClosed("deploying"))) return;
@@ -2572,7 +2603,10 @@ function warnLostProjects(result: DeployResult, only?: ModInfo): void {
   }
 }
 
-async function undoCommand(): Promise<void> {
+/** undoCommand, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const undoCommand = single("gameFolder", "A deploy is already under way.", undoCommandWork);
+
+async function undoCommandWork(): Promise<void> {
   if (!library) return;
   const { gamePath } = settings();
   if (!(await gameClosed("undoing the deploy"))) return;
@@ -2859,7 +2893,10 @@ async function maybeCheckUpdates(): Promise<void> {
   await checkUpdatesCommand(true);
 }
 
-async function checkUpdatesCommand(quiet: boolean, only?: ModInfo[]): Promise<void> {
+/** checkUpdatesCommand, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const checkUpdatesCommand = single((_quiet: boolean, only?: ModInfo[]) => (only ? `check:${only.map((m) => m.id).join(",")}` : "check"), "Already checking for updates.", checkUpdatesCommandWork, { silent: (quiet: boolean) => quiet });
+
+async function checkUpdatesCommandWork(quiet: boolean, only?: ModInfo[]): Promise<void> {
   if (!library) return;
   const client = await nexusClient(!quiet);
   if (!client) return;
@@ -2971,13 +3008,16 @@ async function addFromLink(link: string): Promise<void> {
   await fetchFromNexus(nxm.modId, nxm.fileId, nxm.key, nxm.expires);
 }
 
+/** fetchFromNexus, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const fetchFromNexus = single((modId: number, fileId: number) => `nexus:${modId}:${fileId}`, "That file is already downloading.", fetchFromNexusWork);
+
 /**
  * Downloads one Nexus file into the library and adds it. When the library has an older version of
  * the same file (its line, nexusLines.ts), the new one takes its place in the order and the old
  * one is turned off. Another file of the same page (a second main file, an optional one) is a mod
  * of its own.
  */
-async function fetchFromNexus(modId: number, fileId: number, key?: string, expires?: number, quiet = false): Promise<void> {
+async function fetchFromNexusWork(modId: number, fileId: number, key?: string, expires?: number, quiet = false): Promise<void> {
   if (!library) return;
   const client = await nexusClient(true);
   if (!client) return;
@@ -3183,11 +3223,14 @@ function familiesWithUpdates(): Family[] {
   return library ? families(library).filter((f) => f.update && f.nexusId) : [];
 }
 
+/** updateAllCommand, one at a time (`single`): a second start while it runs gets a short notice instead. */
+const updateAllCommand = single("updateAll", "Update all is already under way.", updateAllCommandWork);
+
 /**
  * "Update all": every mod with an update waiting, after one question, with one summary. From the
  * page, `ids` are the rows its search and filter leave showing, and only those are updated.
  */
-async function updateAllCommand(ids?: string[]): Promise<void> {
+async function updateAllCommandWork(ids?: string[]): Promise<void> {
   if (!library) return;
   const shown = ids && new Set(ids);
   const fams = familiesWithUpdates().filter((f) => !shown || f.mods.some((m) => shown.has(m.id)));
@@ -3224,7 +3267,7 @@ async function updateAllCommand(ids?: string[]): Promise<void> {
         const now = families(library!).find((f) => f.key === fam.key)?.active;
         updated.push(`${fam.name} ${now?.version ?? fam.update!.version}`);
       } catch (err) {
-        if (err instanceof DownloadCancelled) continue; // Skipped by the player; the others go on.
+        if (err instanceof DownloadCancelled || err instanceof AlreadyUnderWay) continue; // Cancelled, or already downloading: the others go on.
         log.appendLine(`Update all: ${fam.name}: ${err instanceof Error ? err.message : String(err)}`);
         failed.push(fam.name);
       }

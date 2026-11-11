@@ -25,6 +25,7 @@ How to keep it:
 
 **Fixed**
 
+- Pressing a button twice no longer starts the same thing twice. A second Mod manager download of a file that is still downloading, a second Deploy, Update all or Run game while the first is going, and the like now give a short notice instead; before, the same file could be downloaded and added twice at once.
 - A Nexus download larger than 2 GB no longer ends in "File size ... is greater than 2 GiB" once it has downloaded; it is added to the library like any other. Comparing a mod's file with one already in a REDcode project (Add to Project) works for files that large too.
 - Largest first on the EDGEdeck page now shows as pressed while it is on. It worked, but its button never lit up.
 - Deploy no longer asks "Keep the changed file, or put the mod's file back?" about a file that was replaced by a copy with the same bytes, as REDcode's Pack and Play does when it swaps an archive into the running game. EDGEdeck now compares the bytes and quietly puts its own file back; a file whose bytes really changed is still asked about. https://github.com/Edgemodders/EDGEdeck/issues/13

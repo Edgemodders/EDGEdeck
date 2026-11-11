@@ -6,6 +6,7 @@ export * from "./conflicts";
 export * from "./deploy";
 export * from "./downloads";
 export * from "./fileBytes";
+export * from "./single";
 export * from "./extract";
 export * from "./families";
 export * from "./nexusLines";
