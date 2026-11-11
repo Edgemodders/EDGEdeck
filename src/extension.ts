@@ -30,8 +30,9 @@ import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove"
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveLibrary, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
 import { ModsView, type ModNode, type SetupStep } from "./modsView";
+import { md5OfFile } from "./fileBytes";
 import { DownloadCancelled, DownloadQueue, downloadsAtOnce, progressText, SpeedMeter } from "./downloads";
-import { download, md5Of, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
+import { download, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
 import { currentNxmHandler, describeHandler, forwarderCommand, forwarderExe, nxmFromQuery, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority, type LinkTarget } from "./nxm";
@@ -3016,6 +3017,7 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
   const dest = path.join(library.root, "downloads", fileName);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const have = fs.existsSync(dest) && !!file && Math.abs(fs.statSync(dest).size - file.size_kb * 1024) < 2048;
+  let md5 = "";
   if (have) log.appendLine(`${fileName} is already in downloads, not downloading again`);
   else {
     await knowPremium(client);
@@ -3038,7 +3040,7 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
             let last = 0;
             let shown = 0;
             if (stop.signal.aborted) throw new DownloadCancelled();
-            await download(links[0].URI, dest, (received, total) => {
+            md5 = await download(links[0].URI, dest, (received, total) => {
               meter.add(received);
               const now = Date.now();
               if (now - shown < 500 && (!total || received < total)) return;
@@ -3057,7 +3059,8 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
       throw err;
     }
   }
-  log.appendLine(`Downloaded ${fileName} (${info.name} ${file?.version ?? ""}) from Nexus mod ${nxm.modId}, md5 ${md5Of(dest)}`);
+  if (!md5) md5 = await md5OfFile(dest);
+  log.appendLine(`Downloaded ${fileName} (${info.name} ${file?.version ?? ""}) from Nexus mod ${nxm.modId}, md5 ${md5}`);
   const existing = line.entries[0];
   const name = existing?.name ?? (line.newLine ? lineName(info.name, file?.name) : info.name);
   if (line.newLine) log.appendLine(`${file?.name ?? fileId} is another file of ${info.name} on Nexus, so it is a mod of its own: ${name}`);

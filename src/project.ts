@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import fs from "./fsx";
 import * as path from "node:path";
 import { classify, type Classification } from "./classifier";
+import { sameBytes } from "./fileBytes";
 import { activateVersion, baseName, familyKey, familyOf, takeFamilyName } from "./families";
 import { addMod, placeAbove, saveMod, sourcePath, type Library, type ModInfo } from "./library";
 
@@ -37,7 +38,7 @@ export function addToProject(lib: Library, mod: ModInfo, files: string[], projec
     const rel = path.join("source", "resources", ...f.split("/"));
     const dest = path.join(resources, ...f.split("/"));
     if (fs.existsSync(dest)) {
-      if (fs.readFileSync(dest).equals(fs.readFileSync(src))) {
+      if (sameBytes(dest, src)) {
         out.same.push(rel);
         continue;
       }

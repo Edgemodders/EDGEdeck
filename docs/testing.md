@@ -156,6 +156,7 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 21: **Run game, exe route** (#12), REDnode's overlay on F10 | **Passed**, as written |
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 22: **deploy with REDbridge running** (#10), parts A, B and C | **Passed.** The first run of A used ArchiveXL, whose archive sits under `red4ext/plugins`, which the scanner does not read, so REDbridge did not start again after the deploy; that is right (the scan reuses what it read and starts REDbridge only for an unread archive in `archive/pc/mod`), and the steps were corrected to say so |
 | 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 23: **downloads at once on Premium, speed shown** (#9) | **Passed.** Led to a Cancel button on the download notifications (asked for by the owner the same day) |
+| 11-10 | `main` after 0.30.1 (for 0.31.0) | Not recorded | Waiting test 24: **Vortex imports** (#6, #8), page 3783 | **Passed**, as written. A 12 GB download through EDGEdeck the same day ended in "File size (13308317994) is greater than 2 GiB": the MD5 for the log read the whole file at once; fixed the same day |
 
 ## Waiting for a hand test
 
@@ -163,10 +164,10 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 24 | **Vortex imports: names, ids and each file its own update** (#6, #8) | 11-10 | See **Tests 23 to 28, step by step** below, test 24. |
 | 26 | **Columns button** | 11-10 | See **Tests 23 to 28, step by step** below, test 26. |
 | 27 | **Newest update first** (#7) | 11-10 | See **Tests 23 to 28, step by step** below, test 27. |
 | 28 | **Cancel a download** | 11-10 | See **Tests 23 to 28, step by step** below, test 28. |
+| 29 | **A download over 2 GB** | 11-10 | See **Tests 23 to 28, step by step** below, test 29. |
 
 ### Tests 23 to 28, step by step
 
@@ -213,6 +214,12 @@ Before you start: in Vortex, **Settings > Mods**, turn off **Enable mods when in
 1. On Nexus, press **Mod manager download** on a large file (a few hundred MB) of a mod you don't have.
 2. While it downloads, press **Cancel** on its notification. **Expect:** the notification goes; no error message; the log says `Download cancelled: <file> (<mod>)`; nothing new in the library; the file is not in the library's `downloads` folder (the page footer's "kept downloads" link).
 3. Press **Mod manager download** on the same file again and let it finish. **Expect:** it downloads from the start and is added as usual. Remove it afterwards.
+
+**29. A download over 2 GB** (the 12 GB mod from 11-10)
+
+1. Press **Mod manager download** on the same file again. Its zip is still in the library's `downloads` folder from the run that failed, so it is not downloaded again.
+2. **Expect:** the log says `... is already in downloads, not downloading again`, then (after a while: EDGEdeck reads 12 GB for the MD5, in the background) `Downloaded ... md5 <32 letters and digits>`, and the mod is added. No "greater than 2 GiB" error. Adding a mod this size takes a while: it is unpacked and copied into the library.
+3. Remove it afterwards if you don't want it; its zip stays in `downloads` until you delete it there.
 
 ### Test 22, step by step
 

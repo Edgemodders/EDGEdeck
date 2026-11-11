@@ -1288,7 +1288,13 @@ console.log("undo: ok");
     // Cancel while downloading: the transfer stops and the part written so far is deleted.
     {
       const http = await import("node:http");
+      const whole = Buffer.from(Array.from({ length: 300 * 1024 }, (_, i) => i % 251));
       const server = http.createServer((req, res) => {
+        if (req.url === "/whole.zip") {
+          res.writeHead(200, { "content-length": String(whole.length) });
+          res.end(whole);
+          return;
+        }
         res.writeHead(200, { "content-length": String(1 << 20) });
         res.write(Buffer.alloc(64 * 1024));
         const t = setInterval(() => res.write(Buffer.alloc(1024)), 50);
@@ -1306,6 +1312,19 @@ console.log("undo: ok");
       );
       assert.ok(seen >= 64 * 1024, "it had started");
       assert.equal(fs.existsSync(dest), false, "the part written so far is gone");
+      // A finished download returns its MD5, worked out as it arrived (a file over 2 GiB cannot be read back whole).
+      const { createHash } = await import("node:crypto");
+      const got = path.join(tmp, "whole.zip");
+      const md5 = await core.download(`http://127.0.0.1:${server.address().port}/whole.zip`, got);
+      assert.equal(md5, createHash("md5").update(whole).digest("hex"), "the MD5 of what was downloaded");
+      assert.equal(await core.md5OfFile(got), md5, "and the MD5 read back a megabyte at a time agrees");
+      const twin = path.join(tmp, "whole-twin.zip");
+      fs.writeFileSync(twin, whole);
+      assert.equal(core.sameBytes(got, twin), true, "same bytes, compared a megabyte at a time");
+      const other = Buffer.from(whole);
+      other[other.length - 1] ^= 1;
+      fs.writeFileSync(twin, other);
+      assert.equal(core.sameBytes(got, twin), false, "one byte different at the end");
       server.closeAllConnections?.();
       await new Promise((r) => server.close(r));
     }

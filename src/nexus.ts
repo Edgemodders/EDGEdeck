@@ -154,9 +154,6 @@ export class NexusClient {
   }
 }
 
-export function md5Of(file: string): string {
-  return crypto.createHash("md5").update(fs.readFileSync(file)).digest("hex");
-}
 
 /** The newest main file of a mod, or the newest file at all when none is marked main. */
 export function newestFile(files: NexusFiles): NexusFile | undefined {
@@ -185,10 +182,11 @@ export function modPageUrl(modId: number): string {
 
 /** Downloads a file to disk, reporting progress in bytes. */
 /**
- * Downloads `url` into `dest`. `signal` stops it: the part already written is deleted and the call
- * rejects with DownloadCancelled. A download that fails partway deletes its part too.
+ * Downloads `url` into `dest` and returns the file's MD5, worked out as it arrives (a file over
+ * 2 GiB cannot be read back in one piece). `signal` stops it: the part already written is deleted
+ * and the call rejects with DownloadCancelled. A download that fails partway deletes its part too.
  */
-export async function download(url: string, dest: string, progress?: (received: number, total: number) => void, signal?: AbortSignal): Promise<void> {
+export async function download(url: string, dest: string, progress?: (received: number, total: number) => void, signal?: AbortSignal): Promise<string> {
   if (signal?.aborted) throw new DownloadCancelled();
   let res: Response;
   try {
@@ -202,12 +200,14 @@ export async function download(url: string, dest: string, progress?: (received: 
   const out = fs.createWriteStream(dest);
   let received = 0;
   const reader = res.body.getReader();
+  const md5 = crypto.createHash("md5");
   let complete = false;
   try {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
       received += value.byteLength;
+      md5.update(value);
       if (!out.write(value)) await new Promise<void>((r) => out.once("drain", () => r()));
       progress?.(received, total);
     }
@@ -220,4 +220,5 @@ export async function download(url: string, dest: string, progress?: (received: 
     // A part of a file is no use to anyone; EDGEdeck wrote it, so it goes.
     if (!complete) fs.rmSync(dest, { force: true });
   }
+  return md5.digest("hex");
 }

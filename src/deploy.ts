@@ -4,6 +4,7 @@
 
 import fs from "./fsx";
 import * as path from "node:path";
+import { sameBytes } from "./fileBytes";
 import { isGameFolder } from "./game";
 import { backupFolder, libraryFolder, sourcePath, type Library, type ModInfo } from "./library";
 
@@ -197,29 +198,6 @@ function sameAsLibrary(entry: ManifestEntry, libraryRoot: string, file: string, 
   return same;
 }
 
-/** Whether two files of the same size hold the same bytes, read a megabyte at a time. */
-function sameBytes(a: string, b: string): boolean {
-  let fa: number | undefined;
-  let fb: number | undefined;
-  try {
-    fa = fs.openSync(a, "r");
-    fb = fs.openSync(b, "r");
-    const ba = Buffer.alloc(1 << 20);
-    const bb = Buffer.alloc(1 << 20);
-    for (;;) {
-      const na = fs.readSync(fa, ba, 0, ba.length, null);
-      const nb = fs.readSync(fb, bb, 0, bb.length, null);
-      if (na !== nb) return false;
-      if (na === 0) return true;
-      if (!ba.subarray(0, na).equals(bb.subarray(0, nb))) return false;
-    }
-  } catch {
-    return false;
-  } finally {
-    if (fa !== undefined) fs.closeSync(fa);
-    if (fb !== undefined) fs.closeSync(fb);
-  }
-}
 
 /** Whether a file EDGEdeck generates says something other than it should (or is missing). */
 function generatedDiffers(file: string, content: string): boolean {

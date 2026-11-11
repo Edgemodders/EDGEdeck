@@ -25,6 +25,7 @@ How to keep it:
 
 **Fixed**
 
+- A Nexus download larger than 2 GB no longer ends in "File size ... is greater than 2 GiB" once it has downloaded; it is added to the library like any other. Comparing a mod's file with one already in a REDcode project (Add to Project) works for files that large too.
 - Largest first on the EDGEdeck page now shows as pressed while it is on. It worked, but its button never lit up.
 - Deploy no longer asks "Keep the changed file, or put the mod's file back?" about a file that was replaced by a copy with the same bytes, as REDcode's Pack and Play does when it swaps an archive into the running game. EDGEdeck now compares the bytes and quietly puts its own file back; a file whose bytes really changed is still asked about. https://github.com/Edgemodders/EDGEdeck/issues/13
 - Run game with the launch setting on `exe` no longer stops REDnode's overlay from opening: the game no longer inherits a VS Code setting (`ELECTRON_RUN_AS_NODE`) that made REDnode 0.58.0 and older close its overlay at once, leaving F10 with only a cursor. https://github.com/Edgemodders/EDGEdeck/issues/12
