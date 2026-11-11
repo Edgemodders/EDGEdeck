@@ -162,23 +162,23 @@ Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 23 | **Downloads one at a time, speed shown** (#9) | 11-10 | See **Tests 23 to 27, step by step** below, test 23. |
+| 23 | **Downloads at once on Premium, speed shown** (#9) | 11-10 | See **Tests 23 to 27, step by step** below, test 23. |
 | 24 | **Vortex imports: names, ids and each file its own update** (#6, #8) | 11-10 | See **Tests 23 to 27, step by step** below, test 24. |
-| 25 | **Free account update pages** (#5) | 11-10 | See **Tests 23 to 27, step by step** below, test 25. |
 | 26 | **Columns button** | 11-10 | See **Tests 23 to 27, step by step** below, test 26. |
 | 27 | **Newest update first** (#7) | 11-10 | See **Tests 23 to 27, step by step** below, test 27. |
 
 ### Tests 23 to 27, step by step
 
-All five use the test build in **every** VS Code window (the Checks run's `.vsix`, **Extensions > ... > Install from VSIX**, then reload each window). The log is **View > Output > EDGEdeck**.
+**Free accounts are not hand-tested by the owner:** the owner's account is Premium, and Nexus's terms allow one account per person. What only a free account shows is covered this way: one download at a time and its `waiting: ... ahead` line (#9) by the smoke test's queue checks and abldvd's own use on a free account (PR #9); the update page that opens at the Mod manager download (#5) by abldvd's hand test on 0.30.0 (PR #5), merged unchanged. A free account's queued notifications, and the expired-link message, have not been seen for this build.
 
-**23. Downloads one at a time, speed shown** (a free and a Premium Nexus account)
+The four below use the test build in **every** VS Code window (the Checks run's `.vsix`, **Extensions > ... > Install from VSIX**, then reload each window). The log is **View > Output > EDGEdeck**.
 
-1. Command Palette: **EDGEdeck: Nexus: sign out**, then **EDGEdeck: Nexus: sign in** with the **free** account. The Set up strip must not show "Handle Nexus download links"; if it does, press it.
+**23. Downloads at once on Premium, speed shown** (the owner's Premium account)
+
+1. Signed in with the Premium account (**EDGEdeck: Nexus: sign in**). The Set up strip must not show "Handle Nexus download links"; if it does, press it.
 2. On Nexus, open three mods you don't have, each in its own tab, and press **Mod manager download** on a file in each, one right after the other. Pick files of a few MB or more, so they take a while.
-3. **Expect:** the first notification shows `starting`, then `12 of 70 MB · 1.4 MB/s · 42 s left`; the second shows `waiting: 1 download ahead`, the third `waiting: 2 downloads ahead`, and each moves up as the one before finishes. The log has a `Downloaded ...` line for each.
-4. Sign out, sign in with the **Premium** account, and do step 2 again with three other files. **Expect:** all three start at once; no `waiting` line.
-5. Remove the six test mods afterwards.
+3. **Expect:** all three start at once, with no `waiting` line, and each notification shows its progress as `12 of 70 MB · 1.4 MB/s · 42 s left`. The log has a `Downloaded ...` line for each.
+4. Remove the three test mods afterwards.
 
 **24. Vortex imports** (on a PC with Vortex and its mods)
 
@@ -187,14 +187,6 @@ All five use the test build in **every** VS Code window (the Checks run's `.vsix
 3. In EDGEdeck: **EDGEdeck: Import from Vortex**, and tick those mods. **Expect** in the pick list: clean names (no date or hash), the version in grey, and `Nexus 3783` in each line's details.
 4. On the EDGEdeck page, **Expect:** each row has its version and an active **Open on Nexus** button (the arrow icon).
 5. Press **Check updates**. **Expect:** a row **-KS- UV Texture Framework** with the two files under it, each a mod of its own; neither is offered the other's file as an update, and neither is turned off.
-
-**25. Free account update pages** (free Nexus account)
-
-1. Sign in with the free account (as in 23.1).
-2. Get a mod with an update waiting: on a mod's Nexus page, **Files > Old files**, press **Mod manager download** on an older file. Then press **Check updates**. **Expect:** its row shows `update <version> available`.
-3. Press the row's **Update** button (the arrow over a line). **Expect:** the browser opens that file on Nexus at the slow **Mod manager download** (not the manual download), and a message in VS Code says to press it.
-4. Let the countdown finish (press the button if asked). **Expect:** the file comes to EDGEdeck through the nxm link, downloads, and takes the old version's place; the old version stays in the Ver list, off.
-5. Note the name of the button the Nexus page showed, so the message's wording can be checked.
 
 **26. Columns button**
 
