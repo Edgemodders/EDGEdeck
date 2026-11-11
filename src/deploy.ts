@@ -5,7 +5,7 @@
 import fs from "./fsx";
 import * as path from "node:path";
 import { isGameFolder } from "./game";
-import { backupFolder, sourcePath, type Library, type ModInfo } from "./library";
+import { backupFolder, libraryFolder, sourcePath, type Library, type ModInfo } from "./library";
 
 export const ManifestName = "edgedeck.deployment.json";
 export const VortexManifestName = "vortex.deployment.json";
@@ -63,7 +63,8 @@ export interface Plan {
   vortex: boolean;
 }
 
-export type ChangeKind = "changed" | "missing" | "sourceMissing";
+/** "copied": another file with the same bytes took the deployed one's place (REDnode's swap copies an archive in); deploy puts EDGEdeck's back without asking. */
+export type ChangeKind = "changed" | "missing" | "sourceMissing" | "copied";
 
 export interface Change {
   entry: ManifestEntry;
@@ -161,16 +162,63 @@ function sourceReplaced(entry: ManifestEntry, method: Manifest["method"], d: Des
 /**
  * Whether a deployed file is still the one EDGEdeck put there. Each entry is judged by how it was put
  * in (an inode means a hardlink), since a moved library leaves both kinds in one manifest for a while.
+ * A file that is not the deployed one but has the library file's bytes is "copied", not "changed":
+ * REDnode's swap (REDcode's Pack and Play) copies an archive over the deployed one (EDGEdeck #13).
  */
-function stillOurs(entry: ManifestEntry, _method: Manifest["method"], gamePath: string): ChangeKind | "ok" {
-  const id = identity(gameFile(gamePath, entry.path));
+function stillOurs(entry: ManifestEntry, libraryRoot: string, gamePath: string): ChangeKind | "ok" {
+  const file = gameFile(gamePath, entry.path);
+  const id = identity(file);
   if (!id) return "missing";
   if (entry.ino) {
-    if (id.ino !== entry.ino) return "changed";
+    if (id.ino !== entry.ino) return sameAsLibrary(entry, libraryRoot, file, id) ? "copied" : "changed";
     if (id.nlink < 2 && entry.mod !== Generated) return "sourceMissing";
     return "ok";
   }
-  return id.size === entry.size && Math.abs(id.mtimeMs - entry.mtimeMs) < 2000 ? "ok" : "changed";
+  if (id.size === entry.size && Math.abs(id.mtimeMs - entry.mtimeMs) < 2000) return "ok";
+  return sameAsLibrary(entry, libraryRoot, file, id) ? "copied" : "changed";
+}
+
+/** Byte comparisons by both files' identities: stillOurs runs on every refresh until the next deploy. */
+const sameBytesSeen = new Map<string, boolean>();
+
+/** Whether a game file has the same bytes as the library file its entry was deployed from: size, then content. */
+function sameAsLibrary(entry: ManifestEntry, libraryRoot: string, file: string, id: { ino: string; size: number; mtimeMs: number }): boolean {
+  if (entry.mod === Generated) return false;
+  const src = path.join(libraryFolder(libraryRoot), entry.mod, ...entry.path.split("/"));
+  const srcId = identity(src);
+  if (!srcId || srcId.size !== id.size) return false;
+  const k = [file, id.ino, id.size, id.mtimeMs, src, srcId.ino, srcId.mtimeMs].join("|");
+  let same = sameBytesSeen.get(k);
+  if (same === undefined) {
+    same = sameBytes(file, src);
+    if (sameBytesSeen.size > 1000) sameBytesSeen.clear();
+    sameBytesSeen.set(k, same);
+  }
+  return same;
+}
+
+/** Whether two files of the same size hold the same bytes, read a megabyte at a time. */
+function sameBytes(a: string, b: string): boolean {
+  let fa: number | undefined;
+  let fb: number | undefined;
+  try {
+    fa = fs.openSync(a, "r");
+    fb = fs.openSync(b, "r");
+    const ba = Buffer.alloc(1 << 20);
+    const bb = Buffer.alloc(1 << 20);
+    for (;;) {
+      const na = fs.readSync(fa, ba, 0, ba.length, null);
+      const nb = fs.readSync(fb, bb, 0, bb.length, null);
+      if (na !== nb) return false;
+      if (na === 0) return true;
+      if (!ba.subarray(0, na).equals(bb.subarray(0, nb))) return false;
+    }
+  } catch {
+    return false;
+  } finally {
+    if (fa !== undefined) fs.closeSync(fa);
+    if (fb !== undefined) fs.closeSync(fb);
+  }
 }
 
 /** Whether a file EDGEdeck generates says something other than it should (or is missing). */
@@ -217,7 +265,7 @@ export function plan(lib: Library, gamePath: string): Plan {
     if (!e || (d.mod?.id ?? Generated) !== e.mod) return true;
     // A file EDGEdeck writes itself (modlist.txt) is due when what it should say has changed.
     if (d.content !== undefined && generatedDiffers(gameFile(gamePath, d.rel), d.content)) return true;
-    if (stillOurs(e, method, gamePath) !== "ok") return true;
+    if (stillOurs(e, lib.root, gamePath) !== "ok") return true;
     // Deployed the other way: the library moved onto or off the game's drive.
     if (d.content === undefined && otherMethod(e, method)) return true;
     return sourceReplaced(e, method, d);
@@ -231,7 +279,7 @@ export function detectChanges(gamePath: string): Change[] {
   if (!manifest) return [];
   const changes: Change[] = [];
   for (const entry of manifest.files) {
-    const state = stillOurs(entry, manifest.method, gamePath);
+    const state = stillOurs(entry, manifest.library, gamePath);
     if (state !== "ok") changes.push({ entry, kind: state });
   }
   return changes;
@@ -354,7 +402,7 @@ function backupPath(lib: Library, rel: string): string {
 
 function removeDeployed(lib: Library, gamePath: string, manifest: Manifest, entry: ManifestEntry, force: boolean, skipped: string[]): boolean {
   const target = gameFile(gamePath, entry.path);
-  const state = stillOurs(entry, manifest.method, gamePath);
+  const state = stillOurs(entry, lib.root, gamePath);
   if (state === "changed" && !force) {
     skipped.push(entry.path);
     return false;
@@ -478,12 +526,13 @@ export function deploy(lib: Library, gamePath: string, decisions: Map<string, De
     let backup = existing?.backup ?? false;
     if (existing) {
       // Our own stale copy, or one the user changed and answered about.
-      const state = stillOurs(existing, manifest.method, gamePath);
+      const state = stillOurs(existing, lib.root, gamePath);
       if (state === "changed" && !decisions.has(d.rel)) {
         result.skipped.push(d.rel);
         return;
       }
-      // "ok" here means the library file was replaced (a rebuilt mod): relink without asking.
+      // "ok" here means the library file was replaced (a rebuilt mod), "copied" that a copy with the
+      // same bytes took the deployed file's place (a REDnode swap): relink without asking.
       fs.rmSync(target, { force: true });
     } else if (fs.existsSync(target)) {
       // A file we never deployed is in the way: keep it safe, bring it back on undo.
@@ -586,8 +635,9 @@ export function pendingChanges(lib: Library, gamePath: string, p: Plan): Pending
     if (!e) out.push({ path: d.rel, mod: id, kind: "add", detail: d.content !== undefined ? "generated by EDGEdeck" : "new in the game folder" });
     else if (e.mod !== id) out.push({ path: d.rel, mod: id, kind: "replace", detail: "takes over the path from", prevMod: e.mod });
     else {
-      const st = stillOurs(e, p.method, gamePath);
+      const st = stillOurs(e, lib.root, gamePath);
       if (st === "missing") out.push({ path: d.rel, mod: id, kind: "restore", detail: "missing from the game folder" });
+      else if (st === "copied") out.push({ path: d.rel, mod: id, kind: "relink", detail: "copied over in the game folder with the same bytes (a REDnode swap); EDGEdeck's file goes back" });
       else if (st === "changed") out.push({ path: d.rel, mod: id, kind: "restore", detail: "changed in the game folder; deploy asks whether to keep it" });
       else if (d.content === undefined && otherMethod(e, p.method)) out.push({ path: d.rel, mod: id, kind: "relink", detail: p.method === "link" ? "the library is on the game's drive now: a hardlink instead of a copy" : "the library is on another drive now: a copy instead of a hardlink" });
       else out.push({ path: d.rel, mod: id, kind: "relink", detail: d.content !== undefined ? "the generated content changed (load order)" : "the library file was replaced (new version or rebuild)" });

@@ -218,6 +218,34 @@ console.log("changes: ok");
   console.log("rebuilt: ok");
 }
 
+// A copy with the same bytes over a hardlinked file (REDnode's swap, EDGEdeck #13): no question, relinked.
+{
+  const gameCopy = path.join(game, "r6", "scripts", "Loose", "Loose.reds");
+  const bytes = fs.readFileSync(gameCopy);
+  fs.rmSync(gameCopy);
+  fs.writeFileSync(gameCopy, bytes);
+  assert.equal(fs.statSync(gameCopy).nlink, 1, "a copy now, not the link");
+  assert.deepEqual(core.detectChanges(game).map((x) => [x.entry.path, x.kind]), [["r6/scripts/Loose/Loose.reds", "copied"]]);
+  const p2 = core.plan(lib, game);
+  assert.deepEqual(p2.add.map((d) => d.rel), ["r6/scripts/Loose/Loose.reds"]);
+  assert.match(core.pendingChanges(lib, game, p2)[0].detail, /same bytes/);
+  const r3 = core.deploy(lib, game);
+  assert.deepEqual(r3.skipped, [], "deploy did not ask");
+  assert.equal(fs.statSync(gameCopy).nlink, 2, "linked again");
+  assert.equal(core.detectChanges(game).length, 0);
+  // Same size, other bytes: still a change, and deploy still asks.
+  const other = Buffer.from(bytes);
+  other[0] ^= 1;
+  fs.rmSync(gameCopy);
+  fs.writeFileSync(gameCopy, other);
+  assert.equal(core.detectChanges(game)[0].kind, "changed");
+  assert.deepEqual(core.deploy(lib, game).skipped, ["r6/scripts/Loose/Loose.reds"]);
+  core.deploy(lib, game, new Map([["r6/scripts/Loose/Loose.reds", "restore"]]));
+  assert.deepEqual(fs.readFileSync(gameCopy), bytes, "the mod's file is back");
+  assert.equal(core.detectChanges(game).length, 0);
+  console.log("same bytes copied over: ok");
+}
+
 // One mod's deploy (REDcode's Install, EDGEdeck #2): its files go in, other mods' changes wait,
 // modlist.txt lists only what is in the game, and the manifest stays true.
 {
@@ -523,6 +551,30 @@ console.log("changes: ok");
     delete lib.info.sectionOf["nexus:500"];
     delete lib.info.sectionOf["nexus:500:20"];
     for (const m of [male, merged]) core.removeMod(lib, m);
+
+    // Imported from Vortex: the page is known, the file is not (issue #4). A main file and an optional
+    // one of the same page, as Vortex names their folders.
+    const truck = { files: [
+      { ...f(40, "Truck Simulator (Full version)", "4.1", "MAIN", 1700000010), file_name: "Truck Simulator (Full version)-600-4-1-1700000010.zip" },
+      { ...f(41, "Job Invitation (Robot) - Optional", "2.1", "OPTIONAL", 1700000000), file_name: "Job Invitation (Robot) - Optional-600-2-1-1700000000.zip" },
+    ], file_updates: [] };
+    assert.equal(core.vortexFile(truck, "Job Invitation (Robot) - Optional-600-2-1-1700000000").file_id, 41, "older Vortex: the file's name");
+    assert.equal(core.vortexFile(truck, "Robot Optional-600-2-1-1700000000").file_id, 41, "older Vortex: the upload time");
+    assert.equal(core.vortexFile(truck, "Job Invitation (Robot) - Optional 600 2.1 2023-11-14T22-13Z aBc123XyZ").file_id, 41, "newer Vortex: the minute, then the version");
+    assert.equal(core.vortexFile(truck, "Something 600 9.9 2023-11-14T22-13Z aBc123XyZ"), undefined, "two files that minute, neither version: no guess");
+    assert.equal(core.vortexFile(truck, "Hand named"), undefined);
+    assert.equal(core.onlyLine(truck, core.newestFile(truck)), undefined, "a page with an optional file: an unknown file gets no update");
+    assert.equal(core.onlyLine(renamed, core.newestFile(renamed)).file_id, 2, "a page with one mod: its newest main file");
+    const vMain = core.addMod(lib, cls("bare", "Fam").placements, { name: "Truck Simulator (Full version)", version: "4.1", source: { type: "vortex", modId: 600, path: path.join(tmp, "vortex", "Truck Simulator (Full version)-600-4-1-1700000010") } });
+    const vOpt = core.addMod(lib, cls("bare", "Fam").placements, { name: "Job Invitation (Robot) - Optional", version: "2.1", source: { type: "vortex", modId: 600, path: path.join(tmp, "vortex", "Job Invitation (Robot) - Optional-600-2-1-1700000000") } });
+    assert.equal(core.familyOf(lib, vOpt).mods.length, 2, "one family before the check, as in the issue");
+    core.splitPage(lib, 600, truck, "Truck Simulator");
+    assert.equal(vOpt.source.fileId, 41, "the optional file is found from its folder");
+    assert.equal(vOpt.source.fileTitle, "Job Invitation (Robot) - Optional");
+    assert.equal(vMain.source.fileId, 40, "and the main file");
+    assert.equal(core.families(lib).filter((x) => x.nexusId === 600).length, 2, "two mods now, each with its own versions");
+    assert.equal(core.newestInLine(truck, core.lineFile(vOpt), core.otherLineFiles(lib, vOpt)).file_id, 41, "the optional file's update is itself, not the main file");
+    for (const m of [vMain, vOpt]) core.removeMod(lib, m);
     console.log("nexus file lines: ok");
   }
 
@@ -900,6 +952,8 @@ console.log("undo: ok");
   assert.deepEqual(core.launchTarget(gogGame, "auto"), { kind: "exe", exe: path.join(gogGame, "bin", "x64", "Cyberpunk2077.exe"), args: ["-modded"] });
   assert.equal(core.launchTarget(steamGame, "exe").kind, "exe");
   assert.equal(core.launchTarget(gogGame, "steam").kind, "steam");
+  const env = core.playerEnv({ ELECTRON_RUN_AS_NODE: "1", Path: "C:\Windows" });
+  assert.deepEqual(env, { Path: "C:\Windows" }, "the game does not inherit ELECTRON_RUN_AS_NODE (EDGEdeck #12)");
   console.log("run game target: ok");
 }
 
@@ -930,14 +984,34 @@ console.log("undo: ok");
       }
     };
     if (fs.existsSync(staging)) sample = findArchive(staging);
+    // Else the smallest mod archive in the game folder (only copied, never changed).
+    const gameMods = core.findGame() ? path.join(core.findGame(), "archive", "pc", "mod") : "";
+    if (!sample && gameMods && fs.existsSync(gameMods)) {
+      sample = fs.readdirSync(gameMods).filter((f) => f.toLowerCase().endsWith(".archive")).map((f) => path.join(gameMods, f)).sort((x, y) => fs.statSync(x).size - fs.statSync(y).size)[0];
+    }
     if (sample) {
-      const r = await b.openMod(sample);
+      // A copy, so the staging folder is only read: deploy replaces such files once the bridge has let go (EDGEdeck #10).
+      const copy = path.join(fs.mkdtempSync(path.join(tmp, "bridge-")), path.basename(sample));
+      fs.copyFileSync(sample, copy);
+      const r = await b.openMod(copy);
       assert.ok(r.files > 0);
       console.log(`bridge openMod ${path.basename(sample)}: ${r.files} resources, first ${r.items[0].name}`);
+      let held = false;
+      try {
+        fs.renameSync(copy, copy + ".moved");
+        fs.renameSync(copy + ".moved", copy);
+      } catch {
+        held = true;
+      }
+      await b.stop();
+      assert.ok(!b.running);
+      fs.renameSync(copy, copy + ".moved");
+      fs.rmSync(copy + ".moved");
+      console.log(`bridge stop: ok (the bridge ${held ? "held the archive until it stopped" : "did not hold the archive"})`);
     } else {
       console.log("bridge openMod: no sample archive found, skipped");
+      await b.stop();
     }
-    b.stop();
   } else {
     console.log("bridge: not found, skipped");
   }
@@ -1319,6 +1393,19 @@ console.log("undo: ok");
   // A mod known by another name than its download (Cyber Engine Tweaks ships as "CET ... - Scripting fixes").
   assert.equal(core.vortexDisplayName({ name: "CET 1.37.1 - Scripting fixes", modId: 107 }), "Cyber Engine Tweaks");
   assert.equal(core.vortexDisplayName({ name: "Flavorful", modId: 13575 }), "Flavorful", "unknown ids keep their own name");
+  // Both ways Vortex names its folders, with versions that hold letters (real names from a staging folder).
+  const parsed = (f) => core.parseVortexFolder(f);
+  assert.deepEqual(parsed("Codeware-7780-1-20-5-1777845006"), { name: "Codeware", modId: 7780, version: "1.20.5" });
+  assert.deepEqual(parsed("Preem Scanner - No Line Effect Removal-9215-1-0-1a-1695485728"), { name: "Preem Scanner - No Line Effect Removal", modId: 9215, version: "1.0.1a" }, "a letter in an older folder's version");
+  assert.deepEqual(parsed("Eviction Notice-23187-1-0-3-for-2-3-1755569719"), { name: "Eviction Notice", modId: 23187, version: "1.0.3.for.2.3" }, "the id is the first number after the name, not the last");
+  assert.deepEqual(parsed("Flushing Etiquette 27902 3.3.2 2026-11-07T18-59Z D2ZS2n36j"), { name: "Flushing Etiquette", modId: 27902, version: "3.3.2" }, "a newer Vortex's folder");
+  assert.deepEqual(parsed("DroneEngineer 1.1.0 37244 5 2026-11-07T14-27Z 2w0lw1dVD"), { name: "DroneEngineer 1.1.0", modId: 37244, version: "5" }, "a version in the name stays in the name");
+  assert.deepEqual(parsed("vibinFM 99718 1.6-beta 2026-10-02T11-04Z abcDEF123"), { name: "vibinFM", modId: 99718, version: "1.6-beta" });
+  assert.equal(parsed("VBody_MiV2_0"), undefined, "a folder named by hand");
+  fs.mkdirSync(path.join(staging, "Flushing Etiquette 27902 3.3.2 2026-11-07T18-59Z D2ZS2n36j", "archive", "pc", "mod"), { recursive: true });
+  fs.writeFileSync(path.join(staging, "Flushing Etiquette 27902 3.3.2 2026-11-07T18-59Z D2ZS2n36j", "archive", "pc", "mod", "flushing.archive"), "x");
+  const newer = core.listVortexMods(fakeGame, staging).find((m) => m.modId === 27902);
+  assert.ok(newer && newer.name === "Flushing Etiquette" && newer.version === "3.3.2", "a newer Vortex's mod keeps its Nexus id at import");
   console.log("vortex staging: ok");
 }
 

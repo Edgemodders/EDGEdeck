@@ -20,6 +20,15 @@ How to keep it:
 
 - Nexus downloads run one at a time; the others say "waiting: 2 downloads ahead" until their turn. Nexus caps a free account's speed for the whole account (3 MB/s, 1.5 MB/s with an ad blocker), so files downloading at once only shared it. The setting `edgedeck.nexusDownloadsAtOnce` changes the number; 0 means no limit, for Premium.
 
+**Fixed**
+
+- Deploy no longer asks "Keep the changed file, or put the mod's file back?" about a file that was replaced by a copy with the same bytes, as REDcode's Pack and Play does when it swaps an archive into the running game. EDGEdeck now compares the bytes and quietly puts its own file back; a file whose bytes really changed is still asked about. https://github.com/Edgemodders/EDGEdeck/issues/13
+- Run game with the launch setting on `exe` no longer stops REDnode's overlay from opening: the game no longer inherits a VS Code setting (`ELECTRON_RUN_AS_NODE`) that made REDnode 0.58.0 and older close its overlay at once, leaving F10 with only a cursor. https://github.com/Edgemodders/EDGEdeck/issues/12
+- A deploy no longer stops partway with "in use, so Windows would not change it" because of EDGEdeck's own archive scanner. Before a deploy, an undo or a remove, EDGEdeck now stops its REDbridge and waits for it to exit, so it lets go of the archives it read. The next conflict scan starts it again. https://github.com/Edgemodders/EDGEdeck/issues/10
+- **Optional files imported from Vortex no longer get another file as their update.** A mod imported from Vortex knew its Nexus page but not its file, so every file of one page (the main file and its optional ones) was one mod, the update check offered the page's newest main file to all of them, and Update all turned the others off. Now the update check finds each mod's file from its Vortex folder's name and makes each file a mod of its own, as for files downloaded from Nexus. A mod whose file is still unknown gets no update on a page that offers more than one mod. See https://github.com/Edgemodders/EDGEdeck/issues/4
+- **Import from Vortex keeps the Nexus link of mods a newer Vortex downloaded.** Newer Vortex names its folders `Name 12345 1.2.0 2026-11-07T18-59Z hash` instead of `Name-12345-1-2-0-1762541940`, and versions with a letter (`1-0-1a`, `r10`, `beta`) did not match either. Those mods came in without their Nexus id: no Open on Nexus Mods, no update check, and a name with the date and hash in it. Now both kinds of folder give the name, the Nexus id and the version. Mods imported before keep what they have; remove and import them again to link them.
+- **Update all works for free Nexus accounts.** For a member without Premium, Update all and a row's update opened each file's page at its manual download, which saves the file to the browser's downloads folder. They now open the Mod manager download page, the one Nexus's own "Mod manager download" button opens, so the file comes back to EDGEdeck through the nxm link.
+
 ## 0.30.1 (2026-11-08)
 
 **New**

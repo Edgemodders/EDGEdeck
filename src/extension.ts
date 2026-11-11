@@ -16,7 +16,7 @@ import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, lat
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
-import { lineFile, lineName, lineOfFile, newestInLine, otherLineFiles, splitPage } from "./nexusLines";
+import { lineFile, lineName, lineOfFile, newestInLine, onlyLine, otherLineFiles, splitPage } from "./nexusLines";
 import { childName, gatherGroups, groupOfFamily, groupToggle, pageGroups, setFamiliesOn, type PageGroup } from "./pageGroups";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrameworks, type FrameworkRelease, type FrameworkSource, type FrameworkState } from "./frameworkGet";
@@ -24,7 +24,7 @@ import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveGroupInSection, moveInSection, moveSection, placeGroupNextTo, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
 import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
-import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, steamLibraries } from "./game";
+import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, playerEnv, steamLibraries } from "./game";
 import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove";
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveLibrary, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
 import { activeLoadout, deleteLoadout, exportLoadout, findLoadout, importLoadout, listLoadouts, loadoutNameProblem, loadoutState, makeActive, newLoadout, readLoadout, renameLoadout, saveLoadout, setInLoadout, syncActiveLoadout } from "./loadouts";
@@ -166,7 +166,7 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.showLog", () => log.show(true)),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("edgedeck")) {
-        bridge?.stop();
+        void bridge?.stop();
         bridge = undefined;
         reload();
       }
@@ -325,7 +325,7 @@ const api: EDGEdeckApi = {
 };
 
 export function deactivate(): void {
-  bridge?.stop();
+  void bridge?.stop();
 }
 
 function modOf(node: ModNode | undefined): ModInfo | undefined {
@@ -798,9 +798,32 @@ function refresh(): void {
   scanTimer = setTimeout(() => void run(() => scanArchives(false)), 400);
 }
 
+/** More than 0 while EDGEdeck replaces or deletes files the bridge may have open: no scan starts it then. */
+let bridgeHeld = 0;
+
+/**
+ * Runs `fn` with EDGEdeck's REDbridge stopped. The bridge keeps the archives it read open, and a
+ * hardlinked library archive is the game folder's file too, so Windows would refuse to replace or
+ * delete it (EDGEdeck #10). The scan that refresh() queues afterwards starts the bridge again.
+ */
+async function withBridgeStopped<T>(fn: () => PromiseLike<T>): Promise<T> {
+  bridgeHeld++;
+  try {
+    if (bridge?.running) {
+      log.appendLine("REDbridge stopped, so it lets go of the archives it read");
+      await bridge.stop();
+    }
+    bridge = undefined;
+    return await fn();
+  } finally {
+    bridgeHeld--;
+  }
+}
+
 /** EDGEdeck's own REDbridge process, started on first use. */
 async function ensureBridge(): Promise<BridgeClient> {
   if (bridge?.running) return bridge;
+  if (bridgeHeld) throw new Error("REDbridge waits while EDGEdeck changes files; try again in a moment.");
   if (!bridgeExe) throw new Error("This needs REDbridge. Run EDGEdeck: Get REDbridge.");
   bridge = new BridgeClient(bridgeExe, settings().dotnetRoot);
   bridge.start();
@@ -808,7 +831,7 @@ async function ensureBridge(): Promise<BridgeClient> {
   log.appendLine(`REDbridge ${info.version} (WolvenKit ${info.wolvenKit}) at ${bridgeExe}`);
   state.bridgeInfo = `REDbridge ${info.version} (WolvenKit ${info.wolvenKit})`;
   if (compareVersions(info.version, MinBridgeVersion) < 0) {
-    bridge.stop();
+    void bridge.stop();
     bridge = undefined;
     bridgeExe = "";
     throw new Error(`REDbridge ${info.version} is older than ${MinBridgeVersion}, which added archive.openMod. Run npm run update in the REDbridge folder.`);
@@ -900,6 +923,11 @@ async function scanArchives(explicit: boolean): Promise<void> {
   }
   const listings: ArchiveListing[] = [];
   for (const { mod, archive } of wanted) {
+    // A deploy, undo or remove stopped the bridge: leave the last result; the refresh after it scans again.
+    if (bridgeHeld) {
+      scanning = false;
+      return;
+    }
     const file = sourcePath(library, mod, archive);
     if (!fs.existsSync(file)) continue;
     try {
@@ -1316,7 +1344,9 @@ async function removeEntries(what: string, mods: ModInfo[], rows: string[] = mod
   if (!library || !mods.length) return;
   if (rows.length) await modsPage.gone(rows);
   await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Removing ${what}` }, async (progress) => {
-    for (const m of mods) removeMod(library!, m);
+    await withBridgeStopped(async () => {
+      for (const m of mods) removeMod(library!, m);
+    });
     refresh();
     // refresh() queues the archive scan; run it here instead, so the notification lasts as long as it does.
     clearTimeout(scanTimer);
@@ -1555,7 +1585,7 @@ async function getBridgeCommand(): Promise<void> {
       last = pct;
     }, (l) => log.appendLine(l));
     bridgeExe = exe;
-    bridge?.stop();
+    await bridge?.stop();
     bridge = undefined;
     const gone = removeOlderBridges(storageDir, release.tag);
     if (gone.length) log.appendLine(`Removed the older REDbridge ${gone.join(", ")}`);
@@ -2254,7 +2284,7 @@ async function moveLibraryCommand(): Promise<void> {
   const to = moveTarget(folder);
   const across = !sameDrive(from, to);
   stopWatching();
-  bridge?.stop();
+  await bridge?.stop();
   bridge = undefined;
   let result: Awaited<ReturnType<typeof moveLibrary>>;
   try {
@@ -2308,7 +2338,7 @@ async function runGameCommand(): Promise<void> {
     return;
   }
   log.appendLine(`Run game: ${target.exe} ${target.args.join(" ")}`);
-  const child = spawn(target.exe, target.args, { cwd: path.dirname(target.exe), detached: true, stdio: "ignore" });
+  const child = spawn(target.exe, target.args, { cwd: path.dirname(target.exe), detached: true, stdio: "ignore", env: playerEnv() });
   child.on("error", (e) => {
     log.appendLine(`Could not start the game: ${e.message}`);
     void vscode.window.showErrorMessage(`EDGEdeck: could not start the game. ${e.message}`);
@@ -2386,7 +2416,7 @@ async function deployNow(only?: ModInfo): Promise<DeployResult | undefined> {
     else if (a === "Put the mod's file back") decisions.set(c.entry.path, "restore");
     else return;
   }
-  const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Deploying", cancellable: false }, async (progress) => {
+  const result = await withBridgeStopped(() => vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Deploying", cancellable: false }, async (progress) => {
     let last = 0;
     try {
       return deploy(
@@ -2405,7 +2435,7 @@ async function deployNow(only?: ModInfo): Promise<DeployResult | undefined> {
       refresh();
       throw lockedFileError(err);
     }
-  });
+  }));
   log.appendLine(`Deployed${only ? ` ${only.name} only` : ""} (${result.method}): ${result.linked} added, ${result.removed} removed, ${result.kept} unchanged, ${result.backedUp} backed up${result.skipped.length ? `, skipped ${result.skipped.join(", ")}` : ""}${result.waiting ? `, ${result.waiting} waiting for other mods` : ""}`);
   let redmodNote = "";
   // REDmod compiles every package in the game at once. One mod's deploy runs it when it changed a
@@ -2526,7 +2556,7 @@ async function undoCommand(): Promise<void> {
   }
   const a = await vscode.window.showWarningMessage(`Remove all ${manifest.files.length} deployed files from the game folder? Your library is not touched.`, { modal: true }, "Undo deploy");
   if (a !== "Undo deploy") return;
-  const result = undo(library, gamePath);
+  const result = await withBridgeStopped(async () => undo(library!, gamePath));
   log.appendLine(`Undo: ${result.removed} removed${result.skipped.length ? `, left alone because they changed: ${result.skipped.join(", ")}` : ""}`);
   refresh();
   void vscode.window.showInformationMessage(`Undo: ${result.removed} files removed.${result.skipped.length ? ` ${result.skipped.length} changed files were left in place; see the log.` : ""}`);
@@ -2992,11 +3022,12 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
 
 /**
  * The newest file Nexus has of a mod: of its own file on the page (nexusLines.ts). Knowing nothing
- * of its file, on a page with no other file in the library, the page's newest main file.
+ * of its file, on a page with no other file in the library, the page's newest main file, and only
+ * when the page offers no other mod: an optional file must not be "updated" to the main one.
  */
 function newestOnPage(lib: Library, mod: ModInfo, files: NexusFiles) {
   const others = otherLineFiles(lib, mod);
-  return mod.source.fileId !== undefined || mod.source.fileTitle || others.length ? newestInLine(files, lineFile(mod), others) : newestFile(files);
+  return mod.source.fileId !== undefined || mod.source.fileTitle || others.length ? newestInLine(files, lineFile(mod), others) : onlyLine(files, newestFile(files));
 }
 
 class PremiumError extends Error {
@@ -3061,9 +3092,13 @@ async function applyUpdate(fam: Family, target: { fileId: number; version: strin
   }
 }
 
-/** For free Nexus members: opens each file's page, where "Mod manager download" sends the file here. */
+/**
+ * For free Nexus members: opens each file's Mod manager download page. `&nmm=1` is what Nexus's own
+ * "Mod manager download" button links to; without it the page is the manual download, whose file
+ * goes to the browser's downloads instead of to EDGEdeck.
+ */
 async function premiumPages(files: { modId: number; fileId: number }[]): Promise<void> {
-  for (const f of files) void vscode.env.openExternal(vscode.Uri.parse(`${modPageUrl(f.modId)}?tab=files&file_id=${f.fileId}`));
+  for (const f of files) void vscode.env.openExternal(vscode.Uri.parse(`${modPageUrl(f.modId)}?tab=files&file_id=${f.fileId}&nmm=1`));
   const handler = describeHandler(await currentNxmHandler());
   const pages = files.length === 1 ? "The file page is open" : `${files.length} file pages are open`;
   void vscode.window.showInformationMessage(
