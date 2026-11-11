@@ -16,7 +16,7 @@ import { dotnet10Root, installBridge, installDotnetRuntime, installedBridge, lat
 import { ConflictsPanel, type ConflictsMessage } from "./conflictsPanel";
 import { DetailPanel } from "./detailPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey } from "./families";
-import { lineFile, lineName, lineOfFile, newestInLine, otherLineFiles, splitPage } from "./nexusLines";
+import { lineFile, lineName, lineOfFile, newestInLine, onlyLine, otherLineFiles, splitPage } from "./nexusLines";
 import { childName, gatherGroups, groupOfFamily, groupToggle, pageGroups, setFamiliesOn, type PageGroup } from "./pageGroups";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrameworks, type FrameworkRelease, type FrameworkSource, type FrameworkState } from "./frameworkGet";
@@ -3001,11 +3001,12 @@ async function fetchFromNexus(modId: number, fileId: number, key?: string, expir
 
 /**
  * The newest file Nexus has of a mod: of its own file on the page (nexusLines.ts). Knowing nothing
- * of its file, on a page with no other file in the library, the page's newest main file.
+ * of its file, on a page with no other file in the library, the page's newest main file, and only
+ * when the page offers no other mod: an optional file must not be "updated" to the main one.
  */
 function newestOnPage(lib: Library, mod: ModInfo, files: NexusFiles) {
   const others = otherLineFiles(lib, mod);
-  return mod.source.fileId !== undefined || mod.source.fileTitle || others.length ? newestInLine(files, lineFile(mod), others) : newestFile(files);
+  return mod.source.fileId !== undefined || mod.source.fileTitle || others.length ? newestInLine(files, lineFile(mod), others) : onlyLine(files, newestFile(files));
 }
 
 class PremiumError extends Error {

@@ -551,6 +551,30 @@ console.log("changes: ok");
     delete lib.info.sectionOf["nexus:500"];
     delete lib.info.sectionOf["nexus:500:20"];
     for (const m of [male, merged]) core.removeMod(lib, m);
+
+    // Imported from Vortex: the page is known, the file is not (issue #4). A main file and an optional
+    // one of the same page, as Vortex names their folders.
+    const truck = { files: [
+      { ...f(40, "Truck Simulator (Full version)", "4.1", "MAIN", 1700000010), file_name: "Truck Simulator (Full version)-600-4-1-1700000010.zip" },
+      { ...f(41, "Job Invitation (Robot) - Optional", "2.1", "OPTIONAL", 1700000000), file_name: "Job Invitation (Robot) - Optional-600-2-1-1700000000.zip" },
+    ], file_updates: [] };
+    assert.equal(core.vortexFile(truck, "Job Invitation (Robot) - Optional-600-2-1-1700000000").file_id, 41, "older Vortex: the file's name");
+    assert.equal(core.vortexFile(truck, "Robot Optional-600-2-1-1700000000").file_id, 41, "older Vortex: the upload time");
+    assert.equal(core.vortexFile(truck, "Job Invitation (Robot) - Optional 600 2.1 2023-11-14T22-13Z aBc123XyZ").file_id, 41, "newer Vortex: the minute, then the version");
+    assert.equal(core.vortexFile(truck, "Something 600 9.9 2023-11-14T22-13Z aBc123XyZ"), undefined, "two files that minute, neither version: no guess");
+    assert.equal(core.vortexFile(truck, "Hand named"), undefined);
+    assert.equal(core.onlyLine(truck, core.newestFile(truck)), undefined, "a page with an optional file: an unknown file gets no update");
+    assert.equal(core.onlyLine(renamed, core.newestFile(renamed)).file_id, 2, "a page with one mod: its newest main file");
+    const vMain = core.addMod(lib, cls("bare", "Fam").placements, { name: "Truck Simulator (Full version)", version: "4.1", source: { type: "vortex", modId: 600, path: path.join(tmp, "vortex", "Truck Simulator (Full version)-600-4-1-1700000010") } });
+    const vOpt = core.addMod(lib, cls("bare", "Fam").placements, { name: "Job Invitation (Robot) - Optional", version: "2.1", source: { type: "vortex", modId: 600, path: path.join(tmp, "vortex", "Job Invitation (Robot) - Optional-600-2-1-1700000000") } });
+    assert.equal(core.familyOf(lib, vOpt).mods.length, 2, "one family before the check, as in the issue");
+    core.splitPage(lib, 600, truck, "Truck Simulator");
+    assert.equal(vOpt.source.fileId, 41, "the optional file is found from its folder");
+    assert.equal(vOpt.source.fileTitle, "Job Invitation (Robot) - Optional");
+    assert.equal(vMain.source.fileId, 40, "and the main file");
+    assert.equal(core.families(lib).filter((x) => x.nexusId === 600).length, 2, "two mods now, each with its own versions");
+    assert.equal(core.newestInLine(truck, core.lineFile(vOpt), core.otherLineFiles(lib, vOpt)).file_id, 41, "the optional file's update is itself, not the main file");
+    for (const m of [vMain, vOpt]) core.removeMod(lib, m);
     console.log("nexus file lines: ok");
   }
 
