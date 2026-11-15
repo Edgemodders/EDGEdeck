@@ -609,6 +609,11 @@ try {
     assert.equal(core.versionFrom("Name-12345-1-0-1a-1762541940"), "1.0.1a");
     assert.equal(core.cleanName("Name-12345-1-0-1a-1762541940"), "Name");
     assert.equal(core.cleanName("CET 1.37.1 - Scripting fixes-107-1-37-1-1759193708"), "CET 1.37.1 - Scripting fixes");
+    // a "-<digits>-" inside the name is not the id: the version has no spaces and starts like a version
+    assert.deepEqual(core.parseVortexFolder("Cyberpunk-2077-HD Reworked-7652-2-0-1700000000"), { name: "Cyberpunk-2077-HD Reworked", modId: 7652, version: "2.0" });
+    assert.deepEqual(core.parseVortexFolder("V-2-Outfits-12345-1-0-1700000000"), { name: "V-2-Outfits", modId: 12345, version: "1.0" });
+    assert.deepEqual(core.parseVortexFolder("Clean Voiceovers-4040-r10-1700000000"), { name: "Clean Voiceovers", modId: 4040, version: "r10" });
+    assert.deepEqual(core.parseVortexFolder("vibinFM-99718-beta-1700000000"), { name: "vibinFM", modId: 99718, version: "beta" });
     // the file's Nexus id finds its mod even when the mod's name is another; no new mod, no name to ask
     const nlib = core.loadLibrary(path.join(tmp, "nlib"), game);
     const { mod: had } = core.finishFomodAdd(nlib, core.prepareFomodAdd(nlib, same(basicRoot)), picks);

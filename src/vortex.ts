@@ -106,11 +106,15 @@ export function guessName(folder: string): string | undefined {
  * - newer Vortex: `Name <id> <version> <upload time> <hash>`
  *   (`Flushing Etiquette 27902 3.3.2 2026-11-07T18-59Z D2ZS2n36j`).
  * Versions may hold letters (`1-0-1a`, `r10`, `1.6-beta`). Undefined for any other name.
+ * In the older form the id is the first number after the name whose rest reads as a version (no
+ * spaces, starting with a digit, `v`/`r` and a digit, or alpha/beta/rc), so a `-2077-` or `-2-`
+ * inside the name (`Cyberpunk-2077-HD Reworked-7652-2-0-...`, `V-2-Outfits-12345-1-0-...`) is not it.
+ * Files downloaded from Nexus carry the same names, so adding a file reads them here too.
  */
 export function parseVortexFolder(folder: string): { name: string; modId: number; version: string } | undefined {
   const spaced = /^(.+) (\d+) (\S+) \d{4}-\d{2}-\d{2}T\d{2}-\d{2}Z \S+$/.exec(folder);
   if (spaced) return { name: spaced[1], modId: Number(spaced[2]), version: spaced[3] };
-  const dashed = /^(.*?)-(\d+)-(.+)-(\d{10})$/.exec(folder);
+  const dashed = /^(.*?)-(\d+)-((?:\d|[vVrR]\d|alpha|beta|rc)[0-9A-Za-z.-]*)-(\d{10})$/.exec(folder);
   if (dashed) return { name: dashed[1], modId: Number(dashed[2]), version: dashed[3].replace(/-/g, ".") };
   return undefined;
 }
