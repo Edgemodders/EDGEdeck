@@ -12,6 +12,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.32.0 (2026-11-15)
+
 **New**
 
 - FOMOD installers: choose options when you add a FOMOD mod; updates keep your choices and only ask when the installer changed.
@@ -23,6 +25,7 @@ How to keep it:
 
 - A FOMOD mod no longer installs every option at once, and its option folders are no longer offered as whole-mod choices.
 - Adding a file with Nexus's newer name (`Name 12345 1.2.0 2026-11-08T15-32Z hash`) gives the mod its name and version without the id, date and hash, and finds the mod of that Nexus page in the library, so a FOMOD file goes over it instead of becoming a second mod.
+- A number inside a mod's name in an older Nexus file name (`Cyberpunk-2077-HD Reworked-7652-2-0-...`) is no longer read as its Nexus id, when adding the file or importing from Vortex.
 
 ## 0.31.0 (2026-11-10)
 
