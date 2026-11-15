@@ -1978,7 +1978,8 @@ async function addFomodFrom(source: string, isFile: boolean, folder: string, pre
     // The window may have waited behind others: the family as it is now decides what this replaces.
     p = reprepareFomodAdd(lib, p);
   }
-  const r = finishFomodAdd(lib, p, choices, { from });
+  // A reinstall renames the mod's library folder, which Windows refuses while REDbridge holds an archive in it (#10).
+  const r = await withBridgeStopped(async () => finishFomodAdd(lib, p, choices, { from }));
   const mod = r.mod;
   log.appendLine(`${p.target ? "Reinstalled" : "Added"} ${mod.name} ${mod.version} from its installer (${mod.files.length} files, ${mod.kinds.join(", ")}) from ${source}${saved ? ", with the saved options" : ""}`);
   if (p.target) {
