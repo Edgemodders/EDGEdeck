@@ -58,3 +58,18 @@ export function cleanChoices(input: unknown): ColumnChoices {
   }
   return out;
 }
+
+/** Whether a mod came in through the FOMOD installer: it keeps a record of the options (or of a waiting update's). */
+export function hasFomod(mod: { fomod?: unknown }): boolean {
+  return !!mod.fomod;
+}
+
+/**
+ * The tags of the Kind column, in order: framework first, the mod's kinds, then `fomod` for a mod
+ * from the FOMOD installer. The search box reads the same words, so typing fomod lists those mods.
+ * A new list: the mod's stored kinds are never changed.
+ */
+export function kindTags(kinds: string[], fomod: boolean): string[] {
+  const tags = [...kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0));
+  return fomod ? [...tags, "fomod"] : tags;
+}

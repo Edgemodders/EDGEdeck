@@ -20,7 +20,7 @@ import { finishFomodAdd, fomodAddStep, prepareFomodAdd, reprepareFomodAdd, sameV
 import { openFomodInstaller } from "./fomodPanel";
 import { activateVersion, families, familyOf, renameFamily, familyUpdate, findSameVersion, type Family, settleNewVersion, familiesWithTwoOn, familyKey, versionFrom, cleanName } from "./families";
 import { lineFile, lineName, lineOfFile, newestInLine, onlyLine, otherLineFiles, splitPage } from "./nexusLines";
-import { cleanChoices, PageColumnsKey } from "./pageColumns";
+import { cleanChoices, hasFomod, PageColumnsKey } from "./pageColumns";
 import { childName, gatherGroups, groupOfFamily, groupToggle, pageGroups, setFamiliesOn, type PageGroup } from "./pageGroups";
 import { checkFrameworks, frameworkDetail, frameworkSummary, type FrameworkCheck } from "./frameworks";
 import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrameworks, type FrameworkRelease, type FrameworkSource, type FrameworkState } from "./frameworkGet";
@@ -1038,6 +1038,7 @@ function pageRow(fam: Family, manifestMods: Set<string>, viewed?: { mod: ModInfo
     status: review ? ["options to review", status].filter(Boolean).join(", ") : status,
     review,
     framework: mod.kinds.includes("framework"),
+    fomod: hasFomod(mod),
     deployed: manifestMods.has(mod.id),
     size: library ? modSize(library, mod).total : 0,
     ...libraryDates(fam, mod),

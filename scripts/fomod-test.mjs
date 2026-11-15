@@ -630,6 +630,19 @@ try {
     assert.throws(() => core.parseModuleConfig('<!DOCTYPE config [<!DOCTYPE inner [<!ENTITY a "x">]>]><config/>'), /not a FOMOD ModuleConfig.xml/);
   }
 
+  // The page's Kind tags: a FOMOD tag after the mod's kinds, so "fomod" in the search box finds it
+  {
+    assert.deepEqual(core.kindTags(["archive", "framework"], true), ["framework", "archive", "fomod"]);
+    assert.deepEqual(core.kindTags(["archive"], false), ["archive"]);
+    // a mod with only a waiting update's record still came from an installer
+    assert.equal(core.hasFomod({ fomod: { pending: { download: "x.7z", version: "2.0" } } }), true);
+    assert.equal(core.hasFomod({}), false);
+    // the stored kinds are left alone
+    const kinds = ["archive"];
+    core.kindTags(kinds, true);
+    assert.deepEqual(kinds, ["archive"]);
+  }
+
   // Vortex's LevelDB read without a native module: tables, log, overwrites and deletions
   {
     let ClassicLevel;

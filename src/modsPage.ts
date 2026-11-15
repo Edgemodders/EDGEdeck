@@ -3,7 +3,7 @@
 // the library line at the bottom. The sidebar tree is the compact companion of this page.
 
 import * as vscode from "vscode";
-import { columnShown, PageColumns, type ColumnChoices } from "./pageColumns";
+import { columnShown, kindTags, PageColumns, type ColumnChoices } from "./pageColumns";
 
 export interface PageRow {
   id: string;
@@ -12,6 +12,8 @@ export interface PageRow {
   /** Every version of this mod in the library, newest first. */
   versions: { id: string; version: string; active: boolean }[];
   kinds: string[];
+  /** The mod in use came in through the FOMOD installer: a FOMOD tag in the Kind column. */
+  fomod: boolean;
   enabled: boolean;
   /** The plain-words status phrase. */
   status: string;
@@ -245,7 +247,7 @@ export function renderPage(d: PageData, csp: string): string {
       { m: { action: "nexus", id: r.id }, icon: "nexus", title: "Open on Nexus", cls: r.nexusId ? "" : "blank" },
       { m: { action: "remove", id: r.id }, icon: "remove", title: r.versions.length > 1 ? `Remove version ${r.version} from Library` : "Remove from Library", cls: "danger" },
     ] as { m: PageMessage; icon: string; title: string; off?: boolean; cls?: string }[];
-    const text = `${r.group ? `${groupName.get(r.group) ?? ""} ` : ""}${r.name} ${r.versions.map((v) => v.version).join(" ")} ${r.kinds.join(" ")} ${r.status}`.toLowerCase();
+    const text = `${r.group ? `${groupName.get(r.group) ?? ""} ` : ""}${r.name} ${r.versions.map((v) => v.version).join(" ")} ${kindTags(r.kinds, r.fomod).join(" ")} ${r.status}`.toLowerCase();
     // The version cell: a dropdown when there is anything to choose, the version alone otherwise.
     const versionCell =
       r.versions.length > 1 || r.update
@@ -256,7 +258,7 @@ export function renderPage(d: PageData, csp: string): string {
     // The cells of the columns a player can turn off (pageColumns.ts), by column id.
     const cells: Record<string, string> = {
       ver: `<td class="vercell col-ver">${versionCell}</td>`,
-      kind: `<td class="col-kind">${[...r.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>`,
+      kind: `<td class="col-kind">${kindTags(r.kinds, r.fomod).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>`,
       size: `<td class="mono size col-size" data-size="${r.size}" title="${r.size.toLocaleString()} bytes in the library">${fmt(r.size)}</td>`,
       added: `<td class="mono upd8 col-added">${day(r.added)}</td>`,
       updated: `<td class="mono upd8 col-updated">${day(r.updated)}</td>`,
