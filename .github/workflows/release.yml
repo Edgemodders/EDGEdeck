@@ -130,6 +130,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm run smoke
+      - run: npm run test:fomod
 
       - name: Package
         run: npx vsce package --no-dependencies --target win32-x64 --readme-path docs/marketplace.md --out "dist/edgedeck-${VERSION}.vsix"
