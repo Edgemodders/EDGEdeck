@@ -12,6 +12,17 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- FOMOD installers: choose options when you add a FOMOD mod; updates keep your choices and only ask when the installer changed.
+- Import FOMOD choices from Vortex for mods you brought over.
+- To change a FOMOD mod's options, add the same file again (or press Mod manager download again on Nexus): its installer opens with your current choices.
+
+**Fixed**
+
+- A FOMOD mod no longer installs every option at once, and its option folders are no longer offered as whole-mod choices.
+- Adding a file with Nexus's newer name (`Name 12345 1.2.0 2026-11-08T15-32Z hash`) gives the mod its name and version without the id, date and hash, and finds the mod of that Nexus page in the library, so a FOMOD file goes over it instead of becoming a second mod.
+
 ## 0.31.0 (2026-11-10)
 
 **New**
@@ -36,16 +47,6 @@ How to keep it:
 - **Optional files imported from Vortex no longer get another file as their update.** A mod imported from Vortex knew its Nexus page but not its file, so every file of one page (the main file and its optional ones) was one mod, the update check offered the page's newest main file to all of them, and Update all turned the others off. Now the update check finds each mod's file from its Vortex folder's name and makes each file a mod of its own, as for files downloaded from Nexus. A mod whose file is still unknown gets no update on a page that offers more than one mod. See https://github.com/Edgemodders/EDGEdeck/issues/4
 - **Import from Vortex keeps the Nexus link of mods a newer Vortex downloaded.** Newer Vortex names its folders `Name 12345 1.2.0 2026-11-07T18-59Z hash` instead of `Name-12345-1-2-0-1762541940`, and versions with a letter (`1-0-1a`, `r10`, `beta`) did not match either. Those mods came in without their Nexus id: no Open on Nexus Mods, no update check, and a name with the date and hash in it. Now both kinds of folder give the name, the Nexus id and the version. Mods imported before keep what they have; remove and import them again to link them.
 - **Update all works for free Nexus accounts.** For a member without Premium, Update all and a row's update opened each file's page at its manual download, which saves the file to the browser's downloads folder. They now open the Mod manager download page, the one Nexus's own "Mod manager download" button opens, so the file comes back to EDGEdeck through the nxm link.
-**New**
-
-- FOMOD installers: choose options when you add a FOMOD mod; updates keep your choices and only ask when the installer changed.
-- Import FOMOD choices from Vortex for mods you brought over.
-- To change a FOMOD mod's options, add the same file again (or press Mod manager download again on Nexus): its installer opens with your current choices.
-
-**Fixed**
-
-- A FOMOD mod no longer installs every option at once, and its option folders are no longer offered as whole-mod choices.
-- Adding a file with Nexus's newer name (`Name 12345 1.2.0 2026-11-08T15-32Z hash`) gives the mod its name and version without the id, date and hash, and finds the mod of that Nexus page in the library, so a FOMOD file goes over it instead of becoming a second mod.
 
 ## 0.30.1 (2026-11-08)
 
