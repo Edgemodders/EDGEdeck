@@ -3,7 +3,7 @@
 // the library line at the bottom. The sidebar tree is the compact companion of this page.
 
 import * as vscode from "vscode";
-import { columnShown, PageColumns, type ColumnChoices } from "./pageColumns";
+import { columnShown, kindTags, PageColumns, type ColumnChoices } from "./pageColumns";
 
 export interface PageRow {
   id: string;
@@ -12,9 +12,13 @@ export interface PageRow {
   /** Every version of this mod in the library, newest first. */
   versions: { id: string; version: string; active: boolean }[];
   kinds: string[];
+  /** The mod in use came in through the FOMOD installer: a FOMOD tag in the Kind column. */
+  fomod: boolean;
   enabled: boolean;
   /** The plain-words status phrase. */
   status: string;
+  /** A downloaded FOMOD update waits for its options to be reviewed. */
+  review?: boolean;
   framework: boolean;
   deployed: boolean;
   /** Bytes in the library for the active version. */
@@ -91,7 +95,7 @@ export interface PageData {
 
 export interface PageMessage {
   action:
-    | "setup" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate" | "deployOne"
+    | "setup" | "reviewFomod" | "downloads" | "getBridge" | "changes" | "toggle" | "details" | "activate" | "moveUp" | "moveDown" | "open" | "nexus" | "update" | "remove" | "add" | "deploy" | "run" | "undo" | "updates" | "conflicts" | "signIn" | "library" | "moveLibrary" | "getFrameworks" | "updateAll" | "checkUpdate" | "deployOne"
     | "sectionOn" | "newSection" | "renameSection" | "deleteSection" | "moveSection" | "pickSection" | "putIn" | "place" | "fold" | "sectionMoveMods" | "sectionRemoveMods"
     | "loadoutView" | "loadoutNew" | "loadoutRename" | "loadoutDelete" | "loadoutActivate" | "loadoutExport" | "loadoutImport"
     | "groupOn" | "groupMove" | "groupSection" | "groupNexus" | "groupCheck" | "groupRemove" | "placeGroup"
@@ -179,6 +183,7 @@ function facetsOf(r: PageRow): string[] {
   if (r.changed) f.push("changed");
   if (r.conflicts) f.push("conflicts");
   if (r.update) f.push("update");
+  if (r.review) f.push("review");
   return f;
 }
 
@@ -192,6 +197,7 @@ const FacetLabels: [string, string][] = [
   ["changed", "Changed in game folder"],
   ["conflicts", "Conflicts"],
   ["update", "Update available"],
+  ["review", "Options to review"],
 ];
 
 /** A time in seconds as YYYY-MM-DD in local time; empty for 0. */
@@ -219,7 +225,7 @@ export function renderPage(d: PageData, csp: string): string {
   const span = (fixed: number) => `colspan="${fixed + shownCount}" data-fixed="${fixed}"`;
   const groupName = new Map(d.sections.flatMap((s) => s.groups.map((g) => [g.key, g.name] as const)));
   const row = (r: PageRow, section: string, first: boolean, last: boolean) => {
-    const statusClass = r.changed || r.conflicts ? "warn" : r.needsDeploy ? "pend" : r.deployed && r.enabled ? "ok" : "dim";
+    const statusClass = r.review || r.changed || r.conflicts ? "warn" : r.needsDeploy ? "pend" : r.deployed && r.enabled ? "ok" : "dim";
     const oneTitle =
       r.oneMod === "undeploy"
         ? r.enabled
@@ -241,7 +247,7 @@ export function renderPage(d: PageData, csp: string): string {
       { m: { action: "nexus", id: r.id }, icon: "nexus", title: "Open on Nexus", cls: r.nexusId ? "" : "blank" },
       { m: { action: "remove", id: r.id }, icon: "remove", title: r.versions.length > 1 ? `Remove version ${r.version} from Library` : "Remove from Library", cls: "danger" },
     ] as { m: PageMessage; icon: string; title: string; off?: boolean; cls?: string }[];
-    const text = `${r.group ? `${groupName.get(r.group) ?? ""} ` : ""}${r.name} ${r.versions.map((v) => v.version).join(" ")} ${r.kinds.join(" ")} ${r.status}`.toLowerCase();
+    const text = `${r.group ? `${groupName.get(r.group) ?? ""} ` : ""}${r.name} ${r.versions.map((v) => v.version).join(" ")} ${kindTags(r.kinds, r.fomod).join(" ")} ${r.status}`.toLowerCase();
     // The version cell: a dropdown when there is anything to choose, the version alone otherwise.
     const versionCell =
       r.versions.length > 1 || r.update
@@ -252,11 +258,11 @@ export function renderPage(d: PageData, csp: string): string {
     // The cells of the columns a player can turn off (pageColumns.ts), by column id.
     const cells: Record<string, string> = {
       ver: `<td class="vercell col-ver">${versionCell}</td>`,
-      kind: `<td class="col-kind">${[...r.kinds].sort((a, b) => (a === "framework" ? -1 : b === "framework" ? 1 : 0)).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>`,
+      kind: `<td class="col-kind">${kindTags(r.kinds, r.fomod).map((k) => `<span class="kind ${k === "framework" ? "fw" : ""}">${esc(k)}</span>`).join("")}</td>`,
       size: `<td class="mono size col-size" data-size="${r.size}" title="${r.size.toLocaleString()} bytes in the library">${fmt(r.size)}</td>`,
       added: `<td class="mono upd8 col-added">${day(r.added)}</td>`,
       updated: `<td class="mono upd8 col-updated">${day(r.updated)}</td>`,
-      status: `<td class="${statusClass} col-status">${r.needsDeploy || r.changed ? `<a class="st" data-msg='${msg({ action: "changes", id: r.id })}' title="What the next deploy does for this mod">${esc(r.status)}</a>` : esc(r.status)}${r.update ? `<a class="upd" data-msg='${msg({ action: "update", id: r.id })}' title="Download ${esc(r.update)} from Nexus and put it in this mod's place">update ${esc(r.update)} available</a>` : ""}</td>`,
+      status: `<td class="${statusClass} col-status">${r.review ? `<a class="st" data-msg='${msg({ action: "reviewFomod", id: r.id })}' title="Open the installer for the downloaded update">${esc(r.status)}</a>` : r.needsDeploy || r.changed ? `<a class="st" data-msg='${msg({ action: "changes", id: r.id })}' title="What the next deploy does for this mod">${esc(r.status)}</a>` : esc(r.status)}${r.update ? `<a class="upd" data-msg='${msg({ action: "update", id: r.id })}' title="Download ${esc(r.update)} from Nexus and put it in this mod's place">update ${esc(r.update)} available</a>` : ""}</td>`,
     };
     return `<tr draggable="true" data-id="${esc(r.id)}" data-group="${esc(section)}"${r.group ? ` data-pg="${esc(r.group)}"` : ""} data-facets="${facetsOf(r).join(" ")}" data-text="${esc(text)}" data-size="${r.size}" data-updated="${r.updated}" class="${r.enabled ? "" : "offrow"}">
 <td class="chk"><input type="checkbox" ${r.enabled ? "checked" : ""} data-msg='${msg({ action: "toggle", id: r.id })}' title="${r.enabled ? "Turn off" : "Turn on"}"></td>

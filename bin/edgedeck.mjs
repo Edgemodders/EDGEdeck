@@ -4,7 +4,8 @@
 //
 //   edgedeck list [--size]              what is in the library, its size and status (--size: largest first)
 //   edgedeck mod <id>                   one mod in full: files, sizes, source, Nexus data, conflicts
-//   edgedeck add <file|folder> [--name N] [--option FOLDER]
+//   edgedeck add <file|folder> [--name N] [--option FOLDER] [--fomod-choices JSON]
+//                                       --fomod-choices: for a FOMOD, [{"step":"..","group":"..","plugins":[".."]}]
 //   edgedeck install-project <.cpmodproj> [--follow | --keep-both]
 //                                       add a REDcode or WolvenKit project's packed output, or refresh it, and turn it on;
 //                                       beside a mod of the same name: --follow makes that mod follow this project,
@@ -60,6 +61,16 @@ if (cmd === "mcp") {
     console.error(json ? JSON.stringify({ error: msg }) : `error: ${msg}`);
     process.exit(1);
   };
+  const parseChoices = (v) => {
+    const shape = '--fomod-choices needs a JSON array of { "step": string, "group": string, "plugins": [string, ...] }';
+    let j;
+    try { j = JSON.parse(String(v)); } catch { return fail(shape); }
+    if (!Array.isArray(j)) return fail(shape);
+    const fits = (c) => !!c && typeof c === "object" && typeof c.step === "string" && typeof c.group === "string" && Array.isArray(c.plugins) && c.plugins.every((n) => typeof n === "string");
+    const bad = j.map((c, i) => (fits(c) ? 0 : i + 1)).filter(Boolean);
+    if (bad.length) return fail(`${shape}; not like that: entry ${bad.join(", ")}`);
+    return j.map((c) => ({ step: c.step, group: c.group, plugins: c.plugins }));
+  };
   const need = (value, what) => value ?? fail(`${cmd} needs ${what}`);
   const usage = () => console.log(fs.readFileSync(new URL(import.meta.url), "utf8").split("\n").filter((l) => l.startsWith("//")).slice(1).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
 
@@ -69,7 +80,7 @@ if (cmd === "mcp") {
     switch (cmd) {
       case "list": out(await v.list(s, !!flags.size)); break;
       case "mod": out(v.mod(s, need(rest[0], "a mod id"))); break;
-      case "add": out(await v.add(s, need(rest[0], "a file or folder"), flags.name, flags.option)); break;
+      case "add": out(await v.add(s, need(rest[0], "a file or folder"), flags.name, flags.option, flags["fomod-choices"] === undefined ? undefined : parseChoices(flags["fomod-choices"]))); break;
       case "install-project": out(v.installProject(s, need(rest[0], "a .cpmodproj file"), flags.follow ? "follow" : flags["keep-both"] ? "version" : undefined)); break;
       case "on":
       case "off": out(v.turn(s, need(rest[0], "a mod id"), cmd === "on")); break;

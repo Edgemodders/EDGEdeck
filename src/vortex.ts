@@ -5,7 +5,9 @@
 import fs from "./fsx";
 import * as path from "node:path";
 import { classify } from "./classifier";
-import { addMod, type Library, type ModInfo } from "./library";
+import { addMod, saveMod, type Library, type ModInfo } from "./library";
+import { readLevelDb } from "./leveldbRead";
+import type { StepChoice } from "./fomod";
 
 export interface VortexMod {
   folder: string;
@@ -104,11 +106,15 @@ export function guessName(folder: string): string | undefined {
  * - newer Vortex: `Name <id> <version> <upload time> <hash>`
  *   (`Flushing Etiquette 27902 3.3.2 2026-11-07T18-59Z D2ZS2n36j`).
  * Versions may hold letters (`1-0-1a`, `r10`, `1.6-beta`). Undefined for any other name.
+ * In the older form the id is the first number after the name whose rest reads as a version (no
+ * spaces, starting with a digit, `v`/`r` and a digit, or alpha/beta/rc), so a `-2077-` or `-2-`
+ * inside the name (`Cyberpunk-2077-HD Reworked-7652-2-0-...`, `V-2-Outfits-12345-1-0-...`) is not it.
+ * Files downloaded from Nexus carry the same names, so adding a file reads them here too.
  */
 export function parseVortexFolder(folder: string): { name: string; modId: number; version: string } | undefined {
   const spaced = /^(.+) (\d+) (\S+) \d{4}-\d{2}-\d{2}T\d{2}-\d{2}Z \S+$/.exec(folder);
   if (spaced) return { name: spaced[1], modId: Number(spaced[2]), version: spaced[3] };
-  const dashed = /^(.*?)-(\d+)-(.+)-(\d{10})$/.exec(folder);
+  const dashed = /^(.*?)-(\d+)-((?:\d|[vVrR]\d|alpha|beta|rc)[0-9A-Za-z.-]*)-(\d{10})$/.exec(folder);
   if (dashed) return { name: dashed[1], modId: Number(dashed[2]), version: dashed[3].replace(/-/g, ".") };
   return undefined;
 }
@@ -206,4 +212,99 @@ export function importFromVortex(lib: Library, mods: VortexMod[]): ImportResult 
     result.added.push(mod);
   }
   return result;
+}
+
+/** What Vortex remembers of one FOMOD mod's installer choices. */
+export interface VortexChoices { vortexId: string; modId?: number; version?: string; choices: StepChoice[] }
+
+/** Vortex's state database, in the user's AppData. */
+export function vortexStateDir(): string {
+  return path.join(process.env.APPDATA ?? path.join(process.env.USERPROFILE ?? "", "AppData", "Roaming"), "Vortex", "state.v2");
+}
+
+/** A stored value is JSON, and may be JSON text inside a JSON string. */
+function parseStored(v: string | undefined): unknown {
+  if (v === undefined) return undefined;
+  let x: unknown;
+  try { x = JSON.parse(v); } catch { return v; }
+  if (typeof x === "string" && "[{".includes(x.trimStart().charAt(0)) && x.trim() !== "") {
+    try { x = JSON.parse(x); } catch { /* keep the string */ }
+  }
+  return x;
+}
+
+/** The FOMOD choices Vortex kept per mod; reads a copy of its database, writes nothing. */
+export function readVortexChoices(stateDir: string): VortexChoices[] {
+  const pre = "persistent###mods###cyberpunk2077###";
+  let rows: Map<string, string>;
+  try {
+    rows = readLevelDb(stateDir, pre);
+  } catch (e) {
+    throw new Error(`Could not read Vortex's data in ${stateDir}: ${(e as Error).message}`);
+  }
+  const optSuffix = "###attributes###installerChoices###options";
+  const out: VortexChoices[] = [];
+  for (const [key, raw] of rows) {
+    if (!key.endsWith(optSuffix)) continue;
+    const vortexId = key.slice(pre.length, key.length - optSuffix.length);
+    if (!vortexId || vortexId.includes("###")) continue;
+    const type = parseStored(rows.get(`${pre}${vortexId}###attributes###installerChoices###type`));
+    if (type !== undefined && type !== "fomod") continue;
+    const opts = parseStored(raw);
+    if (!Array.isArray(opts)) continue;
+    const choices: StepChoice[] = [];
+    for (const step of opts as { name?: string; groups?: unknown }[]) {
+      // A one-step installer is stored without the step's name; applySaved finds it by group name.
+      if (!step || (step.name !== undefined && typeof step.name !== "string") || !Array.isArray(step.groups)) continue;
+      for (const g of step.groups as { name?: unknown; choices?: unknown }[]) {
+        if (!g || typeof g.name !== "string" || !Array.isArray(g.choices)) continue;
+        const plugins = (g.choices as { name?: unknown }[]).map((c) => c?.name).filter((n): n is string => typeof n === "string");
+        choices.push({ step: step.name ?? "", group: g.name, plugins });
+      }
+    }
+    const id = Number(parseStored(rows.get(`${pre}${vortexId}###attributes###modId`)));
+    const ver = parseStored(rows.get(`${pre}${vortexId}###attributes###version`));
+    if (!choices.length) continue;
+    out.push({ vortexId, modId: Number.isFinite(id) && id > 0 ? id : undefined, version: typeof ver === "string" ? ver : undefined, choices });
+  }
+  return out;
+}
+
+/** The last folder name of a path, whichever slash it uses. */
+function lastSegment(p: string): string {
+  return p.split("\\").join("/").split("/").filter(Boolean).pop() ?? "";
+}
+
+/** Gives the library's Vortex mods the choices Vortex kept; a record made by EDGEdeck is never replaced. */
+export function importVortexChoices(lib: Library, list: VortexChoices[]): { matched: { id: string; vortexId: string }[]; unmatched: string[]; skipped: string[] } {
+  const matched: { id: string; vortexId: string }[] = [];
+  const skipped: string[] = [];
+  const used = new Set<string>();
+  const byFolder = new Map(list.map((v) => [v.vortexId, v]));
+  const apply = (mod: ModInfo, v: VortexChoices): void => {
+    used.add(v.vortexId);
+    if (mod.fomod?.from === "edgedeck") {
+      skipped.push(mod.id);
+      return;
+    }
+    // An update already waiting for review keeps waiting.
+    const pending = mod.fomod?.pending;
+    mod.fomod = { choices: v.choices, configHash: "", from: "vortex", ...(pending ? { pending } : {}) };
+    saveMod(lib, mod);
+    matched.push({ id: mod.id, vortexId: v.vortexId });
+  };
+  const later: ModInfo[] = [];
+  // By folder name first, so the fallback only sees what no folder claimed.
+  for (const mod of lib.mods.filter((m) => m.source.type === "vortex")) {
+    const v = mod.source.path ? byFolder.get(lastSegment(mod.source.path)) : undefined;
+    if (v && !used.has(v.vortexId)) apply(mod, v);
+    else later.push(mod);
+  }
+  // By Nexus mod id and version, only when exactly one unclaimed entry fits: a page with several files at one version is ambiguous.
+  for (const mod of later) {
+    if (!mod.source.modId) continue;
+    const fits = list.filter((x) => !used.has(x.vortexId) && x.modId === mod.source.modId && x.version !== undefined && x.version === mod.version);
+    if (fits.length === 1) apply(mod, fits[0]);
+  }
+  return { matched, unmatched: list.filter((v) => !used.has(v.vortexId)).map((v) => v.vortexId), skipped };
 }
