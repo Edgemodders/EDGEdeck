@@ -605,6 +605,10 @@ try {
     assert.equal(core.versionFrom(spaced), "1.9.1");
     assert.equal(core.cleanName("Codeware-7780-1-20-3-1777845006"), "Codeware");
     assert.equal(core.versionFrom("Codeware-7780-1-20-3-1777845006"), "1.20.3");
+    // one parser with Import from Vortex (parseVortexFolder): versions with a letter read the same
+    assert.equal(core.versionFrom("Name-12345-1-0-1a-1762541940"), "1.0.1a");
+    assert.equal(core.cleanName("Name-12345-1-0-1a-1762541940"), "Name");
+    assert.equal(core.cleanName("CET 1.37.1 - Scripting fixes-107-1-37-1-1759193708"), "CET 1.37.1 - Scripting fixes");
     // the file's Nexus id finds its mod even when the mod's name is another; no new mod, no name to ask
     const nlib = core.loadLibrary(path.join(tmp, "nlib"), game);
     const { mod: had } = core.finishFomodAdd(nlib, core.prepareFomodAdd(nlib, same(basicRoot)), picks);

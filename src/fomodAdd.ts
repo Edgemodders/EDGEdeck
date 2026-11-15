@@ -2,7 +2,8 @@
 // prepareFomodAdd works out the family, the version, the mod to reinstall over and the saved
 // choices; finishFomodAdd installs with the choices the caller settled on (saved, given or picked).
 import * as path from "node:path";
-import { baseName, cleanName, families, familyForDownload, familyKey, familyOf, nexusFileName, settleNewVersion, versionFrom } from "./families";
+import { baseName, cleanName, families, familyForDownload, familyKey, familyOf, settleNewVersion, versionFrom } from "./families";
+import { parseVortexFolder } from "./vortex";
 import { activeFiles, applySaved, findFomodRoot, inferChoices, installFomod, moduleConfigPath, readModuleConfig, type Applied, type FomodConfig, type FomodRecord, type StepChoice } from "./fomod";
 import { downloadsFolder, keepDownload, saveMod, type Library, type ModInfo, type ModSource } from "./library";
 
@@ -59,7 +60,7 @@ export function prepareFomodAdd(lib: Library, opts: FomodAddInput): PreparedFomo
   const label = opts.name ?? (isFile ? cleanName(modName) : modName);
   const fams = families(lib);
   // A Nexus file name carries the page's id: it finds the mod even when the names differ.
-  const pageId = preset?.source?.modId ?? (isFile ? nexusFileName(modName)?.modId : undefined);
+  const pageId = preset?.source?.modId ?? (isFile ? parseVortexFolder(modName)?.modId : undefined);
   // The family: the preset's line (a new line has none yet), else the mod this download is kept for, else the Nexus page, else by name.
   const fam = preset?.family
     ? fams.find((f) => f.key === preset.family)
