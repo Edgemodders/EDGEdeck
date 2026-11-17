@@ -20,7 +20,7 @@ Last updated 2026-11-02. Dates before 2026-10-17 come from the session records; 
 | [Release workflow](#release-workflow) | Automated, Run workflow from the Actions tab | 2026-10-31 (v0.29.2) | Pass |
 | [npm package install](#npm-package-install) | By hand | 2026-10-16 (0.26.5) | Pass |
 | [Hand tests by the owner](#hand-tests-by-the-owner) | By hand, real game | 2026-11-02 | 45 runs, see the table |
-| [Waiting](#waiting-for-a-hand-test) | By hand | | none open |
+| [Waiting](#waiting-for-a-hand-test) | By hand | | 31 to 35 (FOMOD, released in 0.32.0 on the contributor's tests) |
 
 ## Automated
 
@@ -165,15 +165,15 @@ Run 2026-10-16 on 0.26.5: **pass**. The server answered with 14 `edgedeck_*` too
 
 ## Waiting for a hand test
 
-Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.0 (2026-11-02), the eye for 0.30.1 (2026-11-08), and tests 20 to 30 for 0.31.0 (2026-11-10; 25 and the free half of 23 need a free account, see the note above test 23). New ones go in this table, with the columns # (kept until the list is done), Test, Since and Steps; a passed one moves to the table above.
+Every hand test through 0.29.4 has passed (2026-11-01), tests 16 to 19 for 0.30.0 (2026-11-02), the eye for 0.30.1 (2026-11-08), and tests 20 to 30 for 0.31.0 (2026-11-10; 25 and the free half of 23 need a free account, see the note above test 23). Tests 31 to 35 came with PR #11 (the FOMOD installer); 0.32.0 shipped on 2026-11-15 after the contributor's runs noted in each row, and the owner has not run them yet. New ones go in this table, with the columns # (kept until the list is done), Test, Since and Steps; a passed one moves to the table above.
 
 | # | Test | Since | Steps |
 |---|---|---|---|
-| 31 | **FOMOD, first install** | PR #11 | Mod manager download of a FOMOD mod you don't have. **Expect:** the installer window opens (steps on the left, options with their pictures); Install adds one mod with only the picked files, a FOMOD tag in its Kind column, and `fomod` in the search box lists it. Tried by the contributor 11-09 on a multi-step FOMOD: passed |
-| 32 | **FOMOD, same file again** | PR #11 | Add the same FOMOD file again. **Expect:** the window opens with the current choices ticked; a different pick reinstalls over the same mod (no second mod). Do it once with the EDGEdeck page open after a conflict scan (REDbridge running): the reinstall must not fail with "in use". Tried by the contributor 11-09: the reinstall passed; the REDbridge-running case not yet (its fix came after) |
-| 33 | **FOMOD choices from Vortex** | PR #11 | On a PC with FOMOD mods installed through Vortex: **EDGEdeck: Import FOMOD choices from Vortex**. **Expect:** a count of mods whose choices came in; adding the next update of one of them installs without the window. Tried by the contributor 11-09: 15 of 15 |
-| 34 | **FOMOD, options to review from a real update** | PR #11 | On a FOMOD mod whose new Nexus version changed its installer, press Update. **Expect:** the row says `options to review`; the link opens the window with the old choices that still fit, and the old version stays in use until Install. Not tried yet: no FOMOD mod had such an update |
-| 35 | **FOMOD in Update all, Premium** | PR #11 | Premium account, a FOMOD mod with an update whose saved choices fit: Update all. **Expect:** it installs with the saved choices and no window; one whose choices no longer fit waits as `options to review`. Not tried: the contributor's account is free |
+| 31 | **FOMOD, first install** | 0.32.0 (PR #11) | Mod manager download of a FOMOD mod you don't have. **Expect:** the installer window opens (steps on the left, options with their pictures); Install adds one mod with only the picked files, a FOMOD tag in its Kind column, and `fomod` in the search box lists it. Tried by the contributor 11-09 on a multi-step FOMOD: passed |
+| 32 | **FOMOD, same file again** | 0.32.0 (PR #11) | Add the same FOMOD file again. **Expect:** the window opens with the current choices ticked; a different pick reinstalls over the same mod (no second mod). Do it once with the EDGEdeck page open after a conflict scan (REDbridge running): the reinstall must not fail with "in use". Tried by the contributor 11-09: the reinstall passed; the REDbridge-running case not yet (its fix came after) |
+| 33 | **FOMOD choices from Vortex** | 0.32.0 (PR #11) | On a PC with FOMOD mods installed through Vortex: **EDGEdeck: Import FOMOD choices from Vortex**. **Expect:** a count of mods whose choices came in; adding the next update of one of them installs without the window. Tried by the contributor 11-09: 15 of 15 |
+| 34 | **FOMOD, options to review from a real update** | 0.32.0 (PR #11) | On a FOMOD mod whose new Nexus version changed its installer, press Update. **Expect:** the row says `options to review`; the link opens the window with the old choices that still fit, and the old version stays in use until Install. Not tried yet: no FOMOD mod had such an update |
+| 35 | **FOMOD in Update all, Premium** | 0.32.0 (PR #11) | Premium account, a FOMOD mod with an update whose saved choices fit: Update all. **Expect:** it installs with the saved choices and no window; one whose choices no longer fit waits as `options to review`. Not tried: the contributor's account is free |
 
 ### Test 30, step by step
 
