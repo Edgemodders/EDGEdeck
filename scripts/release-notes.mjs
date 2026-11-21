@@ -3,7 +3,8 @@
 // section. The same convention as every Edgemodders repo (REDnode's tools/release/notes.mjs).
 //
 //   node scripts/release-notes.mjs [version]            markdown for GitHub, with the install line
-//   node scripts/release-notes.mjs [version] --nexus    plain lines for Nexus's changelog field
+//   node scripts/release-notes.mjs [version] --nexus    the section's short Nexus summary (see below), for
+//                                                       Nexus's changelog field; stops when there is none
 //   --out <file>                                        writes the notes to a file (UTF-8)
 //
 // The version defaults to package.json's. npm run release:notes runs it.
@@ -33,24 +34,55 @@ if (!section.some((line) => line.trim())) {
   process.exit(1);
 }
 
+// The section for GitHub and the stores: without its Nexus summary (below).
+const github = [];
+for (let i = 0, inBlock = false; i < section.length; i++) {
+  if (!inBlock && section[i].trim() === "<!-- nexus") inBlock = true;
+  else if (inBlock && section[i].trim() === "-->") inBlock = false;
+  else if (!inBlock) github.push(section[i]);
+}
+
 if (nexus) {
-  // Nexus's changelog takes one plain line per change: no markdown, links as "text (url)".
-  const plain = (text) =>
-    text
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")
-      .replace(/\*\*([^*]+)\*\*/g, "$1")
-      .replace(/`([^`]+)`/g, "$1");
-  const result = [];
-  let group = "";
-  for (const line of section) {
-    const groupHeading = line.match(/^\*\*(.+)\*\*$/);
-    if (groupHeading) group = groupHeading[1];
-    else if (line.startsWith("- ")) result.push((group ? `${group}: ` : "") + plain(line.slice(2)));
-    else if (line.trim()) result.push(plain(line.trim()));
+  // Nexus shows each line of a version's changelog as one entry, as plain text in a small field,
+  // and its API cannot edit or delete one once posted. So its lines are a short summary written by
+  // hand under the version's heading, in an HTML comment that GitHub, the stores and the docs site hide:
+  //
+  //   <!-- nexus
+  //   New: FOMOD installer: pick a mod's options when you add it
+  //   Fixed: A number inside a mod's name is no longer read as its Nexus id
+  //   -->
+  //
+  // The rules are EDGErepo's (README, "Nexus changelogs"), whose nexus.mjs release refuses notes that
+  // break them: each line starts with New:, Changed:, Fixed:, Removed:, Other: or Needs:, plain text,
+  // at most NEXUS_LINE characters; at most NEXUS_LINES lines with the "Full changelog" link added last.
+  const NEXUS_LINE = 120;
+  const NEXUS_LINES = 13;
+  const open = section.findIndex((line) => line.trim() === "<!-- nexus");
+  const close = open < 0 ? -1 : section.findIndex((line, i) => i > open && line.trim() === "-->");
+  if (open < 0 || close < 0) {
+    console.error(`CHANGELOG.md: the section for ${version} has no Nexus summary. Add one under its heading:
+
+<!-- nexus
+New: one short line per change, at most ${NEXUS_LINE} characters
+-->`);
+    process.exit(1);
   }
-  write(result.join("\n"));
+  const summary = section.slice(open + 1, close).map((line) => line.trim()).filter(Boolean);
+  const wrong = [];
+  if (!summary.length) wrong.push("it is empty");
+  if (summary.length > NEXUS_LINES - 1) wrong.push(`${summary.length} lines, at most ${NEXUS_LINES - 1} (the link makes ${NEXUS_LINES})`);
+  for (const line of summary) {
+    if (!/^(New|Changed|Fixed|Removed|Other|Needs): \S/.test(line)) wrong.push(`"${line}" does not start with New:, Changed:, Fixed:, Removed:, Other: or Needs:`);
+    if (line.length > NEXUS_LINE) wrong.push(`"${line.slice(0, 50)}..." is ${line.length} characters, at most ${NEXUS_LINE}`);
+    if (/`|\*\*|\]\(/.test(line)) wrong.push(`"${line.slice(0, 50)}..." has markdown`);
+  }
+  if (wrong.length) {
+    console.error(`CHANGELOG.md: the Nexus summary for ${version}:\n- ${wrong.join("\n- ")}`);
+    process.exit(1);
+  }
+  write([...summary, "Full changelog: https://edgemodders.github.io/EDGEdeck/changelog.html"].join("\n"));
 } else {
-  write(`${section.join("\n").trim()}
+  write(`${github.join("\n").trim()}
 
 **Install:** in VS Code, search the Extensions view for EDGEdeck (VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=edgemodders.edgedeck, Open VSX: https://open-vsx.org/extension/edgemodders/edgedeck), or install the .vsix below with Extensions: Install from VSIX. Docs: https://edgemodders.github.io/EDGEdeck/ (changelog: https://edgemodders.github.io/EDGEdeck/changelog.html)`);
 }

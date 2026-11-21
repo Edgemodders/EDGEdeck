@@ -1,18 +1,29 @@
 # Changelog
 
-What changed in each EDGEdeck release, for players and modders. Each release takes its notes from its section here: the GitHub release (written by the release workflow), the VS Code Marketplace and Open VSX (which show this file), and the version's changelog on the Nexus Mods page (pasted by hand).
+What changed in each EDGEdeck release, for players and modders. Each release takes its notes from its section here: the GitHub release (written by the release workflow), the VS Code Marketplace and Open VSX (which show this file), and, through a short summary of its own, the version's changelog on the Nexus Mods page (posted by the release workflow).
 
 How to keep it:
 
 - With each change a player or modder would notice, add a line under **Unreleased**, in its group: **New**, **Changed**, **Fixed** or **Other**. One change per line, in the commit that makes the change. Leave out what only the tests see.
 - Before a release, rename **Unreleased** to `## <version> (<date>)` and start a new empty **Unreleased** above it. The release workflow stops before releasing anything if the version has no section.
 - Links are full URLs, since the same text goes to GitHub, the stores and Nexus.
-- `npm run release:notes` prints the GitHub notes; `npm run release:notes -- --nexus` prints plain lines for Nexus's changelog field, one per change.
+- Under each version's heading, a short summary for Nexus in an HTML comment, which GitHub, the stores and the docs site hide: a line `<!-- nexus`, then one line per change starting with `New:`, `Changed:`, `Fixed:`, `Removed:`, `Other:` or `Needs:`, plain text with no markdown, at most 120 characters a line and 12 lines, then a line `-->`. Nexus shows each line as one entry and cannot change it once posted; the release stops before publishing anything when the summary is missing or breaks a rule (EDGErepo's README, "Nexus changelogs").
+- `npm run release:notes` prints the GitHub notes; `npm run release:notes -- --nexus` prints the Nexus summary with the full changelog's link.
 - Sections before 0.28.0 predate the groups and are left as they were; entries before 0.27.0 keep the old name, REDdeck.
 
 ## Unreleased
 
 ## 0.32.0 (2026-11-15)
+
+<!-- nexus
+New: FOMOD installer: pick a mod's options when you add it; updates keep your choices
+New: Import FOMOD choices from Vortex for mods you brought over
+New: A FOMOD tag in the page's Kind column; type fomod in the search box to list those mods
+New: Add the same FOMOD file again to change its options
+Fixed: A FOMOD mod no longer installs every option at once
+Fixed: Nexus's newer file names give the mod its own name and version
+Fixed: A number inside a mod's name is no longer read as its Nexus id
+-->
 
 **New**
 

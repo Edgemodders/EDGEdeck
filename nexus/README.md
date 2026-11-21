@@ -54,7 +54,7 @@ By hand, after `npm run package`: `node scripts/nexus-zip.mjs` writes `dist/EDGE
 ## Updating the page
 
 1. Edit `description.bbcode` here, check it with `node scripts/check-bbcode.mjs nexus/description.bbcode`, commit, push.
-2. With a release: tick **Update Nexus Mods** beside **Make a release** (or `npm run release:nexus`). After the GitHub release the workflow uploads `EDGEdeck-<version>-nexus.zip` as the main file's new version (the old one archived, Mod Manager Download off), adds the version's changelog (`npm run release:notes -- --nexus`) and pushes `description.bbcode` when it differs from the live one.
+2. With a release: tick **Update Nexus Mods** beside **Make a release** (or `npm run release:nexus`). After the GitHub release the workflow uploads `EDGEdeck-<version>-nexus.zip` as the main file's new version (the old one archived, Mod Manager Download off), adds the version's changelog (the short summary in its CHANGELOG.md section, printed by `npm run release:notes -- --nexus`) and pushes `description.bbcode` when it differs from the live one.
 3. The push never overwrites an edit made on Nexus: if the live description is neither the one last pulled nor the one the previous release pushed, the run stops before it builds. Then `node ../EDGErepo/tools/nexus/nexus.mjs pull`, merge with `git diff`, commit, and run again. `node ../EDGErepo/tools/nexus/nexus.mjs status` shows the page's version, files and whether its description matches.
 4. Screenshots uploaded on Nexus show in the description as `staticdelivery.nexusmods.com` links; keep them when editing.
 

@@ -35,7 +35,7 @@ npm install
 | `npm run smoke` | Runs `scripts/smoke.mjs`: classifies sample layouts, adds them to a temp library, deploys into a fake game folder with hardlinks, changes a file by hand, undoes, and imports from Vortex if it is installed (read-only) |
 | `npm run package` | Builds a `.vsix` into `dist/` with vsce (README: `docs/marketplace.md`) |
 | `npm run test:ui` | Runs `src/uiTest.ts` inside a downloaded VS Code (see below) |
-| `npm run release:notes` | Prints the GitHub release notes from CHANGELOG.md; `-- --nexus` prints Nexus's plain lines |
+| `npm run release:notes` | Prints the GitHub release notes from CHANGELOG.md; `-- --nexus` prints the version's short Nexus summary |
 
 To run it, open the repo in VS Code and press F5. A second VS Code window opens with EDGEdeck loaded; its Mods view is in the activity bar. EDGEdeck finds the game through Steam, GOG or Epic; set `edgedeck.gamePath` in that window's settings only for a game they cannot see.
 
