@@ -13,6 +13,14 @@ How to keep it:
 
 ## Unreleased
 
+## 0.33.0 (2026-11-21)
+
+<!-- nexus
+Fixed: Security: a crafted Nexus link could run commands on your PC through EDGEdeck's link handler (0.27.0 to 0.32.0)
+New: Mod manager buttons on EDGEmods (edgemods.ai) open in EDGEdeck and go to the EDGEmods extension
+Changed: Several files changed in the game folder: Keep all and Put all back answer the rest at once
+-->
+
 **New**
 
 - EDGEdeck takes the links from the Mod manager button on EDGEmods (https://edgemods.ai) mod pages, by itself when no other program holds them, and hands them to the EDGEmods extension. Without that extension it says the link needs it and offers to show it. "EDGEdeck: EDGEmods: stop handling links" gives them away, "EDGEmods: handle links" takes them back (https://github.com/Edgemodders/EDGEdeck/issues/16).
