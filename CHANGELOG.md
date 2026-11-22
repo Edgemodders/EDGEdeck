@@ -13,6 +13,10 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- EDGEdeck takes the links from the Mod manager button on EDGEmods (https://edgemods.ai) mod pages, by itself when no other program holds them, and hands them to the EDGEmods extension. Without that extension it says the link needs it and offers to show it. "EDGEdeck: EDGEmods: stop handling links" gives them away, "EDGEmods: handle links" takes them back (https://github.com/Edgemodders/EDGEdeck/issues/16).
+
 ## 0.32.0 (2026-11-15)
 
 <!-- nexus

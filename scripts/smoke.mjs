@@ -1220,6 +1220,19 @@ console.log("undo: ok");
     assert.equal(core.nxmFromQuery(`url=${encodeURIComponent(link)}`), link);
     assert.equal(core.nxmFromQuery("other=1"), undefined);
   }
+  // edgemods links (EDGEdeck#16): the editor's exe straight from the registry, no shell code.
+  {
+    const link = "edgemods://install/street-cred/1.0.0";
+    assert.equal(core.linkFromQuery(`url=${link}`, "edgemods"), link);
+    assert.equal(core.linkFromQuery(`url=${encodeURIComponent(link)}`, "edgemods"), link);
+    const exe = "C:\\Users\\V\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe";
+    const line = core.edgemodsCommand(exe, "vscode-insiders");
+    assert.equal(line, `"${exe}" --open-url -- "vscode-insiders://edgemodders.edgedeck/edgemods?url=%1"`);
+    assert.doesNotMatch(line, /powershell/i);
+    assert.equal(core.edgemodsExe(line), exe);
+    assert.equal(core.edgemodsExe(`"C:\\Other\\Manager.exe" --open-url -- "%1"`), undefined);
+    assert.equal(core.describeHandler(line), "EDGEdeck");
+  }
   assert.throws(() => core.parseNxm("https://www.nexusmods.com/cyberpunk2077/mods/7780"), /Not an nxm link/);
   assert.throws(() => core.parseNxm("nxm://cyberpunk2077/collections/abc/revisions/1"), /collections/);
   assert.equal(core.versionNewer("1.20.4", "1.20.3"), true);

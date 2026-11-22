@@ -10,7 +10,7 @@ import * as vscode from "vscode";
 import { classify } from "./classifier";
 import { removeTemp } from "./extract";
 import fsx, { electronFs } from "./fsx";
-import { nxmFromQuery } from "./nxm";
+import { linkFromQuery, nxmFromQuery } from "./nxm";
 
 export async function run(): Promise<void> {
   // A .asar file in a mod (REDnode's host has resources\app.asar): Electron's node:fs reads it as a
@@ -34,6 +34,11 @@ export async function run(): Promise<void> {
   const link = "nxm://cyberpunk2077/mods/35393/files/166705?key=a-b_c&expires=1760000000&user_id=42";
   const uri = vscode.Uri.parse(`vscode://edgemodders.edgedeck/nxm?url=${encodeURIComponent(link)}`);
   assert.equal(nxmFromQuery(uri.query), link, `query as VS Code gives it: ${uri.query}`);
+  // An edgemods link as the registry sends it, unencoded (EDGEdeck#16).
+  const emLink = "edgemods://install/street-cred/1.0.0";
+  const emUri = vscode.Uri.parse(`vscode://edgemodders.edgedeck/edgemods?url=${emLink}`);
+  assert.equal(emUri.path, "/edgemods");
+  assert.equal(linkFromQuery(emUri.query, "edgemods"), emLink, `query as VS Code gives it: ${emUri.query}`);
   const lib = process.env.EDGEDECK_TEST_LIB!;
   const game = process.env.EDGEDECK_TEST_GAME!;
   assert.ok(lib && game, "EDGEDECK_TEST_LIB and EDGEDECK_TEST_GAME must be set");

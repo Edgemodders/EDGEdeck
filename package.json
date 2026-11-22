@@ -284,6 +284,16 @@
         "category": "EDGEdeck"
       },
       {
+        "command": "edgedeck.edgemodsHandleLinks",
+        "title": "EDGEmods: handle links",
+        "category": "EDGEdeck"
+      },
+      {
+        "command": "edgedeck.edgemodsReleaseLinks",
+        "title": "EDGEmods: stop handling links",
+        "category": "EDGEdeck"
+      },
+      {
         "command": "edgedeck.saveLoadout",
         "title": "Save as new loadout...",
         "category": "EDGEdeck"

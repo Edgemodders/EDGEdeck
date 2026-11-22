@@ -39,7 +39,7 @@ import { DownloadCancelled, DownloadQueue, downloadsAtOnce, progressText, SpeedM
 import { download, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
-import { currentNxmHandler, describeHandler, forwarderCommand, forwarderExe, nxmFromQuery, nxmReadError, parseNxm, registerNxmHandler, unregisterNxmHandler, UriAuthority, type LinkTarget } from "./nxm";
+import { currentEdgemodsHandler, currentNxmHandler, describeHandler, edgemodsCommand, edgemodsExe, EdgemodsScheme, forwarderCommand, forwarderExe, linkFromQuery, nxmFromQuery, nxmReadError, parseNxm, registerEdgemodsHandler, registerNxmHandler, unregisterEdgemodsHandler, unregisterNxmHandler, UriAuthority, type LinkTarget } from "./nxm";
 import { deployedRedmodPackages, deployRedmod, enabledRedmodPackages } from "./redmod";
 import { addToProject, classifyProject, findProjectFile, installProject, projectName, sameNameMod, syncProjects, type BesideHow, type InstallProjectResult } from "./project";
 import { importFromVortex, importVortexChoices, listVortexMods, readVortexChoices, vortexDisplayName, vortexStagingCandidates, vortexStateDir, type VortexChoices } from "./vortex";
@@ -67,7 +67,7 @@ let globalState: vscode.Memento;
 let bridge: BridgeClient | undefined;
 let bridgeExe = "";
 let scanTimer: NodeJS.Timeout | undefined;
-let state: { plan?: Plan; changes: Change[]; archive?: ArchiveConflictSummary; version?: string; bridgeInfo?: string; bridgeUpdate?: string; setup: SetupStep[]; nxmHandler?: string; vortexMods: number } = { changes: [], setup: [], vortexMods: 0 };
+let state: { plan?: Plan; changes: Change[]; archive?: ArchiveConflictSummary; version?: string; bridgeInfo?: string; bridgeUpdate?: string; setup: SetupStep[]; nxmHandler?: string; edgemodsHandler?: string; vortexMods: number } = { changes: [], setup: [], vortexMods: 0 };
 const archiveCache = new Map<string, { mtimeMs: number; resources: Map<string, string> }>();
 
 export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
@@ -171,6 +171,8 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.nexusAddLink", () => run(nexusAddLinkCommand)),
     vscode.commands.registerCommand("edgedeck.nexusHandleLinks", () => run(nexusHandleLinksCommand).then(() => refreshSetup(true))),
     vscode.commands.registerCommand("edgedeck.nexusReleaseLinks", () => run(nexusReleaseLinksCommand).then(() => refreshSetup(true))),
+    vscode.commands.registerCommand("edgedeck.edgemodsHandleLinks", () => run(edgemodsHandleLinksCommand).then(() => refreshSetup(true))),
+    vscode.commands.registerCommand("edgedeck.edgemodsReleaseLinks", () => run(edgemodsReleaseLinksCommand).then(() => refreshSetup(true))),
     vscode.window.registerUriHandler({ handleUri: (uri) => void run(() => handleUri(uri)) }),
     vscode.commands.registerCommand("edgedeck.refresh", () => reload()),
     vscode.commands.registerCommand("edgedeck.showLog", () => log.show(true)),
@@ -357,6 +359,7 @@ async function allSetupSteps(): Promise<(SetupStep & { done: boolean })[]> {
     { id: "bridge", label: "Get REDbridge", detail: "Sees conflicts inside archives; a 70 MB download", command: "edgedeck.getBridge", done: !!bridgeExe },
     { id: "nexus", label: "Sign in to Nexus Mods", detail: "For updates and downloads from the site", command: "edgedeck.nexusSignIn", done: signedIn },
     { id: "links", label: "Handle Nexus download links", detail: `Mod manager download buttons go to ${handler} now`, command: "edgedeck.nexusHandleLinks", done: handler === "EDGEdeck" },
+    edgemodsLinksStep(),
     { id: "vortex", label: "Import from Vortex", detail: `${state.vortexMods} mod${state.vortexMods === 1 ? "" : "s"} in Vortex, none in the library yet`, command: "edgedeck.importVortex", done: !state.vortexMods || !!library?.mods.some((m) => m.source.type === "vortex") },
   ];
 }
@@ -388,6 +391,7 @@ async function refreshSetup(full = false): Promise<void> {
       log.appendLine(`Nexus download links: could not update the handler: ${(err as Error).message}`);
     }
   }
+  if (full) await refreshEdgemodsLinks(target);
   const hidden = new Set(globalState.get<string[]>(SetupHiddenKey, []));
   const all = await allSetupSteps();
   state.setup = all.filter((s) => !s.done && !hidden.has(s.id));
@@ -3067,6 +3071,7 @@ async function nexusAddLinkCommand(): Promise<void> {
 }
 
 async function handleUri(uri: vscode.Uri): Promise<void> {
+  if (uri.path === "/edgemods") return openEdgemodsLink(linkFromQuery(uri.query, EdgemodsScheme));
   if (uri.path !== "/nxm") return;
   const url = nxmFromQuery(uri.query);
   if (!url) throw new Error("The link EDGEdeck received had no nxm URL in it.");
@@ -3477,6 +3482,91 @@ async function nexusHandleLinksCommand(): Promise<void> {
   void run(() => refreshSetup());
   log.appendLine(`nxm links: now handled by EDGEdeck (before: ${who}), through ${linkTarget().exe ?? `${vscode.env.uriScheme}://`}`);
   void vscode.window.showInformationMessage("EDGEdeck now handles Nexus download links. On a mod page, press Mod manager download and the file lands in the library.");
+}
+
+// ---- edgemods links (EDGEdeck#16): EDGEdeck holds them, the EDGEmods extension acts on them ----
+
+/** Set when the player gave edgemods links away, so EDGEdeck does not take them back quietly. */
+const EdgemodsReleasedKey = "edgedeck.edgemodsReleased";
+const EdgemodsExtension = "edgemodders.edgemods";
+
+/**
+ * No other mod manager claims edgemods links, so EDGEdeck registers for them quietly when nobody
+ * holds them, and rewrites its own entry for this editor when it is stale. Another program's entry,
+ * another installed editor's, and links the player gave away are left alone. Never from a test run.
+ */
+async function refreshEdgemodsLinks(target: LinkTarget): Promise<void> {
+  const handler = await currentEdgemodsHandler();
+  state.edgemodsHandler = handler;
+  if (testRun || !target.exe || globalState.get<boolean>(EdgemodsReleasedKey)) return;
+  const exe = handler && edgemodsExe(handler);
+  const elsewhere = !!exe && fs.existsSync(exe) && exe.toLowerCase() !== target.exe.toLowerCase();
+  const wanted = edgemodsCommand(target.exe, target.scheme);
+  if (handler && (!handler.includes(UriAuthority) || elsewhere || handler === wanted)) return;
+  try {
+    await registerEdgemodsHandler(target.exe, target.scheme);
+    state.edgemodsHandler = wanted;
+    log.appendLine(`EDGEmods links: ${handler ? "updated EDGEdeck's handler" : "now handled by EDGEdeck"}, through ${target.exe}`);
+  } catch (err) {
+    log.appendLine(`EDGEmods links: could not register: ${(err as Error).message}`);
+  }
+}
+
+/** Shown only while another program holds edgemods links (EDGEdeck takes them quietly otherwise). */
+function edgemodsLinksStep(): SetupStep & { done: boolean } {
+  const who = describeHandler(state.edgemodsHandler);
+  const other = who !== "nobody" && who !== "EDGEdeck" && !globalState.get<boolean>(EdgemodsReleasedKey);
+  return { id: "edgemodsLinks", label: "Handle EDGEmods links", detail: `Mod manager buttons on EDGEmods go to ${who} now`, command: "edgedeck.edgemodsHandleLinks", done: !other };
+}
+
+async function edgemodsHandleLinksCommand(): Promise<void> {
+  const target = linkTarget();
+  if (!target.exe) throw new Error("EDGEdeck could not find this editor's program, so it cannot take EDGEmods links here.");
+  const who = describeHandler(await currentEdgemodsHandler());
+  if (who !== "nobody" && who !== "EDGEdeck") {
+    const a = await vscode.window.showWarningMessage(`${who} handles EDGEmods links right now. Hand them to EDGEdeck?`, { modal: true }, "Hand them to EDGEdeck");
+    if (!a) return;
+  }
+  await globalState.update(EdgemodsReleasedKey, undefined);
+  await registerEdgemodsHandler(target.exe, target.scheme);
+  state.edgemodsHandler = edgemodsCommand(target.exe, target.scheme);
+  log.appendLine(`EDGEmods links: now handled by EDGEdeck (before: ${who}), through ${target.exe}`);
+  void vscode.window.showInformationMessage("EDGEdeck now handles EDGEmods links: the Mod manager button on a mod's page opens here.");
+}
+
+async function edgemodsReleaseLinksCommand(): Promise<void> {
+  const who = describeHandler(await currentEdgemodsHandler());
+  await globalState.update(EdgemodsReleasedKey, true);
+  if (who !== "EDGEdeck") {
+    void vscode.window.showInformationMessage(`EDGEmods links are handled by ${who}, not EDGEdeck. EDGEdeck will leave them alone.`);
+    return;
+  }
+  await unregisterEdgemodsHandler();
+  log.appendLine("EDGEmods links: EDGEdeck no longer handles them");
+  void vscode.window.showInformationMessage('EDGEdeck no longer handles EDGEmods links. "EDGEdeck: EDGEmods: handle links" takes them back.');
+}
+
+/**
+ * An edgemods link from the registry. EDGEdeck reads only the scheme; the EDGEmods extension asks
+ * the player, signs in, downloads and then hands the files back to EDGEdeck. Without it, says so.
+ */
+async function openEdgemodsLink(url: string | undefined): Promise<void> {
+  if (!url || !/^edgemods:/i.test(url)) throw new Error("The link EDGEdeck received had no EDGEmods link in it.");
+  log.appendLine(`EDGEmods link received: ${url}`);
+  const ext = vscode.extensions.getExtension<{ openLink?: (url: string) => Promise<void> } | undefined>(EdgemodsExtension);
+  const show = () => vscode.commands.executeCommand("workbench.extensions.search", EdgemodsExtension);
+  if (!ext) {
+    const a = await vscode.window.showInformationMessage("EDGEmods links need the EDGEmods extension, which fetches the mod and what it needs.", "Show the extension");
+    if (a) await show();
+    return;
+  }
+  const api = await ext.activate();
+  if (typeof api?.openLink !== "function") {
+    const a = await vscode.window.showWarningMessage("This EDGEmods extension cannot open links yet. Update it, then press Mod manager again.", "Show the extension");
+    if (a) await show();
+    return;
+  }
+  await api.openLink(url);
 }
 
 async function nexusReleaseLinksCommand(): Promise<void> {

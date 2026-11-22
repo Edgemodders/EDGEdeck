@@ -27,10 +27,15 @@ export interface NxmLink {
  * the link. A query that is still encoded is decoded once.
  */
 export function nxmFromQuery(query: string): string | undefined {
+  return linkFromQuery(query, "nxm");
+}
+
+/** The link of the given scheme inside the query of a vscode:// link, as nxmFromQuery. */
+export function linkFromQuery(query: string, scheme: string): string | undefined {
   const i = query.indexOf("url=");
   if (i < 0) return undefined;
   const value = query.slice(i + "url=".length);
-  return /^nxm%3A/i.test(value) ? decodeURIComponent(value) : value || undefined;
+  return new RegExp(`^${scheme}%3A`, "i").test(value) ? decodeURIComponent(value) : value || undefined;
 }
 
 /** Parses nxm://cyberpunk2077/mods/123/files/456?key=...&expires=...&user_id=... */
@@ -111,6 +116,51 @@ export async function currentNxmHandler(): Promise<string | undefined> {
     return m?.[1].trim();
   } catch (err) {
     nxmReadError = (err as Error).message;
+    return undefined;
+  }
+}
+
+// ---- edgemods:// links: the "Mod manager" button on a mod's page on EDGEmods (EDGEdeck#16) ----
+//
+// edgemods://install/<mod>/<version>, with the mod's id and the release; EDGEdeck reads only the
+// scheme and hands the link to the EDGEmods extension. Any web page can open one, so the link never
+// goes into shell code: the registry runs the editor's exe with --open-url, as VS Code's own
+// vscode:// entry does, and the link is one quoted argument. EDGEmods' links have no query, so they
+// need no encoding inside ours.
+
+export const EdgemodsScheme = "edgemods";
+const EdgemodsKey = "HKCU\\Software\\Classes\\edgemods";
+
+/** The command the registry runs for an edgemods link: the editor's exe, opening ours. */
+export function edgemodsCommand(exe: string, scheme = UriScheme): string {
+  return `"${exe}" --open-url -- "${scheme}://${UriAuthority}/edgemods?url=%1"`;
+}
+
+/** The editor exe an edgemods command opens, if it is EDGEdeck's. */
+export function edgemodsExe(command: string): string | undefined {
+  return command.includes(UriAuthority) ? /^"([^"]+)" --open-url/.exec(command)?.[1] : undefined;
+}
+
+/** Registers EDGEdeck for edgemods links, for this user. */
+export async function registerEdgemodsHandler(exe: string, scheme = UriScheme): Promise<void> {
+  await run("reg", ["add", EdgemodsKey, "/ve", "/d", "URL:EDGEmods link", "/f"], { windowsHide: true });
+  await run("reg", ["add", EdgemodsKey, "/v", "URL Protocol", "/d", "", "/f"], { windowsHide: true });
+  await run("reg", ["add", `${EdgemodsKey}\\shell\\open\\command`, "/ve", "/d", edgemodsCommand(exe, scheme), "/f"], { windowsHide: true });
+}
+
+/** Removes EDGEdeck's registration for edgemods links; another program's is left alone. */
+export async function unregisterEdgemodsHandler(): Promise<void> {
+  if ((await currentEdgemodsHandler())?.includes(UriAuthority)) {
+    await run("reg", ["delete", EdgemodsKey, "/f"], { windowsHide: true });
+  }
+}
+
+/** The command currently registered for edgemods links, or undefined. */
+export async function currentEdgemodsHandler(): Promise<string | undefined> {
+  try {
+    const { stdout } = await run("reg", ["query", `${EdgemodsKey}\\shell\\open\\command`, "/ve"], { windowsHide: true });
+    return /REG_SZ\s+(.+)$/m.exec(stdout)?.[1].trim();
+  } catch {
     return undefined;
   }
 }
