@@ -2546,17 +2546,29 @@ async function deployNowWork(only?: ModInfo): Promise<DeployResult | undefined> 
   }
   const decisions = new Map<string, Decision>();
   const scope = only && modDeployPaths(gamePath, plan(library, gamePath), only.id);
-  for (const c of detectChanges(gamePath).filter((c) => c.kind === "changed" && (!scope || scope.has(c.entry.path.toLowerCase())))) {
+  // One question per changed file, and with more than one left, buttons that answer the rest too.
+  const changed = detectChanges(gamePath).filter((c) => c.kind === "changed" && (!scope || scope.has(c.entry.path.toLowerCase())));
+  for (let i = 0; i < changed.length; i++) {
+    const c = changed[i];
+    const left = changed.length - i;
     const mod = library.mods.find((m) => m.id === c.entry.mod)?.name ?? c.entry.mod;
+    const keepAll = `Keep all ${left} changed files`;
+    const restoreAll = `Put all ${left} back`;
     const a = await vscode.window.showWarningMessage(
       `${c.entry.path} changed in the game folder since EDGEdeck deployed it from ${mod}. Keep the changed file, or put the mod's file back?`,
-      { modal: true },
+      { modal: true, detail: changed.length > 1 ? `File ${i + 1} of ${changed.length}.${left > 1 ? ` The "all" buttons answer this one and the ${left - 1} after it.` : ""}` : undefined },
       "Keep the changed file",
       "Put the mod's file back",
+      ...(left > 1 ? [keepAll, restoreAll] : []),
     );
-    if (a === "Keep the changed file") decisions.set(c.entry.path, "keep");
-    else if (a === "Put the mod's file back") decisions.set(c.entry.path, "restore");
-    else return;
+    if (!a) return;
+    const decision: Decision = a === "Keep the changed file" || a === keepAll ? "keep" : "restore";
+    const rest = a === keepAll || a === restoreAll ? changed.slice(i) : [c];
+    for (const r of rest) decisions.set(r.entry.path, decision);
+    if (rest.length > 1) {
+      log.appendLine(`Changed in the game folder: ${decision === "keep" ? "kept" : "put back"} ${rest.length} files at once`);
+      break;
+    }
   }
   const result = await withBridgeStopped(() => vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Deploying", cancellable: false }, async (progress) => {
     let last = 0;

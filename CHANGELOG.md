@@ -17,6 +17,10 @@ How to keep it:
 
 - EDGEdeck takes the links from the Mod manager button on EDGEmods (https://edgemods.ai) mod pages, by itself when no other program holds them, and hands them to the EDGEmods extension. Without that extension it says the link needs it and offers to show it. "EDGEdeck: EDGEmods: stop handling links" gives them away, "EDGEmods: handle links" takes them back (https://github.com/Edgemodders/EDGEdeck/issues/16).
 
+**Changed**
+
+- When several deployed files changed in the game folder, Deploy's question for each now also has Keep all and Put all back, which answer that file and the rest at once instead of one question per file.
+
 ## 0.32.0 (2026-11-15)
 
 <!-- nexus
