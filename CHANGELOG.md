@@ -21,6 +21,10 @@ How to keep it:
 
 - When several deployed files changed in the game folder, Deploy's question for each now also has Keep all and Put all back, which answer that file and the rest at once instead of one question per file.
 
+**Fixed**
+
+- Security: a crafted Nexus download link (nxm://) opened from a web page could run its own commands on your PC through the small PowerShell forwarder EDGEdeck registered for those links (EDGEdeck 0.27.0 to 0.32.0). Windows now starts the editor directly with the link, and EDGEdeck replaces the old forwarder by itself the first time it starts. If Vortex or another program holds Nexus links right now, nothing of EDGEdeck's is registered and nothing changes.
+
 ## 0.32.0 (2026-11-15)
 
 <!-- nexus

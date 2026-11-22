@@ -1,8 +1,7 @@
 // nxm:// links: what the "Mod manager download" button on Nexus opens. VS Code cannot register a
-// protocol for an extension, so EDGEdeck registers a small PowerShell forwarder under the current
-// user's classes that hands vscode://edgemodders.edgedeck/nxm?url=<link> to the editor it runs in,
-// whose URI handler passes it to the extension. Registration is explicit, and so is giving the
-// links back.
+// protocol for an extension, so EDGEdeck registers the editor's own exe under the current user's
+// classes, opening vscode://edgemodders.edgedeck/nxm?url=<link>, whose URI handler passes it to the
+// extension. Registration is explicit, and so is giving the links back.
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -68,27 +67,41 @@ export interface LinkTarget {
 }
 
 /**
- * The command the registry runs for an nxm link: forward it to the editor, percent-encoded. With an
- * exe, the link goes straight to that exe's --open-url, the way the editor's own protocol entry does
- * it, so whatever holds the vscode:// protocol (a test build, another editor) does not matter. The
- * link goes in single quotes inside the PowerShell code: -Command joins its arguments into code, and
- * the & between a link's query parameters is a parse error there. Nexus links have no quotes.
+ * The command the registry runs for a link: the editor's exe with --open-url, the way the editor's
+ * own vscode:// entry does it, so whatever holds the vscode:// protocol (a test build, another
+ * editor) does not matter. The link is one quoted argument and never part of shell code: any web
+ * page can open an nxm or edgemods link, and up to 0.32.0 a link with a ' in it could break out of
+ * the PowerShell forwarder's quotes and run its own code. The link goes in unencoded; VS Code hands
+ * the query over decoded anyway, and linkFromQuery takes everything after url=.
  */
-export function forwarderCommand(target: LinkTarget = {}): string {
-  const url = `$u = '${target.scheme ?? UriScheme}://${UriAuthority}/nxm?url=' + [uri]::EscapeDataString('%1')`;
-  const open = target.exe ? `Start-Process -FilePath '${target.exe.replace(/'/g, "''")}' -ArgumentList '--open-url','--',$u` : "Start-Process $u";
-  return `powershell.exe -NoProfile -WindowStyle Hidden -Command "${url}; ${open}"`;
+export function linkCommand(target: LinkTarget, path: "nxm" | "edgemods"): string {
+  if (!target.exe) throw new Error("EDGEdeck could not find this editor's program, so it cannot take links here.");
+  return `"${target.exe}" --open-url -- "${target.scheme ?? UriScheme}://${UriAuthority}/${path}?url=%1"`;
 }
 
-/** The editor exe a forwarder sends links to, if it names one. */
-export function forwarderExe(command: string): string | undefined {
-  return /-FilePath '((?:[^']|'')+)'/.exec(command)?.[1].replace(/''/g, "'");
+/** The command the registry runs for an nxm link. */
+export function forwarderCommand(target: LinkTarget): string {
+  return linkCommand(target, "nxm");
+}
+
+/**
+ * EDGEdeck's own registry entry read back: the editor it opens and that editor's link scheme, and
+ * whether it is the PowerShell forwarder of 0.27.0 to 0.32.0, which has to be replaced.
+ * Undefined for another program's entry.
+ */
+export function readForwarder(command: string): { exe?: string; scheme?: string; old: boolean } | undefined {
+  if (!command.includes(UriAuthority)) return undefined;
+  const direct = /^"([^"]+)" --open-url -- "([a-z-]+):\/\//i.exec(command);
+  if (direct) return { exe: direct[1], scheme: direct[2], old: false };
+  const exe = /-FilePath '((?:[^']|'')+)'/.exec(command)?.[1].replace(/''/g, "'");
+  const scheme = /\$u = '([a-z-]+):\/\//i.exec(command)?.[1];
+  return { exe, scheme, old: true };
 }
 
 const Key = "HKCU\\Software\\Classes\\nxm";
 
 /** Registers EDGEdeck as the handler for nxm links for this user. Returns what handled them before, if known. */
-export async function registerNxmHandler(target: LinkTarget = {}): Promise<string | undefined> {
+export async function registerNxmHandler(target: LinkTarget): Promise<string | undefined> {
   const before = await currentNxmHandler();
   await run("reg", ["add", Key, "/ve", "/d", "URL:Nexus Mods link", "/f"], { windowsHide: true });
   await run("reg", ["add", Key, "/v", "URL Protocol", "/d", "", "/f"], { windowsHide: true });
@@ -123,29 +136,22 @@ export async function currentNxmHandler(): Promise<string | undefined> {
 // ---- edgemods:// links: the "Mod manager" button on a mod's page on EDGEmods (EDGEdeck#16) ----
 //
 // edgemods://install/<mod>/<version>, with the mod's id and the release; EDGEdeck reads only the
-// scheme and hands the link to the EDGEmods extension. Any web page can open one, so the link never
-// goes into shell code: the registry runs the editor's exe with --open-url, as VS Code's own
-// vscode:// entry does, and the link is one quoted argument. EDGEmods' links have no query, so they
-// need no encoding inside ours.
+// scheme and hands the link to the EDGEmods extension. Registered the same way as nxm links
+// (linkCommand).
 
 export const EdgemodsScheme = "edgemods";
 const EdgemodsKey = "HKCU\\Software\\Classes\\edgemods";
 
-/** The command the registry runs for an edgemods link: the editor's exe, opening ours. */
-export function edgemodsCommand(exe: string, scheme = UriScheme): string {
-  return `"${exe}" --open-url -- "${scheme}://${UriAuthority}/edgemods?url=%1"`;
-}
-
-/** The editor exe an edgemods command opens, if it is EDGEdeck's. */
-export function edgemodsExe(command: string): string | undefined {
-  return command.includes(UriAuthority) ? /^"([^"]+)" --open-url/.exec(command)?.[1] : undefined;
+/** The command the registry runs for an edgemods link. */
+export function edgemodsCommand(target: LinkTarget): string {
+  return linkCommand(target, "edgemods");
 }
 
 /** Registers EDGEdeck for edgemods links, for this user. */
-export async function registerEdgemodsHandler(exe: string, scheme = UriScheme): Promise<void> {
+export async function registerEdgemodsHandler(target: LinkTarget): Promise<void> {
   await run("reg", ["add", EdgemodsKey, "/ve", "/d", "URL:EDGEmods link", "/f"], { windowsHide: true });
   await run("reg", ["add", EdgemodsKey, "/v", "URL Protocol", "/d", "", "/f"], { windowsHide: true });
-  await run("reg", ["add", `${EdgemodsKey}\\shell\\open\\command`, "/ve", "/d", edgemodsCommand(exe, scheme), "/f"], { windowsHide: true });
+  await run("reg", ["add", `${EdgemodsKey}\\shell\\open\\command`, "/ve", "/d", edgemodsCommand(target), "/f"], { windowsHide: true });
 }
 
 /** Removes EDGEdeck's registration for edgemods links; another program's is left alone. */

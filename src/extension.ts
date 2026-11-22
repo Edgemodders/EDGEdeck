@@ -39,7 +39,7 @@ import { DownloadCancelled, DownloadQueue, downloadsAtOnce, progressText, SpeedM
 import { download, modPageUrl, newestFile, NexusClient, versionNewer, type NexusFiles } from "./nexus";
 import { ApiKeysPage, hasWebSocket, signIn } from "./nexusSso";
 import { fetchUser, needsRefresh, OAuthTokens, refreshTokens, signInWithOAuth, tokenUser } from "./nexusOAuth";
-import { currentEdgemodsHandler, currentNxmHandler, describeHandler, edgemodsCommand, edgemodsExe, EdgemodsScheme, forwarderCommand, forwarderExe, linkFromQuery, nxmFromQuery, nxmReadError, parseNxm, registerEdgemodsHandler, registerNxmHandler, unregisterEdgemodsHandler, unregisterNxmHandler, UriAuthority, type LinkTarget } from "./nxm";
+import { currentEdgemodsHandler, currentNxmHandler, describeHandler, edgemodsCommand, EdgemodsScheme, forwarderCommand, linkFromQuery, nxmFromQuery, nxmReadError, parseNxm, readForwarder, registerEdgemodsHandler, registerNxmHandler, unregisterEdgemodsHandler, unregisterNxmHandler, UriAuthority, type LinkTarget } from "./nxm";
 import { deployedRedmodPackages, deployRedmod, enabledRedmodPackages } from "./redmod";
 import { addToProject, classifyProject, findProjectFile, installProject, projectName, sameNameMod, syncProjects, type BesideHow, type InstallProjectResult } from "./project";
 import { importFromVortex, importVortexChoices, listVortexMods, readVortexChoices, vortexDisplayName, vortexStagingCandidates, vortexStateDir, type VortexChoices } from "./vortex";
@@ -368,25 +368,28 @@ async function allSetupSteps(): Promise<(SetupStep & { done: boolean })[]> {
 async function refreshSetup(full = false): Promise<void> {
   const target = linkTarget();
   let stale = false;
+  let want: LinkTarget | undefined;
   if (full) {
     // Read first, then store: refresh() replaces `state` while the read waits, and
     // `state.nxmHandler = await ...` would write into the object it replaced.
     const handler = await currentNxmHandler();
     state.nxmHandler = handler;
-    // Our own forwarder, but not the current one: from an older build (no exe), for an editor no
-    // longer there, or for another editor that is (the user handed the links to it there; left alone).
-    const exe = handler && forwarderExe(handler);
-    const elsewhere = exe && fs.existsSync(exe) && exe.toLowerCase() !== target.exe?.toLowerCase() ? exe : undefined;
-    stale = !!handler?.includes(UriAuthority) && handler !== forwarderCommand(target) && !elsewhere;
-    const current = handler === forwarderCommand(target) ? ", current" : elsewhere ? `, through ${elsewhere}` : stale ? ", from an older build" : "";
+    // Our own entry, but not the current one: the PowerShell forwarder of 0.27.0 to 0.32.0 (a
+    // crafted link could run code through it), one for an editor no longer there, or one for
+    // another editor that is (the user handed the links to it there: kept for that editor).
+    const fw = handler ? readForwarder(handler) : undefined;
+    const elsewhere = fw?.exe && fs.existsSync(fw.exe) && fw.exe.toLowerCase() !== target.exe?.toLowerCase() ? fw.exe : undefined;
+    if (fw) want = elsewhere ? { exe: elsewhere, scheme: fw.scheme } : target.exe ? target : undefined;
+    stale = !!fw && !!want && handler !== forwarderCommand(want);
+    const current = !fw ? "" : !stale ? (elsewhere ? `, through ${elsewhere}` : ", current") : fw.old ? ", the old PowerShell forwarder" : ", from an older build";
     log.appendLine(`Nexus download links go to: ${describeHandler(handler)}${current}${nxmReadError ? ` (${nxmReadError.trim()})` : ""}`);
   }
   // Never from a test run: its editor is a throwaway copy.
-  if (stale && !testRun) {
+  if (stale && want && !testRun) {
     try {
-      await registerNxmHandler(target);
-      state.nxmHandler = forwarderCommand(target);
-      log.appendLine("Nexus download links: updated EDGEdeck's handler to the current forwarder");
+      await registerNxmHandler(want);
+      state.nxmHandler = forwarderCommand(want);
+      log.appendLine(`Nexus download links: updated EDGEdeck's handler, through ${want.exe}`);
     } catch (err) {
       log.appendLine(`Nexus download links: could not update the handler: ${(err as Error).message}`);
     }
@@ -3489,6 +3492,7 @@ async function nexusHandleLinksCommand(): Promise<void> {
     const a = await vscode.window.showWarningMessage(`${who} handles Nexus download links right now. Hand them to EDGEdeck? ${who} can take them back from its own settings.`, { modal: true }, "Hand them to EDGEdeck");
     if (!a) return;
   }
+  if (!linkTarget().exe) throw new Error("EDGEdeck could not find this editor's program, so it cannot take Nexus download links here.");
   await registerNxmHandler(linkTarget());
   state.nxmHandler = forwarderCommand(linkTarget());
   void run(() => refreshSetup());
@@ -3511,12 +3515,12 @@ async function refreshEdgemodsLinks(target: LinkTarget): Promise<void> {
   const handler = await currentEdgemodsHandler();
   state.edgemodsHandler = handler;
   if (testRun || !target.exe || globalState.get<boolean>(EdgemodsReleasedKey)) return;
-  const exe = handler && edgemodsExe(handler);
+  const exe = handler ? readForwarder(handler)?.exe : undefined;
   const elsewhere = !!exe && fs.existsSync(exe) && exe.toLowerCase() !== target.exe.toLowerCase();
-  const wanted = edgemodsCommand(target.exe, target.scheme);
+  const wanted = edgemodsCommand(target);
   if (handler && (!handler.includes(UriAuthority) || elsewhere || handler === wanted)) return;
   try {
-    await registerEdgemodsHandler(target.exe, target.scheme);
+    await registerEdgemodsHandler(target);
     state.edgemodsHandler = wanted;
     log.appendLine(`EDGEmods links: ${handler ? "updated EDGEdeck's handler" : "now handled by EDGEdeck"}, through ${target.exe}`);
   } catch (err) {
@@ -3540,8 +3544,8 @@ async function edgemodsHandleLinksCommand(): Promise<void> {
     if (!a) return;
   }
   await globalState.update(EdgemodsReleasedKey, undefined);
-  await registerEdgemodsHandler(target.exe, target.scheme);
-  state.edgemodsHandler = edgemodsCommand(target.exe, target.scheme);
+  await registerEdgemodsHandler(target);
+  state.edgemodsHandler = edgemodsCommand(target);
   log.appendLine(`EDGEmods links: now handled by EDGEdeck (before: ${who}), through ${target.exe}`);
   void vscode.window.showInformationMessage("EDGEdeck now handles EDGEmods links: the Mod manager button on a mod's page opens here.");
 }
