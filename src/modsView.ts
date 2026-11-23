@@ -23,13 +23,18 @@ export interface SetupStep {
 /**
  * A mod's icon color, as on the EDGEdeck page: yellow when something needs a look (a conflict, a file
  * changed in the game folder), cyan while a change waits for a deploy (not deployed yet, changed, off
- * but still in the game), the accent when it is on and deployed, dim when it is off.
+ * but still in the game), green when it is on with a newer file on Nexus, the accent when it is on
+ * and deployed, dim when it is off.
  */
 export function statusColor(status: string, enabled: boolean): string {
   if (status.includes("conflict") || status.includes("changed in game folder")) return "editorWarning.foreground";
   if (/not deployed yet|deploy again|still deployed/.test(status)) return "edgedeck.pending";
-  return enabled ? "edgedeck.accent" : "disabledForeground";
+  if (!enabled) return "disabledForeground";
+  return /update .+ available/.test(status) ? "edgedeck.update" : "edgedeck.accent";
 }
+
+/** The color of a row over several mods: the first of these any of them has, else on or off. */
+const ColorOrder = ["editorWarning.foreground", "edgedeck.pending", "edgedeck.update"];
 
 const SetupIcons: Record<SetupStep["id"], string> = { game: "folder-opened", drive: "server", frameworks: "layers", bridge: "cloud-download", nexus: "account", links: "link", edgemodsLinks: "link", vortex: "archive" };
 
@@ -149,9 +154,9 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
       item.tooltip = new vscode.MarkdownString(
         [`**${g.name}**`, `${g.families.length} files from Nexus mod ${g.nexusId}, each a mod of its own with its own versions.`, "The box turns every file off and remembers which were on; ticking it again turns those back on."].join("  \n"),
       );
-      // The worst of its files' states: a warning, else waiting for a deploy, else on or off.
+      // The worst of its files' states: a warning, else waiting for a deploy, else an update, else on or off.
       const colors = g.families.map((f) => statusColor(this.status(f.active), f.active.enabled));
-      const color = colors.includes("editorWarning.foreground") ? "editorWarning.foreground" : colors.includes("edgedeck.pending") ? "edgedeck.pending" : on ? "edgedeck.accent" : "disabledForeground";
+      const color = ColorOrder.find((c) => colors.includes(c)) ?? (on ? "edgedeck.accent" : "disabledForeground");
       item.iconPath = new vscode.ThemeIcon("files", new vscode.ThemeColor(color));
       item.contextValue = "page";
       item.checkboxState = on ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
@@ -209,7 +214,8 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
         "Click for details. Expand for folders and files.",
       ].filter(Boolean).join("  \n"),
     );
-    item.contextValue = "mod";
+    // modNexus: the row also has Check for updates and Update.
+    item.contextValue = mod.source.modId ? "modNexus" : "mod";
     item.command = { command: "edgedeck.details", title: "Details", arguments: [node] };
     item.checkboxState = mod.enabled ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
     const icon = status.includes("conflict") ? "warning" : status.includes("changed") ? "edit" : "package";

@@ -157,7 +157,8 @@
       {
         "command": "edgedeck.deployMod",
         "title": "Deploy this mod",
-        "category": "EDGEdeck"
+        "category": "EDGEdeck",
+        "icon": "$(rocket)"
       },
       {
         "command": "edgedeck.undeployMod",
@@ -317,7 +318,20 @@
       {
         "command": "edgedeck.switchVersion",
         "title": "Switch version...",
-        "category": "EDGEdeck"
+        "category": "EDGEdeck",
+        "icon": "$(versions)"
+      },
+      {
+        "command": "edgedeck.checkModUpdate",
+        "title": "Check for updates",
+        "category": "EDGEdeck",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "edgedeck.updateMod",
+        "title": "Update",
+        "category": "EDGEdeck",
+        "icon": "$(arrow-circle-up)"
       },
       {
         "command": "edgedeck.showChanges",
@@ -521,62 +535,87 @@
         },
         {
           "command": "edgedeck.moveUp",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "inline@1"
         },
         {
           "command": "edgedeck.moveDown",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "inline@2"
         },
         {
           "command": "edgedeck.details",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "0_details@1"
         },
         {
           "command": "edgedeck.nexusOpen",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "1_open@0"
         },
         {
           "command": "edgedeck.openInExplorer",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "1_open@1"
         },
         {
           "command": "edgedeck.revealInGame",
-          "when": "view == edgedeck.mods && viewItem =~ /^(mod|folder|file)$/",
+          "when": "view == edgedeck.mods && viewItem =~ /^(mod|modNexus|folder|file)$/",
           "group": "1_open@1"
         },
         {
           "command": "edgedeck.rename",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "9_remove@0"
         },
         {
           "command": "edgedeck.remove",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "9_remove@1"
         },
         {
           "command": "edgedeck.deployMod",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "0_deploy@1"
         },
         {
           "command": "edgedeck.undeployMod",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "0_deploy@2"
         },
         {
+          "command": "edgedeck.deployMod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
+          "group": "inline@0"
+        },
+        {
+          "command": "edgedeck.checkModUpdate",
+          "when": "view == edgedeck.mods && viewItem == modNexus",
+          "group": "inline@3"
+        },
+        {
+          "command": "edgedeck.updateMod",
+          "when": "view == edgedeck.mods && viewItem == modNexus",
+          "group": "inline@4"
+        },
+        {
           "command": "edgedeck.switchVersion",
-          "when": "view == edgedeck.mods && viewItem == mod",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/",
           "group": "inline@9"
         },
         {
+          "command": "edgedeck.checkModUpdate",
+          "when": "view == edgedeck.mods && viewItem == modNexus",
+          "group": "0_update@1"
+        },
+        {
+          "command": "edgedeck.updateMod",
+          "when": "view == edgedeck.mods && viewItem == modNexus",
+          "group": "0_update@2"
+        },
+        {
           "command": "edgedeck.addToProject",
-          "when": "view == edgedeck.mods && viewItem == mod && edgedeck.projectOpen",
+          "when": "view == edgedeck.mods && viewItem =~ /^mod(Nexus)?$/ && edgedeck.projectOpen",
           "group": "1_open@2"
         },
         {
@@ -649,6 +688,14 @@
         },
         {
           "command": "edgedeck.rename",
+          "when": "false"
+        },
+        {
+          "command": "edgedeck.checkModUpdate",
+          "when": "false"
+        },
+        {
+          "command": "edgedeck.updateMod",
           "when": "false"
         }
       ],
@@ -744,6 +791,16 @@
           "light": "#00727a",
           "highContrast": "#19f3ff",
           "highContrastLight": "#00727a"
+        }
+      },
+      {
+        "id": "edgedeck.update",
+        "description": "EDGEdeck's icon for a mod with a newer file on Nexus.",
+        "defaults": {
+          "dark": "#5dffa1",
+          "light": "#17803d",
+          "highContrast": "#5dffa1",
+          "highContrastLight": "#17803d"
         }
       }
     ],

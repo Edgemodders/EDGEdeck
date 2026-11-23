@@ -16,10 +16,12 @@ How to keep it:
 **New**
 
 - Ready for the EDGEmods extension (https://edgemods.ai): when it installs a mod and what the mod needs, EDGEdeck adds them to the library in order, all or nothing, and turns them on; if one fails, the library is left exactly as it was and the message says which mod failed and why. A mod from EDGEmods shows "From EDGEmods" in the list, and its newer releases become new versions of the same mod. EDGEdeck does not deploy them by itself (https://github.com/Edgemodders/EDGEdeck/issues/16).
+- A mod from Nexus has Check for updates and Update in its right-click menu in the Mods view, and as icons when you point at its row. Check for updates asks Nexus about that mod only; Update asks and, when there is a newer file, downloads it in the mod's place. A mod with a newer file on Nexus has a green icon and "update ... available" at the end of its row. The green can be changed with the theme color edgedeck.update.
 
 **Changed**
 
 - The Mods view's icons use the EDGEdeck page's colors: cyan while a mod's changes wait for a deploy (not deployed yet, changed, or off but still in the game), yellow only when something needs a look (a conflict, or a file changed in the game folder). A Nexus page's row with several files takes the color of its files. The cyan can be changed with the theme color edgedeck.pending.
+- Switch version on a mod's row in the Mods view is an icon now, like the others, and the row has a Deploy icon too, first in the row: it turns the mod on and deploys only that mod.
 
 ## 0.33.0 (2026-11-21)
 

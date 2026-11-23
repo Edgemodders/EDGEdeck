@@ -169,6 +169,11 @@ export function activate(context: vscode.ExtensionContext): EDGEdeckApi {
     vscode.commands.registerCommand("edgedeck.nexusSetKey", () => run(() => nexusSetKeyCommand().then(() => undefined))),
     vscode.commands.registerCommand("edgedeck.nexusOpen", (node: ModNode) => run(() => nexusOpenCommand(modOf(node)))),
     vscode.commands.registerCommand("edgedeck.checkUpdates", () => run(() => checkUpdatesCommand(false))),
+    vscode.commands.registerCommand("edgedeck.checkModUpdate", (node: ModNode) => run(async () => {
+      const mod = modOf(node);
+      if (mod) await checkUpdatesCommand(false, [mod]);
+    })),
+    vscode.commands.registerCommand("edgedeck.updateMod", (node: ModNode) => run(() => checkAndUpdateCommand(modOf(node)))),
     vscode.commands.registerCommand("edgedeck.nexusAddLink", () => run(nexusAddLinkCommand)),
     vscode.commands.registerCommand("edgedeck.nexusHandleLinks", () => run(nexusHandleLinksCommand).then(() => refreshSetup(true))),
     vscode.commands.registerCommand("edgedeck.nexusReleaseLinks", () => run(nexusReleaseLinksCommand).then(() => refreshSetup(true))),
@@ -3302,6 +3307,13 @@ class PremiumError extends Error {
   constructor() {
     super("Nexus gives direct downloads to Premium members only. Use the Mod manager download button on the site, which sends a link with a key.");
   }
+}
+
+/** The Mods view's Update: asks Nexus first, so the row shows what it has, then updates when it has a newer file. */
+async function checkAndUpdateCommand(mod: ModInfo | undefined): Promise<void> {
+  if (!mod?.source.modId) return;
+  await checkUpdatesCommand(true, [mod]);
+  await updateModCommand(mod);
 }
 
 /** Updates a mod to the newest file Nexus has, with one confirmation. */
