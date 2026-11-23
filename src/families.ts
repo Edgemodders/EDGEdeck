@@ -65,6 +65,7 @@ export function versionFrom(base: string): string {
 
 export function familyKey(mod: ModInfo): string {
   if (mod.family) return mod.family;
+  if (mod.source.type === "edgemods" && mod.source.edgemodsId) return `edgemods:${mod.source.edgemodsId}`;
   if (mod.source.modId) return `nexus:${mod.source.modId}`;
   const pkg = rednodePackageId(mod);
   if (pkg) return `rednode:${pkg}`;

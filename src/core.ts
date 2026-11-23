@@ -28,6 +28,7 @@ export * from "./nxm";
 export * from "./project";
 export * from "./redmod";
 export * from "./sections";
+export * from "./installMods";
 export * from "./sizes";
 export * from "./verbs";
 export * from "./vortex";

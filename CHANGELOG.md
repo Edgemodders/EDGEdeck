@@ -13,6 +13,10 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- Ready for the EDGEmods extension (https://edgemods.ai): when it installs a mod and what the mod needs, EDGEdeck adds them to the library in order, all or nothing, and turns them on; if one fails, the library is left exactly as it was and the message says which mod failed and why. A mod from EDGEmods shows "From EDGEmods" in the list, and its newer releases become new versions of the same mod. EDGEdeck does not deploy them by itself (https://github.com/Edgemodders/EDGEdeck/issues/16).
+
 ## 0.33.0 (2026-11-21)
 
 <!-- nexus

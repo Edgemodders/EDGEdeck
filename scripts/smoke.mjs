@@ -1637,6 +1637,115 @@ console.log("undo: ok");
   }
 }
 
+// installMods for the EDGEmods extension (EDGEdeck#16): a list of downloaded releases, in order, all
+// or nothing; each turned on, never deployed. Its own library, so the checks see only these mods.
+{
+  const emLib = core.loadLibrary(path.join(tmp, "em-lib"), game);
+  const emSrc = path.join(tmp, "em-src");
+  const pack = (name, files) => {
+    const dir = path.join(emSrc, name);
+    for (const [rel, text] of Object.entries(files)) write(path.join(dir, rel), text);
+    const file = path.join(tmp, "em-zips", name, "main.zip"); // every mod's file named main.zip: kept apart by mod and version
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    execFileSync(sevenZa, ["a", "-tzip", file, path.join(dir, "*")], { stdio: "ignore" });
+    return file;
+  };
+  const item = (modId, version, files, extra = {}) => ({ source: "edgemods", modId, version, name: modId.replace(/-/g, " "), requires: [], files, ...extra });
+  const noAsk = { sevenZa, pickOption: async () => undefined, fomodWindow: async () => undefined };
+  const state = () => JSON.stringify({ info: emLib.info, mods: emLib.mods }) + fs.readdirSync(path.join(emLib.root, "library")).sort().join(",");
+
+  // Two mods, the second needing the first; the second in two files (a main file and an optional one).
+  const base = pack("base-1.0.0", { "r6/scripts/Base/base.reds": "// base 1.0.0" });
+  const credMain = pack("cred-main", { "archive/pc/mod/StreetCred.archive": "cred" });
+  const credOpt = pack("cred-opt", { "r6/tweaks/StreetCred/opt.yaml": "opt: 1" });
+  let res = await core.installMods(emLib, [item("base-lib", "1.0.0", [base]), item("street-cred", "1.0.0", [credMain, credOpt], { requires: ["base-lib"] })], noAsk);
+  assert.equal(res.ok, true, JSON.stringify(res));
+  assert.deepEqual(res.installed.map((x) => [x.modId, x.version]), [["base-lib", "1.0.0"], ["street-cred", "1.0.0"]]);
+  const cred = emLib.mods.find((m) => m.id === res.installed[1].id);
+  assert.deepEqual(cred.files, ["archive/pc/mod/StreetCred.archive", "r6/tweaks/StreetCred/opt.yaml"], "two files, one mod");
+  assert.equal(cred.enabled, true);
+  assert.equal(core.familyKey(cred), "edgemods:street-cred");
+  assert.deepEqual(cred.source.requires, ["base-lib"]);
+  assert.equal(cred.source.paths.length, 2);
+  assert.ok(cred.source.path.includes(path.join("downloads", "edgemods", "street-cred", "1.0.0")), cred.source.path);
+  assert.ok(!fs.existsSync(path.join(emLib.root, "downloads", "main.zip")), "nothing kept under the bare file name");
+  assert.deepEqual(core.edgemodsMods(emLib, game).map((m) => [m.modId, m.version, m.on, m.deployed]), [["base-lib", "1.0.0", true, false], ["street-cred", "1.0.0", true, false]]);
+
+  // The same release again: skipped, not added twice, and turned back on if it was off.
+  cred.enabled = false;
+  core.saveMod(emLib, cred);
+  res = await core.installMods(emLib, [item("street-cred", "1.0.0", [credMain, credOpt])], noAsk);
+  assert.equal(res.ok, true);
+  assert.deepEqual(res.skipped.map((x) => x.id), [cred.id]);
+  assert.equal(res.installed.length, 0);
+  assert.equal(emLib.mods.filter((m) => core.familyKey(m) === "edgemods:street-cred").length, 1);
+  assert.equal(cred.enabled, true);
+
+  // A newer release joins the family and takes the older one's place; the older stays, off.
+  const base11 = pack("base-1.1.0", { "r6/scripts/Base/base.reds": "// base 1.1.0" });
+  res = await core.installMods(emLib, [item("base-lib", "1.1.0", [base11])], noAsk);
+  assert.equal(res.ok, true);
+  const fam = emLib.mods.filter((m) => core.familyKey(m) === "edgemods:base-lib");
+  assert.equal(fam.length, 2);
+  assert.deepEqual(fam.map((m) => [m.version, m.enabled]).sort(), [["1.0.0", false], ["1.1.0", true]]);
+  const newer = fam.find((m) => m.version === "1.1.0");
+  assert.ok(emLib.info.order.indexOf(newer.id) < emLib.info.order.indexOf(cred.id), "in the older version's place in the order");
+
+  // All or nothing: the first item adds base-lib 1.2.0 and turns 1.1.0 off; the second has two files
+  // putting the same path. Nothing of either stays.
+  const before = state();
+  const base12 = pack("base-1.2.0", { "r6/scripts/Base/base.reds": "// base 1.2.0" });
+  const clashA = pack("clash-a", { "archive/pc/mod/Clash.archive": "a" });
+  const clashB = pack("clash-b", { "archive/pc/mod/Clash.archive": "b" });
+  res = await core.installMods(emLib, [item("base-lib", "1.2.0", [base12]), item("clash-mod", "1.0.0", [clashA, clashB])], noAsk);
+  assert.equal(res.ok, false);
+  assert.equal(res.failed.modId, "clash-mod");
+  assert.equal(res.failed.step, "files");
+  assert.match(res.failed.reason, /both put archive\/pc\/mod\/Clash\.archive/);
+  assert.equal(res.undone.length, 1, "base-lib 1.2.0 was taken out again");
+  assert.equal(state(), before, "the library is exactly as it was");
+  const reread = core.loadLibrary(emLib.root, game);
+  assert.equal(JSON.stringify({ info: reread.info, mods: reread.mods }), JSON.stringify({ info: emLib.info, mods: emLib.mods }), "and on disk too");
+  assert.ok(!fs.existsSync(path.join(emLib.root, "downloads", "edgemods", "base-lib", "1.2.0", "main.zip")), "its kept download removed");
+
+  // Bad items fail before anything changes, naming the step.
+  res = await core.installMods(emLib, [item("Bad Id", "1.0.0", [base])], noAsk);
+  assert.deepEqual([res.ok, res.failed.step], [false, "check"]);
+  res = await core.installMods(emLib, [item("rar-mod", "1.0.0", [path.join(tmp, "x.rar")])], noAsk);
+  assert.match(res.failed.reason, /not a \.zip or \.7z/);
+  assert.equal(state(), before);
+
+  // A choice: option folders without `option` ask; a closed question fails at "choice" and undoes.
+  const opts = pack("opts", { "Option A/archive/pc/mod/A.archive": "a", "Option B/archive/pc/mod/B.archive": "b" });
+  res = await core.installMods(emLib, [item("base-lib", "1.2.0", [base12]), item("opt-mod", "1.0.0", [opts])], noAsk);
+  assert.deepEqual([res.ok, res.failed.step, res.undone.length], [false, "choice", 1]);
+  assert.equal(state(), before);
+  res = await core.installMods(emLib, [item("opt-mod", "1.0.0", [opts], { option: "Option B" })], noAsk);
+  assert.equal(res.ok, true, JSON.stringify(res));
+  assert.deepEqual(emLib.mods.find((m) => m.id === res.installed[0].id).files, ["archive/pc/mod/B.archive"]);
+
+  // A FOMOD: with fomodChoices no window; without, the window (here: closed) fails at "choice";
+  // with a second file it fails at "files".
+  const fomodZip = path.join(tmp, "em-zips", "fomod", "main.zip");
+  fs.mkdirSync(path.dirname(fomodZip), { recursive: true });
+  execFileSync(sevenZa, ["a", "-tzip", fomodZip, path.join(root, "scripts", "fixtures", "fomod", "basic", "*")], { stdio: "ignore" });
+  const mid = state();
+  res = await core.installMods(emLib, [item("fomod-mod", "1.0.0", [fomodZip])], noAsk);
+  assert.deepEqual([res.ok, res.failed?.step], [false, "choice"]);
+  res = await core.installMods(emLib, [item("fomod-mod", "1.0.0", [fomodZip, base])], noAsk);
+  assert.deepEqual([res.ok, res.failed?.step], [false, "files"]);
+  assert.equal(state(), mid);
+  const choices = [{ step: "Size", group: "Size", plugins: ["Small"] }, { step: "Extras", group: "Extras", plugins: [] }];
+  res = await core.installMods(emLib, [item("fomod-mod", "1.0.0", [fomodZip], { fomodChoices: choices })], noAsk);
+  assert.equal(res.ok, true, JSON.stringify(res));
+  const fm = emLib.mods.find((m) => m.id === res.installed[0].id);
+  assert.equal(core.familyKey(fm), "edgemods:fomod-mod");
+  assert.equal(fm.source.type, "edgemods");
+  assert.ok(fm.fomod, "the choices are kept for its updates");
+  assert.ok(fm.source.path.includes(path.join("downloads", "edgemods", "fomod-mod")), fm.source.path);
+  console.log("installMods: ok");
+}
+
 // Vortex, if present on this machine: list and classify, import into the temp library, never write.
 const vortex = core.listVortexMods(game);
 if (vortex.length) {

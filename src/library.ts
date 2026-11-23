@@ -12,13 +12,22 @@ import type { FomodRecord } from "./fomod";
 export type ModKind = "archive" | "xl" | "redmod" | "reds" | "tweak" | "cet" | "red4ext" | "audioware" | "input" | "config" | "asi" | "framework" | "rednode" | "other";
 
 export interface ModSource {
-  /** github: a framework from its author's GitHub release (path is the release page, modId its Nexus id). */
-  type: "folder" | "file" | "nexus" | "project" | "vortex" | "github";
+  /**
+   * github: a framework from its author's GitHub release (path is the release page, modId its Nexus id).
+   * edgemods: a release from EDGEmods, installed by the EDGEmods extension (edgemodsId, path the kept download).
+   */
+  type: "folder" | "file" | "nexus" | "project" | "vortex" | "github" | "edgemods";
   path?: string;
   modId?: number;
   fileId?: number;
   /** For a Nexus file: its name on the mod page ("Main File - Female"), which tells the files of one page apart. */
   fileTitle?: string;
+  /** For an EDGEmods release: the mod's EDGEmods id, such as "street-cred". */
+  edgemodsId?: string;
+  /** For an EDGEmods release that came as several files: every kept download, `path` first. */
+  paths?: string[];
+  /** For an EDGEmods release: the EDGEmods ids of the mods it needs (stored; EDGEdeck does not check them yet). */
+  requires?: string[];
 }
 
 /** `mod.json`, one per mod folder. */
@@ -283,6 +292,9 @@ export function moveMod(lib: Library, mod: ModInfo, delta: -1 | 1): void {
 
 /** Keeps the original archive so the mod can be re-added or inspected later. */
 export function keepDownload(lib: Library, file: string): string {
+  // Already kept (an EDGEmods download keeps its own copy under downloads/edgemods first).
+  const rel = path.relative(downloadsFolder(lib.root), file);
+  if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) return file;
   fs.mkdirSync(downloadsFolder(lib.root), { recursive: true });
   const dest = path.join(downloadsFolder(lib.root), path.basename(file));
   if (path.resolve(dest) !== path.resolve(file)) fs.copyFileSync(file, dest);

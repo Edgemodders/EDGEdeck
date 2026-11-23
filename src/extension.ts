@@ -27,6 +27,7 @@ import { FrameworkSources, frameworkStates, latestFrameworkRelease, missingFrame
 import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveGroupInSection, moveInSection, moveSection, placeGroupNextTo, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
+import { edgemodsMods, installMods, type EdgemodsMod, type InstalledItem, type InstallItem, type InstallResult } from "./installMods";
 import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
 import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, playerEnv, steamLibraries } from "./game";
 import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove";
@@ -218,6 +219,15 @@ export interface EDGEdeckApi {
   deployMod(id: string): Promise<ApiDeployResult | undefined>;
   /** Turns a mod off; the next deploy removes its files from the game. */
   turnOff(id: string): void;
+  /**
+   * For the EDGEmods extension (EDGEdeck#16, since 0.34.0): installs downloaded EDGEmods releases in
+   * the given order, requirements first, all or nothing, and turns each on in the active loadout.
+   * Does not deploy. A release the library has already is listed in `skipped`. On a failure the
+   * library is as it was before the call, and `failed` says which mod, at what step, and why.
+   */
+  installMods(mods: InstallItem[], options?: { title?: string }): Promise<InstallResult>;
+  /** For the EDGEmods extension (EDGEdeck#16, since 0.34.0): every EDGEmods release in the library. */
+  edgemodsMods(): EdgemodsMod[];
 }
 
 /**
@@ -334,7 +344,43 @@ const api: EDGEdeckApi = {
     saveMod(lib, mod);
     refresh();
   },
+  installMods: (mods, options) => installEdgemods(mods, options?.title),
+  edgemodsMods: () => (library ? edgemodsMods(library, settings().gamePath) : []),
 };
+
+/** One installMods call at a time: a second one while the first runs is refused, not queued. */
+let installingEdgemods = false;
+
+/** installMods for the EDGEmods extension: the questions in VS Code, a progress line, the log. */
+async function installEdgemods(mods: InstallItem[], title?: string): Promise<InstallResult> {
+  const first = Array.isArray(mods) && typeof mods[0]?.modId === "string" ? mods[0].modId : "";
+  if (!library) return { ok: false, failed: { modId: first, step: "check", reason: "EDGEdeck has no library loaded; the EDGEdeck log says why." }, undone: [] };
+  if (installingEdgemods) return { ok: false, failed: { modId: first, step: "check", reason: "EDGEdeck is already installing mods from EDGEmods. Try again when it has finished." }, undone: [] };
+  installingEdgemods = true;
+  const lib = library;
+  try {
+    const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: title || "Installing from EDGEmods" }, (progress) =>
+      installMods(lib, mods, {
+        sevenZa,
+        progress: (text) => progress.report({ message: text }),
+        pickOption: async (item, options) =>
+          (await vscode.window.showQuickPick(options.map((o) => ({ label: o.label })), { placeHolder: `${item.name} comes with a choice. Which one?`, title: "Choose an option", ignoreFocusOut: true }))?.label,
+        fomodWindow: (item, p) =>
+          openFomodInstaller({ title: `${item.name} ${item.version}`, subtitle: installerSubtitle(p), cfg: p.cfg, root: p.root, choices: p.applied.choices, warnings: p.applied.warnings, ctx: { activeFiles: activeFiles(lib) } }),
+      }),
+    );
+    if (result.ok) {
+      const list = (xs: InstalledItem[]) => xs.map((x) => `${x.modId} ${x.version} (${x.id})`).join(", ");
+      log.appendLine(`From EDGEmods: installed ${result.installed.length ? list(result.installed) : "nothing new"}${result.skipped.length ? `; already in the library: ${list(result.skipped)}` : ""}; all on, not deployed`);
+    } else {
+      log.appendLine(`From EDGEmods: nothing installed. ${result.failed.modId} failed at ${result.failed.step}: ${result.failed.reason}${result.undone.length ? ` (undone: ${result.undone.join(", ")})` : ""}`);
+    }
+    return result;
+  } finally {
+    installingEdgemods = false;
+    refresh();
+  }
+}
 
 export function deactivate(): void {
   void bridge?.stop();

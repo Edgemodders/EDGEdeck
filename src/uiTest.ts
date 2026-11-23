@@ -3,6 +3,7 @@
 // commands that need no dialog. Throws on the first failure; the runner reports it.
 
 import * as assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -102,6 +103,8 @@ export async function run(): Promise<void> {
     installProject(f: string): Promise<{ id: string; added: boolean } | undefined>;
     deploy(): Promise<{ lost: unknown[] } | undefined>;
     deployMod(id: string): Promise<{ waiting?: number } | undefined>;
+    installMods(mods: unknown[], options?: { title?: string }): Promise<{ ok: boolean; installed?: { id: string }[] }>;
+    edgemodsMods(): { modId: string; on: boolean; deployed: boolean }[];
   };
   const proj = path.join(lib, "..", "ui-project");
   fs.mkdirSync(path.join(proj, "packed", "archive", "pc", "mod"), { recursive: true });
@@ -118,6 +121,18 @@ export async function run(): Promise<void> {
   const one = await api.deployMod(installed!.id);
   assert.equal(one?.waiting, 0, "deployMod left other changes waiting");
   assert.equal(fs.readFileSync(path.join(game, "archive", "pc", "mod", "UiProject.archive"), "utf8"), "p2", "deployMod did not relink the rebuilt file");
+
+  // installMods and edgemodsMods for the EDGEmods extension (#16): one release through the real API.
+  const emDir = path.join(lib, "..", "ui-edgemods");
+  fs.mkdirSync(path.join(emDir, "archive", "pc", "mod"), { recursive: true });
+  fs.writeFileSync(path.join(emDir, "archive", "pc", "mod", "UiEdgemods.archive"), "em");
+  const emZip = path.join(lib, "..", "ui-edgemods.zip");
+  execFileSync(path.join(ext.extensionPath, "bin", "7za.exe"), ["a", "-tzip", emZip, path.join(emDir, "*")], { stdio: "ignore" });
+  const em = await api.installMods([{ source: "edgemods", modId: "ui-edgemods", version: "1.0.0", name: "UI EDGEmods", requires: [], files: [emZip] }], { title: "UI test" });
+  assert.equal(em.ok, true, `installMods: ${JSON.stringify(em)}`);
+  assert.deepEqual(api.edgemodsMods().map((m) => [m.modId, m.on, m.deployed]), [["ui-edgemods", true, false]]);
+  await api.deployMod(em.installed![0].id);
+  assert.equal(api.edgemodsMods()[0].deployed, true, "edgemodsMods did not see the deploy");
 
   await cfg.update("libraryPath", undefined, vscode.ConfigurationTarget.Global);
   await cfg.update("gamePath", undefined, vscode.ConfigurationTarget.Global);

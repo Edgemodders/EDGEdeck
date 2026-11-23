@@ -190,7 +190,7 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
         `**${mod.name}** ${mod.version}${others > 1 ? ` (${others} versions in the library)` : ""}`,
         `${mod.kinds.join(", ")} · ${mod.files.length} files · ${size} in the library`,
         `Added ${new Date(mod.added).toLocaleString()}`,
-        mod.source.type === "github" ? `From its GitHub release${mod.source.modId ? ` (Nexus mod ${mod.source.modId})` : ""}` : mod.source.type === "nexus" || mod.source.modId ? `Nexus mod ${mod.source.modId}${mod.nexus?.author ? ` by ${mod.nexus.author}` : ""}${mod.nexus?.checked ? ` · checked ${mod.nexus.checked.slice(0, 10)}` : ""}` : mod.source.type === "vortex" ? "Imported from Vortex" : mod.source.type === "project" ? `REDcode project ${mod.source.path ?? ""}` : mod.source.path ? `From ${mod.source.path}` : "",
+        mod.source.type === "edgemods" ? `From EDGEmods (${mod.source.edgemodsId})` : mod.source.type === "github" ? `From its GitHub release${mod.source.modId ? ` (Nexus mod ${mod.source.modId})` : ""}` : mod.source.type === "nexus" || mod.source.modId ? `Nexus mod ${mod.source.modId}${mod.nexus?.author ? ` by ${mod.nexus.author}` : ""}${mod.nexus?.checked ? ` · checked ${mod.nexus.checked.slice(0, 10)}` : ""}` : mod.source.type === "vortex" ? "Imported from Vortex" : mod.source.type === "project" ? `REDcode project ${mod.source.path ?? ""}` : mod.source.path ? `From ${mod.source.path}` : "",
         status ? `Status: ${status}` : "",
         "Click for details. Expand for folders and files.",
       ].filter(Boolean).join("  \n"),
