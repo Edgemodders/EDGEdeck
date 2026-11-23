@@ -19,7 +19,7 @@ How to keep it:
 
 **Changed**
 
-- The Mods view's icons use the EDGEdeck page's colors: cyan while a mod's changes wait for a deploy (not deployed yet, changed, or off but still in the game), yellow only when something needs a look (a conflict, or a file changed in the game folder). The cyan can be changed with the theme color edgedeck.pending.
+- The Mods view's icons use the EDGEdeck page's colors: cyan while a mod's changes wait for a deploy (not deployed yet, changed, or off but still in the game), yellow only when something needs a look (a conflict, or a file changed in the game folder). A Nexus page's row with several files takes the color of its files. The cyan can be changed with the theme color edgedeck.pending.
 
 ## 0.33.0 (2026-11-21)
 
