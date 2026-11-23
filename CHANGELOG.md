@@ -13,6 +13,16 @@ How to keep it:
 
 ## Unreleased
 
+## 0.34.0 (2026-11-23)
+
+<!-- nexus
+New: Check for updates and Update on a mod's row in the Mods view (right-click or hover icons)
+New: A Deploy icon on each mod's row deploys only that mod
+New: Ready for the EDGEmods extension: it can install mods and what they need, all or nothing
+Changed: Mods view icons: cyan while changes wait for a deploy, green with an update on Nexus
+Changed: Switch version on a mod's row is an icon now
+-->
+
 **New**
 
 - Ready for the EDGEmods extension (https://edgemods.ai): when it installs a mod and what the mod needs, EDGEdeck adds them to the library in order, all or nothing, and turns them on; if one fails, the library is left exactly as it was and the message says which mod failed and why. A mod from EDGEmods shows "From EDGEmods" in the list, and its newer releases become new versions of the same mod. EDGEdeck does not deploy them by itself (https://github.com/Edgemodders/EDGEdeck/issues/16).
