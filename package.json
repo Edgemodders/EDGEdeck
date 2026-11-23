@@ -735,6 +735,16 @@
           "highContrast": "#fcee0a",
           "highContrastLight": "#8a7a00"
         }
+      },
+      {
+        "id": "edgedeck.pending",
+        "description": "EDGEdeck's icon for a mod whose changes wait for a deploy.",
+        "defaults": {
+          "dark": "#19f3ff",
+          "light": "#00727a",
+          "highContrast": "#19f3ff",
+          "highContrastLight": "#00727a"
+        }
       }
     ],
     "mcpServerDefinitionProviders": [

@@ -17,6 +17,10 @@ How to keep it:
 
 - Ready for the EDGEmods extension (https://edgemods.ai): when it installs a mod and what the mod needs, EDGEdeck adds them to the library in order, all or nothing, and turns them on; if one fails, the library is left exactly as it was and the message says which mod failed and why. A mod from EDGEmods shows "From EDGEmods" in the list, and its newer releases become new versions of the same mod. EDGEdeck does not deploy them by itself (https://github.com/Edgemodders/EDGEdeck/issues/16).
 
+**Changed**
+
+- The Mods view's icons use the EDGEdeck page's colors: cyan while a mod's changes wait for a deploy (not deployed yet, changed, or off but still in the game), yellow only when something needs a look (a conflict, or a file changed in the game folder). The cyan can be changed with the theme color edgedeck.pending.
+
 ## 0.33.0 (2026-11-21)
 
 <!-- nexus

@@ -198,8 +198,12 @@ export class ModsView implements vscode.TreeDataProvider<ModNode> {
     item.contextValue = "mod";
     item.command = { command: "edgedeck.details", title: "Details", arguments: [node] };
     item.checkboxState = mod.enabled ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
+    // As on the EDGEdeck page: yellow when something needs a look (a conflict, a file changed in the
+    // game folder), cyan while a change waits for a deploy.
     const icon = status.includes("conflict") ? "warning" : status.includes("changed") ? "edit" : "package";
-    const color = status.includes("conflict") || status.includes("changed") ? "editorWarning.foreground" : mod.enabled ? "edgedeck.accent" : "disabledForeground";
+    const warn = status.includes("conflict") || status.includes("changed in game folder");
+    const pending = /not deployed yet|deploy again|still deployed/.test(status);
+    const color = warn ? "editorWarning.foreground" : pending ? "edgedeck.pending" : mod.enabled ? "edgedeck.accent" : "disabledForeground";
     item.iconPath = new vscode.ThemeIcon(icon, new vscode.ThemeColor(color));
     return item;
   }
