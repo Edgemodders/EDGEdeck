@@ -197,6 +197,22 @@ export function addMod(lib: Library, placements: Placement[], opts: AddOptions):
 }
 
 /**
+ * Puts a copy of `from` at `dest` as a new file. Never writes into the file already there: with
+ * hardlink deploy, that file is the game folder's too, and the game would change without a deploy.
+ * A new file leaves the game's copy as it was, and deploy sees the mod changed (`sourceReplaced`).
+ */
+export function copyAsNewFile(from: string, dest: string): void {
+  const temp = `${dest}.new-${process.pid}-${Date.now().toString(36)}`;
+  fs.copyFileSync(from, temp);
+  try {
+    fs.renameSync(temp, dest);
+  } catch (e) {
+    fs.rmSync(temp, { force: true });
+    throw e;
+  }
+}
+
+/**
  * Reinstall over an existing mod: builds the whole new tree beside the mod folder, then swaps it in, so a
  * failed copy leaves the mod as it was. Id, order and settings stay; files in the folder that the mod did
  * not list are carried over. Files are copied, never written through an existing (hardlinked) file.

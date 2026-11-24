@@ -8,7 +8,7 @@ import * as path from "node:path";
 import { classify, type Classification } from "./classifier";
 import { sameBytes } from "./fileBytes";
 import { activateVersion, baseName, familyKey, familyOf, takeFamilyName } from "./families";
-import { addMod, placeAbove, saveMod, sourcePath, type Library, type ModInfo } from "./library";
+import { addMod, copyAsNewFile, placeAbove, saveMod, sourcePath, type Library, type ModInfo } from "./library";
 
 export interface AddToProjectResult {
   /** Project-relative paths written. */
@@ -132,12 +132,13 @@ export function syncProjects(lib: Library): ModInfo[] {
     }
     const c = classifyProject(mod.source.path);
     if (!c.placements.length) continue;
-    // Replace the library copy file by file; files the project no longer produces are removed.
+    // Replace the library copy file by file, each as a new file so a hardlinked game copy waits for the
+    // deploy; files the project no longer produces are removed.
     const keep = new Set<string>();
     for (const p of c.placements) {
       const dest = sourcePath(lib, mod, p.to);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.copyFileSync(p.from, dest);
+      copyAsNewFile(p.from, dest);
       keep.add(p.to);
     }
     for (const f of mod.files) if (!keep.has(f)) fs.rmSync(sourcePath(lib, mod, f), { force: true });
@@ -234,7 +235,7 @@ export function installProject(lib: Library, projectFile: string, beside?: { mod
   for (const p of c.placements) {
     const dest = sourcePath(lib, existing, p.to);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.copyFileSync(p.from, dest);
+    copyAsNewFile(p.from, dest);
     keep.add(p.to);
   }
   for (const f of existing.files) if (!keep.has(f)) fs.rmSync(sourcePath(lib, existing, f), { force: true });
