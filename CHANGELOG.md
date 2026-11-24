@@ -13,6 +13,12 @@ How to keep it:
 
 ## Unreleased
 
+## 0.34.1 (2026-11-24)
+
+<!-- nexus
+Fixed: Packing a REDcode project again changed the game folder at once; now the new files wait for Deploy
+-->
+
 **Fixed**
 
 - With hardlink deploy, packing a REDcode project again changed its file in the game folder at once, without a deploy, and the mod still said "deployed". Now the new files wait in the library: the mod says "changed, deploy again" and the next deploy puts them in the game, so Undo deploy and the deploy report cover them. The same for REDcode's Install, which deploys next.
