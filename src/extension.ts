@@ -28,7 +28,7 @@ import { ModsPage, type PageMessage, type PageRow } from "./modsPage";
 import { addSection, deleteSection, moveGroupInSection, moveInSection, moveSection, placeGroupNextTo, placeNextTo, putInSection, renameSection, sectionNameOf, sectionNameProblem, sectionsOf, setSectionOn } from "./sections";
 import { formatBytes, forgetSizes, librarySize, modSize } from "./sizes";
 import { edgemodsMods, installMods, type EdgemodsMod, type InstalledItem, type InstallItem, type InstallResult } from "./installMods";
-import { findSevenZip, removeTemp, unpackOrCopy } from "./extract";
+import { ExtensionReplacedError, findSevenZip, removeTemp, unpackOrCopy } from "./extract";
 import { findGame, gameRunning, gameVersion, isGameFolder, launchTarget, playerEnv, steamLibraries } from "./game";
 import { holdsLibrary, moveLibrary, moveTarget, sameDrive } from "./libraryMove";
 import { addMod, defaultLibraryPath, downloadsFolder, keepDownload, loadLibrary, modFolder, placeAbove, removeMod, saveLibrary, saveMod, sourcePath, type Library, type ModInfo, type ModSource } from "./library";
@@ -501,6 +501,11 @@ async function run(fn: () => Promise<void> | void): Promise<void> {
       return;
     }
     if (err instanceof DownloadCancelled) return; // The player pressed Cancel; the log has a line.
+    if (err instanceof ExtensionReplacedError) {
+      log.appendLine(`Error: ${err.message}`);
+      void vscode.window.showWarningMessage(err.message, "Reload window").then((a) => a && vscode.commands.executeCommand("workbench.action.reloadWindow"));
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     log.appendLine(`Error: ${message}`);
     void vscode.window.showErrorMessage(`EDGEdeck: ${message}`, "Show log").then((a) => a && log.show(true));
@@ -3444,6 +3449,8 @@ async function updateAllCommandWork(ids?: string[]): Promise<void> {
         updated.push(`${fam.name} ${now?.version ?? fam.update!.version}`);
       } catch (err) {
         if (err instanceof DownloadCancelled || err instanceof AlreadyUnderWay) continue; // Cancelled, or already downloading: the others go on.
+        // The rest would fail the same way; run() offers the reload. Files downloaded so far stay in downloads.
+        if (err instanceof ExtensionReplacedError) throw err;
         log.appendLine(`Update all: ${fam.name}: ${err instanceof Error ? err.message : String(err)}`);
         failed.push(fam.name);
       }

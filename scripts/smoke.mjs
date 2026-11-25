@@ -103,6 +103,21 @@ const lib = core.loadLibrary(libRoot, game);
 const zipped = zip("rooted.zip", path.join(src, "rooted"));
 const extracted = path.join(tmp, "extracted");
 await core.extractArchive(zipped, extracted, sevenZa);
+// The bundled 7za gone after the extension started (an update removed the old version's folder):
+// an installed 7-Zip does it, else the error asks for a reload.
+{
+  const gone = path.join(tmp, "old-version", "bin", "7za.exe");
+  const out = path.join(tmp, "extracted-again");
+  const installed = ["ProgramFiles", "ProgramFiles(x86)"].some((v) => process.env[v] && fs.existsSync(path.join(process.env[v], "7-Zip", "7z.exe")));
+  if (installed) {
+    await core.extractArchive(zipped, out, gone);
+    assert.ok(fs.readdirSync(out).length, "an installed 7-Zip unpacks it");
+  } else {
+    await assert.rejects(core.extractArchive(zipped, out, gone), (e) => e instanceof core.ExtensionReplacedError && /Reload the window/.test(e.message));
+  }
+  fs.rmSync(out, { recursive: true, force: true });
+  console.log(`7za gone: ok (${installed ? "installed 7-Zip used" : "asks for a reload"})`);
+}
 c = core.classify(extracted, "Rooted");
 const rooted = core.addMod(lib, c.placements, { name: "Rooted", version: "1.0", source: { type: "file", path: zipped } });
 assert.equal(rooted.files.length, 4);

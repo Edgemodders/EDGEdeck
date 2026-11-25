@@ -23,10 +23,27 @@ export function findSevenZip(extensionRoot: string): string | undefined {
   return candidates.find((c) => fs.existsSync(c));
 }
 
+/** An installed 7-Zip (7z.exe), if any. */
+function systemSevenZip(): string | undefined {
+  const pf = process.env.ProgramFiles ?? "C:\\Program Files";
+  const pf86 = process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)";
+  return [path.join(pf, "7-Zip", "7z.exe"), path.join(pf86, "7-Zip", "7z.exe")].find((p) => fs.existsSync(p));
+}
+
+/**
+ * The extension's own files went away under the running code: VS Code installed a newer EDGEdeck and
+ * removed the old version's folder while this window still runs it. A reload fixes it.
+ */
+export class ExtensionReplacedError extends Error {
+  constructor() {
+    super("EDGEdeck was updated while this window was open, and the old version's files are gone. Reload the window (Developer: Reload Window), then try again.");
+  }
+}
+
 function findRarTool(): { exe: string; args: (file: string, dest: string) => string[] } | undefined {
   const pf = process.env.ProgramFiles ?? "C:\\Program Files";
   const pf86 = process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)";
-  const sevenZip = [path.join(pf, "7-Zip", "7z.exe"), path.join(pf86, "7-Zip", "7z.exe")].find((p) => fs.existsSync(p));
+  const sevenZip = systemSevenZip();
   if (sevenZip) return { exe: sevenZip, args: (file, dest) => ["x", "-y", `-o${dest}`, file] };
   const unrar = [path.join(pf, "WinRAR", "UnRAR.exe"), path.join(pf86, "WinRAR", "UnRAR.exe")].find((p) => fs.existsSync(p));
   if (unrar) return { exe: unrar, args: (file, dest) => ["x", "-y", "-o+", file, dest + path.sep] };
@@ -70,5 +87,9 @@ export async function extractArchive(file: string, dest: string, sevenZa: string
     return;
   }
   if (!sevenZa) throw new Error("The bundled 7za.exe is missing. Rebuild the extension (npm run build) to restore it.");
-  await run(sevenZa, ["x", "-y", `-o${dest}`, file], { windowsHide: true, maxBuffer: 1 << 24 });
+  // Found when the extension started, gone now: an update removed this version's folder. An
+  // installed 7-Zip still does the job; without one, the window needs a reload.
+  const exe = fs.existsSync(sevenZa) ? sevenZa : systemSevenZip();
+  if (!exe) throw new ExtensionReplacedError();
+  await run(exe, ["x", "-y", `-o${dest}`, file], { windowsHide: true, maxBuffer: 1 << 24 });
 }
