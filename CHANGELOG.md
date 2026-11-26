@@ -13,6 +13,12 @@ How to keep it:
 
 ## Unreleased
 
+## 0.34.2 (2026-11-25)
+
+<!-- nexus
+Fixed: After a background update, unpacking failed with "7za.exe ENOENT"; now it offers Reload window
+-->
+
 **Fixed**
 
 - After VS Code updated EDGEdeck in the background, unpacking a mod (an update, an add) in a window still running the old version failed with "spawn ...7za.exe ENOENT", because VS Code had removed the old version's files. Now an installed 7-Zip is used instead when there is one; otherwise EDGEdeck says it was updated and offers Reload window, and Update all stops there instead of failing each mod.
