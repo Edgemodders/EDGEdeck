@@ -13,6 +13,12 @@ How to keep it:
 
 ## Unreleased
 
+## 0.34.3 (2026-11-26)
+
+<!-- nexus
+Fixed: The FOMOD installer's messages no longer have a double space after a mod without a version
+-->
+
 **Fixed**
 
 - The FOMOD installer's messages and log lines no longer have a double space after the name of a mod without a version.
