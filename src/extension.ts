@@ -2045,14 +2045,15 @@ async function addFomodFrom(source: string, isFile: boolean, folder: string, pre
   // A reinstall renames the mod's library folder, which Windows refuses while REDbridge holds an archive in it (#10).
   const r = await withBridgeStopped(async () => finishFomodAdd(lib, p, choices, { from }));
   const mod = r.mod;
-  log.appendLine(`${p.target ? "Reinstalled" : "Added"} ${mod.name} ${mod.version} from its installer (${mod.files.length} files, ${mod.kinds.join(", ")}) from ${source}${saved ? ", with the saved options" : ""}`);
+  const label = [mod.name, mod.version].filter(Boolean).join(" ");
+  log.appendLine(`${p.target ? "Reinstalled" : "Added"} ${label} from its installer (${mod.files.length} files, ${mod.kinds.join(", ")}) from ${source}${saved ? ", with the saved options" : ""}`);
   if (p.target) {
-    if (!preset?.quiet) void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is installed again with the options picked. Deploy to put it in the game.`);
+    if (!preset?.quiet) void vscode.window.showInformationMessage(`${label} is installed again with the options picked. Deploy to put it in the game.`);
   } else if (r.replaced) {
     log.appendLine(`  a new version of ${r.replaced.name}: takes the place of ${r.replaced.version || "the earlier one"}, which is off now`);
-    if (!preset?.quiet) void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is a new version of ${r.replaced.name} ${r.replaced.version}${saved ? ", installed with your saved options" : ""}. It takes its place${mod.enabled ? " and is on" : ""}; ${r.replaced.version || "the earlier one"} stays in the library, off. Pick it from the version list to go back.`);
+    if (!preset?.quiet) void vscode.window.showInformationMessage(`${label} is a new version of ${[r.replaced.name, r.replaced.version].filter(Boolean).join(" ")}${saved ? ", installed with your saved options" : ""}. It takes its place${mod.enabled ? " and is on" : ""}; ${r.replaced.version || "the earlier one"} stays in the library, off. Pick it from the version list to go back.`);
   } else if (r.older && !preset?.quiet) {
-    void vscode.window.showInformationMessage(`${mod.name} ${mod.version} is older than ${r.older.version}, so it was added switched off. Pick it from the version list to use it.`);
+    void vscode.window.showInformationMessage(`${label} is older than ${r.older.version}, so it was added switched off. Pick it from the version list to use it.`);
   }
   if (r.unplaced.length) {
     log.appendLine(`  not placed: ${r.unplaced.join(", ")}`);
