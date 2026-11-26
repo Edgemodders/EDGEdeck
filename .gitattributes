@@ -1,3 +1,9 @@
+# Files are LF, in the repo and on disk, so scripted edits match on every machine. Only Windows batch
+# files keep CRLF. See REDnode's CLAUDE.md, "Writing files on this PC (Windows, Git Bash, PowerShell 5.1)".
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 # Every change adds a line under Unreleased, so two branches always touch the same spot. Union keeps
 # both sides when git merges them; check the result for group headings run together.
 CHANGELOG.md merge=union
