@@ -13,6 +13,15 @@ How to keep it:
 
 ## Unreleased
 
+## 0.34.4 (2026-11-27)
+
+<!-- nexus
+Fixed: Files under r6\storages (settings and presets, as in HUD Painter) and other r6 folders are placed again
+Fixed: A mod added before this fix lacks those files: remove it and add it again (the download is kept)
+Fixed: A game folder whose version cannot be read shows "version unknown", not "game not found"
+Fixed: A clearer log line when a mod's .archive cannot be read for conflicts
+-->
+
 **Fixed**
 
 - Files under `r6\storages`, where some mods keep their settings and presets (for example HUD Painter, https://www.nexusmods.com/cyberpunk2077/mods/14935), are placed again instead of left out with "not placed". So is any other file a mod ships in a folder under `r6`, except the game's own `r6\cache` and `r6\logs`. A mod added before this fix lacks those files: remove it and add it again (its download is kept, so Nexus does not download it twice).
