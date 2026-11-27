@@ -53,6 +53,8 @@ function knownPath(segments: string[]): { to: string; kind: ModKind } | undefine
         if (next === "audioware") return { to: rest, kind: "audioware" };
         if (next === "input") return { to: rest, kind: "input" };
         if (next === "config") return { to: rest, kind: "config" };
+        // Codeware's per-mod storage (r6/storages/<mod>/): settings and presets a mod ships as JSON.
+        if (next === "storages") return { to: rest, kind: "config" };
         break;
       case "red4ext":
         // A REDnode package lives in REDnode's apps folder; REDnode itself is a framework.
@@ -76,6 +78,20 @@ function knownPath(segments: string[]): { to: string; kind: ModKind } | undefine
         if (next === "tools") return { to: rest, kind: "framework" };
         break;
     }
+  }
+  return undefined;
+}
+
+/**
+ * Any other file in a folder under r6 (r6/<folder>/.../<file>) goes where its path says: the mod's
+ * author laid it out as the game folder. Not the game's own r6/cache and r6/logs. Checked after the
+ * CET, REDmod and REDnode folder rules, so a folder named r6 inside one of those stays with it.
+ */
+function r6Path(segments: string[]): string | undefined {
+  for (let i = 0; i < segments.length - 2; i++) {
+    if (lower(segments[i]) !== "r6") continue;
+    const next = lower(segments[i + 1]);
+    return next === "cache" || next === "logs" ? undefined : segments.slice(i).join("/");
   }
   return undefined;
 }
@@ -199,6 +215,12 @@ export function classify(root: string, modName: string): Classification {
     const rednode = under(f, rednodeDirs);
     if (rednode) {
       placements.push({ from: f, to: `red4ext/plugins/REDnode/apps/${rednode[0]}/${rednode[1]}`, kind: "rednode" });
+      placed.add(f);
+      continue;
+    }
+    const r6 = r6Path(segments);
+    if (r6 && !IgnoredExtensions.has(ext)) {
+      placements.push({ from: f, to: r6, kind: "other" });
       placed.add(f);
       continue;
     }

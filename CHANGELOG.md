@@ -15,6 +15,7 @@ How to keep it:
 
 **Fixed**
 
+- Files under `r6\storages`, where some mods keep their settings and presets (for example HUD Painter, https://www.nexusmods.com/cyberpunk2077/mods/14935), are placed again instead of left out with "not placed". So is any other file a mod ships in a folder under `r6`, except the game's own `r6\cache` and `r6\logs`. A mod added before this fix lacks those files: remove it and add it again (its download is kept, so Nexus does not download it twice).
 - The EDGEdeck page and the status bar no longer say "game not found" for a game folder whose version EDGEdeck cannot read; they say "Cyberpunk 2077, version unknown".
 - When EDGEdeck cannot look inside a mod's `.archive` for conflicts, the log says so in plain words and says what may be wrong, instead of only REDbridge's "Access to the path is denied".
 

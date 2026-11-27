@@ -61,6 +61,16 @@ write(path.join(src, "rednode-rooted", "red4ext", "plugins", "REDnode", "apps", 
 write(path.join(src, "rednode-rooted", "red4ext", "plugins", "REDnode", "apps", "coords", "index.html"));
 write(path.join(src, "rednode-itself", "red4ext", "plugins", "REDnode", "REDnode.dll"));
 write(path.join(src, "rednode-itself", "red4ext", "plugins", "REDnode", "host", "REDnode-overlay.exe"));
+// HUD Painter's layout (Nexus 14935): Codeware storage JSON beside the usual folders; plus an r6 folder
+// EDGEdeck has no rule for, the game's own r6/cache, and a CET mod with a folder named r6 inside.
+write(path.join(src, "storages", "r6", "scripts", "HUDPainter", "HUDPainter.reds"));
+write(path.join(src, "storages", "r6", "storages", "HUDPainter", "DEFAULT.json"), "{}");
+write(path.join(src, "storages", "r6", "storages", "RedscriptConfigFramework", "RedFunctions.card.json"), "{}");
+write(path.join(src, "storages", "r6", "somethingnew", "Thing", "data.json"), "{}");
+write(path.join(src, "storages", "r6", "somethingnew", "Thing", "readme.txt"));
+write(path.join(src, "storages", "r6", "cache", "modded", "x.redscripts"));
+write(path.join(src, "cet-r6", "CetR6", "init.lua"));
+write(path.join(src, "cet-r6", "CetR6", "r6", "data", "x.json"), "{}");
 
 const cls = (folder, name) => core.classify(path.join(src, folder), name);
 let c = cls("bare", "Bare");
@@ -96,6 +106,18 @@ c = cls("redmod", "MyRedmod");
 assert.deepEqual(c.placements.map((p) => p.to).sort(), ["mods/MyRedmod/archives/x.archive", "mods/MyRedmod/info.json"]);
 c = cls("framework", "RED4ext");
 assert.deepEqual(c.kinds, ["framework"]);
+c = cls("storages", "HUD Painter");
+assert.deepEqual(c.placements.map((p) => p.to).sort(), [
+  "r6/scripts/HUDPainter/HUDPainter.reds",
+  "r6/somethingnew/Thing/data.json",
+  "r6/storages/HUDPainter/DEFAULT.json",
+  "r6/storages/RedscriptConfigFramework/RedFunctions.card.json",
+], "files under r6 go where their path says, Codeware's storages included");
+assert.equal(c.placements.find((p) => p.to.endsWith("DEFAULT.json")).kind, "config");
+assert.deepEqual(c.unplaced.map((u) => u.split(path.sep).join("/")), ["r6/cache/modded/x.redscripts"], "never into the game's r6/cache");
+assert.deepEqual(c.ignored.map((u) => u.split(path.sep).join("/")), ["r6/somethingnew/Thing/readme.txt"]);
+c = cls("cet-r6", "CetR6");
+assert.deepEqual(c.placements.map((p) => p.to).sort(), ["bin/x64/plugins/cyber_engine_tweaks/mods/CetR6/init.lua", "bin/x64/plugins/cyber_engine_tweaks/mods/CetR6/r6/data/x.json"], "a folder named r6 inside a CET mod stays with it");
 console.log("classifier: ok");
 
 // Extract a zip and add from it.
