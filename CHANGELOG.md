@@ -13,6 +13,11 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- The EDGEdeck page and the status bar no longer say "game not found" for a game folder whose version EDGEdeck cannot read; they say "Cyberpunk 2077, version unknown".
+- When EDGEdeck cannot look inside a mod's `.archive` for conflicts, the log says so in plain words and says what may be wrong, instead of only REDbridge's "Access to the path is denied".
+
 ## 0.34.3 (2026-11-26)
 
 <!-- nexus

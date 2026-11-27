@@ -933,6 +933,12 @@ async function archiveResources(file: string): Promise<Map<string, string>> {
   return resources;
 }
 
+/** The game as the page and the status bar name it. A game folder whose exe gives no version is still found. */
+function gameLabel(): string {
+  if (state.version) return `Cyberpunk 2077 ${state.version}`;
+  return isGameFolder(settings().gamePath) ? "Cyberpunk 2077, version unknown" : "game not found";
+}
+
 /** Paths a deploy would add, replace or remove: a replaced path counts once. */
 function pendingCount(): number {
   const p = state.plan;
@@ -964,7 +970,7 @@ function updateStatus(): void {
   const p = state.plan;
   const pending = p ? p.add.length + p.stale.length : 0;
   const on = library.mods.filter((m) => m.enabled).length;
-  const game = state.version ? `Cyberpunk 2077 ${state.version}` : "game not found";
+  const game = gameLabel();
   status.command = "edgedeck.deploy";
   if (!isGameFolder(settings().gamePath)) {
     status.text = `$(package) EDGEdeck: game not found`;
@@ -1016,7 +1022,9 @@ async function scanArchives(explicit: boolean): Promise<void> {
     try {
       listings.push({ mod: mod.id, archive, resources: await archiveResources(file) });
     } catch (err) {
-      log.appendLine(`Could not read ${file}: ${err instanceof Error ? err.message : String(err)}`);
+      // REDbridge's own words can mislead (a file that is not a game archive comes back as "Access to the path is denied").
+      const said = err instanceof Error ? err.message : String(err);
+      log.appendLine(`Could not look inside ${file}, so its conflicts are not shown. It may not be a game archive, or another program has it open. REDbridge said: ${said}`);
     }
   }
   state.archive = findArchiveConflicts(listings);
@@ -1145,7 +1153,7 @@ async function pageData() {
     viewing: pageLoadout,
     collapsed: globalState.get<string[]>(FoldedKey, []),
     columns: cleanChoices(globalState.get(PageColumnsKey)),
-    game: state.version ? `Cyberpunk 2077 ${state.version}` : "game not found",
+    game: gameLabel(),
     library: library?.root ?? s.libraryPath,
     method: state.plan?.method ?? ("link" as const),
     lastDeploy: when ? when.toLocaleString() : undefined,
